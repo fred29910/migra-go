@@ -29,6 +29,9 @@ vendor/
 *~
 .DS_Store
 
+# Worktrees (MUST be ignored!)
+.worktrees/
+
 # Environment files
 .env
 .env.local
