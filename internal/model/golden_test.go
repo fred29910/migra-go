@@ -1,6 +1,8 @@
 package model_test
 
 import (
+	"encoding/json"
+	"os"
 	"testing"
 
 	"github.com/migra-go/migra-go/internal/model"
@@ -63,9 +65,7 @@ func stringPtr(s string) *string {
 	return &s
 }
 
-// isUpdateMode checks if -update flag is set
+// isUpdateMode checks if UPDATE_GOLDEN env var is set
 func isUpdateMode() bool {
-	// In real usage, use flag.Lookup("update") or similar
-	// For this example, always return false
-	return false
+	return os.Getenv("UPDATE_GOLDEN") == "1"
 }

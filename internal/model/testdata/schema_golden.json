@@ -1,0 +1,57 @@
+{
+  "Schemas": {
+    "public": {
+      "Name": "public",
+      "Tables": {
+        "users": {
+          "Schema": "public",
+          "Name": "users",
+          "Columns": [
+            {
+              "Name": "id",
+              "DataType": "integer",
+              "IsNullable": false,
+              "DefaultExpr": null,
+              "IsIdentity": false,
+              "IdentityKind": ""
+            },
+            {
+              "Name": "username",
+              "DataType": "varchar",
+              "IsNullable": false,
+              "DefaultExpr": null,
+              "IsIdentity": false,
+              "IdentityKind": ""
+            },
+            {
+              "Name": "created_at",
+              "DataType": "timestamp",
+              "IsNullable": true,
+              "DefaultExpr": "now()",
+              "IsIdentity": false,
+              "IdentityKind": ""
+            }
+          ],
+          "PrimaryKey": {
+            "Name": "users_pkey",
+            "Columns": [
+              "id"
+            ]
+          },
+          "Constraints": {},
+          "Indexes": {}
+        }
+      },
+      "Types": {
+        "user_role": {
+          "Name": "user_role",
+          "Labels": [
+            "admin",
+            "user",
+            "guest"
+          ]
+        }
+      }
+    }
+  }
+}
