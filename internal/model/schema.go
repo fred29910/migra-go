@@ -1,11 +1,15 @@
 package model
 
-// Schema represents a database schema with all its objects
+// Schema represents the complete database schema with namespaces
 type Schema struct {
+	Schemas map[string]*Namespace
+}
+
+// Namespace represents a schema namespace (e.g., public, app)
+type Namespace struct {
+	Name   string
 	Tables map[string]*Table
 	Types  map[string]*EnumType
-	Views  map[string]*View
-	Funcs  map[string]*Function
 }
 
 // EnumType represents a PostgreSQL enum type
@@ -14,24 +18,28 @@ type EnumType struct {
 	Labels []string
 }
 
-// View represents a database view
-type View struct {
-	Name string
-	Definition string
-}
-
-// Function represents a database function
-type Function struct {
-	Name       string
-	Definition string
-}
-
 // NewSchema creates a new empty schema
 func NewSchema() *Schema {
 	return &Schema{
+		Schemas: make(map[string]*Namespace),
+	}
+}
+
+// GetOrCreateNamespace gets or creates a namespace by name
+func (s *Schema) GetOrCreateNamespace(name string) *Namespace {
+	if ns, ok := s.Schemas[name]; ok {
+		return ns
+	}
+	ns := &Namespace{
+		Name:   name,
 		Tables: make(map[string]*Table),
 		Types:  make(map[string]*EnumType),
-		Views:  make(map[string]*View),
-		Funcs:  make(map[string]*Function),
 	}
+	s.Schemas[name] = ns
+	return ns
+}
+
+// GetNamespace gets a namespace by name, returns nil if not found
+func (s *Schema) GetNamespace(name string) *Namespace {
+	return s.Schemas[name]
 }

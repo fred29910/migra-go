@@ -2,19 +2,12 @@ package model
 
 // Table represents a database table
 type Table struct {
+	Schema      string
 	Name        string
-	Columns     map[string]*Column
+	Columns     []*Column         // Preserve order for column ordering strategies
 	PrimaryKey  *PrimaryKey
-	Indexes     map[string]*Index
 	Constraints map[string]*Constraint
-}
-
-// Column represents a table column
-type Column struct {
-	Name     string
-	DataType string
-	Nullable bool
-	Default  *string
+	Indexes     map[string]*Index
 }
 
 // PrimaryKey represents a primary key constraint
@@ -32,7 +25,7 @@ type Index struct {
 	Method  string
 }
 
-// Constraint represents a table constraint (foreign key, check, unique, etc.)
+// Constraint represents a table constraint (check, unique, etc.)
 type Constraint struct {
 	Name       string
 	Type       string
@@ -41,11 +34,27 @@ type Constraint struct {
 }
 
 // NewTable creates a new table with initialized maps
-func NewTable(name string) *Table {
+func NewTable(schema, name string) *Table {
 	return &Table{
+		Schema:      schema,
 		Name:        name,
-		Columns:     make(map[string]*Column),
-		Indexes:     make(map[string]*Index),
+		Columns:     make([]*Column, 0),
 		Constraints: make(map[string]*Constraint),
+		Indexes:     make(map[string]*Index),
 	}
+}
+
+// GetColumn finds a column by name
+func (t *Table) GetColumn(name string) *Column {
+	for _, col := range t.Columns {
+		if col.Name == name {
+			return col
+		}
+	}
+	return nil
+}
+
+// AddColumn adds a column to the table
+func (t *Table) AddColumn(col *Column) {
+	t.Columns = append(t.Columns, col)
 }
