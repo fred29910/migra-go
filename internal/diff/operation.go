@@ -6,16 +6,16 @@ import "github.com/migra-go/migra-go/internal/model"
 type Kind string
 
 const (
-	KindAddTable      Kind = "add_table"
-	KindDropTable     Kind = "drop_table"
-	KindAddColumn     Kind = "add_column"
-	KindDropColumn    Kind = "drop_column"
+	KindAddTable       Kind = "add_table"
+	KindDropTable      Kind = "drop_table"
+	KindAddColumn      Kind = "add_column"
+	KindDropColumn     Kind = "drop_column"
 	KindAlterColumnType Kind = "alter_column_type"
-	KindSetNotNull    Kind = "set_not_null"
-	KindDropNotNull   Kind = "drop_not_null"
-	KindAddIndex      Kind = "add_index"
-	KindDropIndex     Kind = "drop_index"
-	KindAddConstraint Kind = "add_constraint"
+	KindSetNotNull     Kind = "set_not_null"
+	KindDropNotNull    Kind = "drop_not_null"
+	KindAddIndex       Kind = "add_index"
+	KindDropIndex      Kind = "drop_index"
+	KindAddConstraint  Kind = "add_constraint"
 	KindDropConstraint Kind = "drop_constraint"
 	KindAddEnumType    Kind = "add_enum_type"
 	KindDropEnumType   Kind = "drop_enum_type"
@@ -133,7 +133,7 @@ func NewAlterColumnTypeOp(schema, table, column, fromType, toType string) *Alter
 }
 
 func (op *AlterColumnTypeOp) IsDestructive() bool {
-	return true // Type changes can be destructive
+	return true
 }
 
 // SetNotNullOp represents setting a column to NOT NULL

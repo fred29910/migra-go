@@ -75,12 +75,10 @@ func (p *Planner) assignStage(op diff.Operation) Stage {
 	return StageDeploy
 }
 
-// TopoSort performs topological sort on operations within a stage
-// TODO: Implement proper dependency graph
-func TopoSort(ops []diff.Operation) []diff.Operation {
-	// Build dependency graph
-	// For now, return as-is (simplified)
-	return ops
+// TopoSort performs topological sort on operations using DAG
+func TopoSort(ops []diff.Operation) ([]diff.Operation, error) {
+	dag := BuildDAG(ops)
+	return dag.GetExecutionOrder()
 }
 
 // GetObjectKey extracts object key from operation for dependency tracking

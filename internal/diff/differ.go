@@ -36,7 +36,7 @@ func (d *Differ) diffSchemas(source, target *model.Schema) {
 		if sourceNs, exists := source.Schemas[name]; exists {
 			d.diffNamespace(sourceNs, targetNs)
 		} else {
-			// Entire namespace needs to be created (MVP: skip, assume public)
+			// Entire namespace needs to be created
 			d.diffNamespace(nil, targetNs)
 		}
 	}

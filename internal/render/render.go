@@ -1,6 +1,7 @@
 package render
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -197,9 +198,9 @@ func ifExistsPrefix(use bool) string {
 func RenderJSON(ops []diff.Operation) (string, error) {
 	// Convert operations to a JSON-friendly format
 	type OpInfo struct {
-		Kind    string             `json:"kind"`
-		Object  model.ObjectKey   `json:"object"`
-		Destructive bool          `json:"destructive"`
+		Kind       string           `json:"kind"`
+		Object     model.ObjectKey  `json:"object"`
+		Destructive bool            `json:"destructive"`
 	}
 	
 	infos := make([]OpInfo, len(ops))
@@ -211,7 +212,10 @@ func RenderJSON(ops []diff.Operation) (string, error) {
 		}
 	}
 	
-	// TODO: implement JSON marshaling
-	_ = infos
-	return "", fmt.Errorf("JSON rendering not yet implemented")
+	data, err := json.MarshalIndent(infos, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	
+	return string(data), nil
 }
