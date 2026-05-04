@@ -25,11 +25,16 @@ func NewParser() *Parser {
 
 // ParseSQL parses SQL string and returns the schema
 func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
+	// Reset parser state for each ParseSQL call.
+	p.schema = model.NewSchema()
+	p.errors = p.errors[:0]
+
 	// Normalize SQL: remove comments and extra whitespace
 	sql = p.removeComments(sql)
-	
+
 	// Split into statements (by semicolon)
 	scanner := bufio.NewScanner(strings.NewReader(sql))
+	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
 	scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
 		// Simple semicolon splitting for MVP
 		if atEOF && len(data) == 0 {
@@ -56,6 +61,10 @@ func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		p.errors = append(p.errors, fmt.Errorf("scan SQL statements: %w", err))
+	}
+
 	if len(p.errors) > 0 {
 		return p.schema, fmt.Errorf("parsing completed with %d errors", len(p.errors))
 	}
@@ -65,36 +74,36 @@ func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
 // removeComments removes SQL comments (-- and /* */)
 func (p *Parser) removeComments(sql string) string {
 	// Remove single-line comments
-	re := regexp.MustCompile(`--[^\n]*`)
+	re := regexp.MustCompile(`(?m)--[^\n]*`)
 	sql = re.ReplaceAllString(sql, "")
-	
+
 	// Remove multi-line comments
-	re = regexp.MustCompile(`/\*.*?\*/`)
+	re = regexp.MustCompile(`(?s)/\*.*?\*/`)
 	sql = re.ReplaceAllString(sql, "")
-	
+
 	return strings.TrimSpace(sql)
 }
 
 // handleStatement dispatches statement handling
 func (p *Parser) handleStatement(stmt string) error {
 	upper := strings.ToUpper(strings.TrimSpace(stmt))
-	
+
 	if strings.HasPrefix(upper, "CREATE TABLE") {
 		return p.handleCreateTable(stmt)
 	}
-	
+
 	if strings.HasPrefix(upper, "ALTER TABLE") {
 		return p.handleAlterTable(stmt)
 	}
-	
+
 	if strings.HasPrefix(upper, "CREATE INDEX") || strings.HasPrefix(upper, "CREATE UNIQUE INDEX") {
 		return p.handleCreateIndex(stmt)
 	}
-	
+
 	if strings.HasPrefix(upper, "CREATE TYPE") && strings.Contains(upper, "AS ENUM") {
 		return p.handleCreateEnum(stmt)
 	}
-	
+
 	return fmt.Errorf("unsupported statement: %s", stmt[:min(len(stmt), 50)])
 }
 
@@ -106,19 +115,19 @@ func (p *Parser) handleCreateTable(stmt string) error {
 	if matches == nil {
 		return fmt.Errorf("failed to parse CREATE TABLE statement")
 	}
-	
+
 	schemaName := matches[1]
 	tableName := matches[2]
 	if schemaName == "" {
 		schemaName = "public"
 	}
-	
+
 	// Get or create namespace
 	ns := p.schema.GetOrCreateNamespace(schemaName)
-	
+
 	// Create table
 	table := model.NewTable(schemaName, tableName)
-	
+
 	// Extract column definitions (simplified)
 	// Find content between first ( and last )
 	start := strings.Index(stmt, "(")
@@ -127,24 +136,24 @@ func (p *Parser) handleCreateTable(stmt string) error {
 		ns.Tables[tableName] = table
 		return nil
 	}
-	
+
 	body := stmt[start+1 : end]
 	// Split by comma, but not inside parentheses
 	parts := p.splitByComma(body)
-	
+
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue
 		}
-		
+
 		// Try to parse as column definition
 		col := p.parseColumnDef(part)
 		if col != nil {
 			table.AddColumn(col)
 		}
 	}
-	
+
 	ns.Tables[tableName] = table
 	return nil
 }
@@ -157,25 +166,25 @@ func (p *Parser) parseColumnDef(def string) *model.Column {
 	if matches == nil {
 		return nil
 	}
-	
+
 	col := &model.Column{
 		Name:       matches[1],
 		DataType:   strings.ToLower(strings.TrimSpace(matches[2])),
 		IsNullable: true,
 	}
-	
+
 	// Check for NOT NULL
 	rest := strings.ToUpper(matches[3])
 	if strings.Contains(rest, "NOT NULL") {
 		col.IsNullable = false
 	}
-	
+
 	// Check for DEFAULT
 	if strings.Contains(rest, "DEFAULT") {
 		// Simplified: just mark that there is a default
 		// TODO: extract actual default value
 	}
-	
+
 	return col
 }
 
@@ -187,30 +196,30 @@ func (p *Parser) handleAlterTable(stmt string) error {
 	if matches == nil {
 		return fmt.Errorf("failed to parse ALTER TABLE statement (MVP only supports ADD COLUMN)")
 	}
-	
+
 	tableName := matches[1]
 	colName := matches[2]
 	colType := strings.ToLower(strings.TrimSpace(matches[3]))
-	
+
 	// Get namespace
 	ns, exists := p.schema.Schemas["public"]
 	if !exists {
 		return fmt.Errorf("schema 'public' not found")
 	}
-	
+
 	// Get table
 	table, exists := ns.Tables[tableName]
 	if !exists {
 		return fmt.Errorf("table '%s' not found", tableName)
 	}
-	
+
 	// Add column
 	col := &model.Column{
 		Name:       colName,
 		DataType:   colType,
 		IsNullable: true,
 	}
-	
+
 	table.AddColumn(col)
 	return nil
 }
@@ -223,23 +232,23 @@ func (p *Parser) handleCreateIndex(stmt string) error {
 	if matches == nil {
 		return fmt.Errorf("failed to parse CREATE INDEX statement")
 	}
-	
+
 	indexName := matches[2]
 	tableName := matches[3]
 	columnsStr := matches[4]
-	
+
 	// Get namespace (schema)
 	ns, exists := p.schema.Schemas["public"]
 	if !exists {
 		return fmt.Errorf("schema 'public' not found")
 	}
-	
+
 	// Get table
 	table, exists := ns.Tables[tableName]
 	if !exists {
 		return fmt.Errorf("table '%s' not found", tableName)
 	}
-	
+
 	// Parse columns
 	columns := make([]string, 0)
 	colParts := strings.Split(columnsStr, ",")
@@ -248,7 +257,7 @@ func (p *Parser) handleCreateIndex(stmt string) error {
 		col = strings.Trim(col, "\"")
 		columns = append(columns, col)
 	}
-	
+
 	// Create index
 	unique := matches[1] != ""
 	index := &model.Index{
@@ -258,7 +267,7 @@ func (p *Parser) handleCreateIndex(stmt string) error {
 		Unique:  unique,
 		Method:  "btree",
 	}
-	
+
 	table.Indexes[indexName] = index
 	return nil
 }
@@ -271,13 +280,13 @@ func (p *Parser) handleCreateEnum(stmt string) error {
 	if matches == nil {
 		return fmt.Errorf("failed to parse CREATE TYPE AS ENUM statement")
 	}
-	
+
 	typeName := matches[1]
 	labelsStr := matches[2]
-	
+
 	// Get namespace
 	ns := p.schema.GetOrCreateNamespace("public")
-	
+
 	// Parse labels
 	labels := make([]string, 0)
 	labelParts := strings.Split(labelsStr, ",")
@@ -288,13 +297,13 @@ func (p *Parser) handleCreateEnum(stmt string) error {
 			labels = append(labels, label)
 		}
 	}
-	
+
 	// Create enum type
 	ns.Types[typeName] = &model.EnumType{
 		Name:   typeName,
 		Labels: labels,
 	}
-	
+
 	return nil
 }
 
@@ -303,7 +312,7 @@ func (p *Parser) splitByComma(s string) []string {
 	result := make([]string, 0)
 	depth := 0
 	current := ""
-	
+
 	for _, ch := range s {
 		switch ch {
 		case '(':
@@ -323,11 +332,11 @@ func (p *Parser) splitByComma(s string) []string {
 			current += string(ch)
 		}
 	}
-	
+
 	if current != "" {
 		result = append(result, strings.TrimSpace(current))
 	}
-	
+
 	return result
 }
 

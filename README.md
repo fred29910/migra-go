@@ -26,13 +26,13 @@ go build -o schemadiff ./cmd/schemadiff
 
 ```bash
 # 比较 SQL 文件和数据库
-schemadiff file.sql postgres://user:pass@localhost/dbname
+schemadiff diff file.sql postgres://user:pass@localhost/dbname
 
 # 比较两个数据库
-schemadiff postgres://localhost/db1 postgres://localhost/db2
+schemadiff diff postgres://localhost/db1 postgres://localhost/db2
 
 # 比较两个 SQL 文件
-schemadiff file_a.sql file_b.sql
+schemadiff diff file_a.sql file_b.sql
 ```
 
 ### 命令行参数
@@ -49,17 +49,17 @@ schemadiff file_a.sql file_b.sql
 
 1. **从 SQL 文件迁移到数据库**：
    ```bash
-   schemadiff schema.sql postgres://localhost/myapp
+   schemadiff diff schema.sql postgres://localhost/myapp
    ```
 
 2. **仅输出高风险操作警告**：
    ```bash
-   schemadiff --unsafe-drop=false file.sql postgres://localhost/myapp
+   schemadiff diff --unsafe-drop=false file.sql postgres://localhost/myapp
    ```
 
 3. **输出 JSON 格式**：
    ```bash
-   schemadiff -f json file.sql postgres://localhost/myapp
+   schemadiff diff -f json file.sql postgres://localhost/myapp
    ```
 
 ## 项目结构

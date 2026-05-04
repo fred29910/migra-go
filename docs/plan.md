@@ -1,323 +1,326 @@
-# 🧩 总体目标：用 Go 重写“SQL 文件 ↔ PostgreSQL 实际 Schema”双向 Diff 工具
+# MIGRA-Go 实施方案（Merged）
 
-你要实现的是 **Go 版 MIGRA**，但语义、结构、可扩展性都要比 Python 版更现代、可维护。
+## 1. 目标与范围
 
-核心能力：
+### 1.1 总体目标
+构建一个可维护、可测试、可扩展的 Go 工具，实现以下核心链路：
 
-1. **解析 SQL 文件 → 构建虚拟 schema**
-2. **从 PostgreSQL 实例读取实际 schema**
-3. **进行结构化 diff（表、列、约束、索引、类型、视图、函数等）**
-4. **输出可执行的 SQL migration**
+1. `SQL 文件 -> SchemaModel`
+2. `PostgreSQL 实例 -> SchemaModel`
+3. `SchemaModel A vs B -> 结构化 DiffOp`
+4. `DiffOp -> 可执行迁移 SQL`
 
----
+### 1.2 MVP 范围（必须先做）
 
-# 🧱 整体架构设计（Golang）
+MVP 仅覆盖：
 
+1. schema/table/column
+2. primary key
+3. enum type
+4. normal index（含唯一索引）
+5. 非外键类常见约束（not null/check/default）
+
+不在 MVP 内（延后）：
+
+1. view/function/trigger/rule
+2. rollback 自动生成
+3. 跨数据库方言支持
+4. 图形化输出（DOT/LSP）
+
+这样能优先保证“结果正确 + 可上线试用”。
+
+## 2. 架构与目录
+
+```text
+/cmd/schemadiff
+/internal/model
+/internal/parser
+/internal/introspect
+/internal/normalize
+/internal/diff
+/internal/plan
+/internal/render
+/internal/testutil
 ```
-/internal
-    /parser        # SQL → AST → SchemaModel
-    /introspect    # DB Metadata (pg_catalog → SchemaModel)
-    /model         # 中间结构化 SchemaModel
-    /diff          # ModelDiff
-    /render        # Diff → SQL migration
-/cmd
-    schemadiff     # CLI 入口
+
+模块职责：
+
+1. `model`: 中间结构、对象 ID、序列化
+2. `parser`: SQL AST -> model（优先 DDL 子集）
+3. `introspect`: pg_catalog/information_schema -> model
+4. `normalize`: 语义归一化，减少“假 diff”
+5. `diff`: 生成强类型 DiffOp
+6. `plan`: 依赖图、拓扑排序、分阶段执行策略
+7. `render`: DiffOp -> SQL
+
+## 3. 数据模型设计（关键）
+
+### 3.1 对象标识
+
+禁止仅用 `map[string]*Obj`；统一用可唯一标识对象的 Key：
+
+```go
+type ObjectKey struct {
+    Schema    string
+    Name      string
+    Kind      ObjectKind
+    Signature string // function 用参数签名；其他对象可为空
+}
 ```
 
----
+函数重载、跨 schema 同名对象由 `Signature + Schema` 消歧。
 
-# 🗂️ 一、SchemaModel（核心中间层）
-
-所有 diff 逻辑都基于 **中间结构模型**：
+### 3.2 SchemaModel（MVP）
 
 ```go
 type Schema struct {
+    Schemas map[string]*Namespace
+}
+
+type Namespace struct {
+    Name   string
     Tables map[string]*Table
     Types  map[string]*EnumType
-    Views  map[string]*View
-    Funcs  map[string]*Function
 }
 
 type Table struct {
-    Name       string
-    Columns    map[string]*Column
-    PrimaryKey *PrimaryKey
-    Indexes    map[string]*Index
+    Schema      string
+    Name        string
+    Columns     []*Column          // 保留顺序，支持列顺序相关策略
+    PrimaryKey  *PrimaryKey
     Constraints map[string]*Constraint
+    Indexes     map[string]*Index
 }
 
 type Column struct {
-    Name       string
-    DataType   string
-    Nullable   bool
-    Default    *string
+    Name         string
+    DataType     string
+    IsNullable   bool
+    DefaultExpr  *string
+    IsIdentity   bool
+    IdentityKind string // ALWAYS/BY DEFAULT
 }
 ```
 
-原则：
+设计原则：
 
-* Model 必须 100% 稳定、可序列化（用于测试）
-* 不依赖 postgres 本身 → 可对比“任何来源”构建的 schema
+1. `json` 可稳定序列化（用于 golden）
+2. 字段表达“语义”而非“展示文本”
+3. 可来自 parser/introspect 两种输入
 
----
+## 4. 归一化策略（normalize）
 
-# 📘 二、SQL 文件解析（替代 schemainspector 的 SQL parser）
+先归一化，再 diff。否则误报会非常多。
 
-## 推荐方案：pg_query（C binding）+ sqlparser AST → SchemaModel
+必须实现：
 
-你已经试过 Python 的 `pg_query` —— Go 版本也有 binding，可直接用。
+1. 类型同义归一：`int4 -> integer`，`bool -> boolean`
+2. 默认值表达式归一：去除无关括号、schema 前缀噪声
+3. 标识符归一：quoted/unquoted 一致化
+4. 约束定义归一：空白、大小写、冗余 cast
 
-Go 库：
-
-* [https://github.com/lfittl/pg_query_go](https://github.com/lfittl/pg_query_go)
-
-解析思路：
-
-```
-SQL 文件 (create table...) 
-→ 使用 pg_query 生成 AST 
-→ 遍历 AST → 构建 SchemaModel
-```
-
-你需要实现：
-
-* CreateTableStmt
-* AlterTableStmt
-* CreateIndexStmt
-* CreateTypeStmt (ENUM)
-* CreateFunctionStmt
-* CreateViewStmt
-
-用 visitor pattern 实现：
+建议接口：
 
 ```go
-type Parser struct {}
-
-func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
-    tree, _ := pg_query.Parse(sql)
-    for _, stmt := range tree.Statements {
-        switch stmt.(type) {
-        case *pg.CreateTable:
-            p.handleCreateTable(...)
-        }
-    }
-}
+func CanonicalizeSchema(s *model.Schema) (*model.Schema, error)
 ```
 
-最终目的：**SQL 文件完全还原 SchemaModel**
+## 5. Parser 方案
 
----
+### 5.1 解析路线
 
-# 🏛️ 三、Postgres 实例 introspection（替代 schemainspector）
+优先采用 `pg_query_go`：
 
-使用 pg_catalog & information_schema 构建 SchemaModel：
+1. SQL -> PostgreSQL AST
+2. Visitor 提取 DDL 语义
+3. 写入 SchemaModel
 
-推荐 SQL：
+MVP 支持节点：
 
-### 表和列
+1. `CreateStmt`（CREATE TABLE）
+2. `AlterTableStmt`（列新增/变更、约束）
+3. `IndexStmt`（CREATE INDEX）
+4. `CreateEnumStmt`（CREATE TYPE ... AS ENUM）
 
-```sql
-SELECT table_name, column_name, data_type, is_nullable, column_default
-FROM information_schema.columns
-WHERE table_schema = 'public'
-ORDER BY ordinal_position;
-```
+后续扩展节点：
 
-### PK、约束
+1. `CreateFunctionStmt`
+2. `CreateViewStmt`
 
-```sql
-SELECT
-    pgc.conname,
-    pgc.contype,
-    pg_get_constraintdef(pgc.oid) AS definition,
-    tbl.relname as table_name
-FROM pg_constraint pgc
-JOIN pg_class tbl ON tbl.oid = pgc.conrelid
-WHERE tbl.relnamespace = 'public'::regnamespace;
-```
+### 5.2 工程注意事项
 
-### 枚举类型
+1. 明确 `cgo` 依赖，CI 中验证 Linux/macOS 构建
+2. parser 错误需携带 statement 位置，便于定位
+3. 对暂不支持语句返回“可读错误”，不要 silent skip
 
-```sql
-SELECT t.typname, e.enumlabel
-FROM pg_type t
-JOIN pg_enum e ON t.oid = e.enumtypid;
-```
+## 6. Introspection 方案
 
-### 索引
+### 6.1 数据来源
 
-```sql
-SELECT indexname, indexdef, tablename
-FROM pg_indexes WHERE schemaname='public';
-```
+组合使用：
 
-你要写：
+1. `pg_catalog`（完整性高）
+2. `information_schema`（可读性好）
+
+避免只限定 `public`，支持 `--schema` 参数（可多值）。
+
+### 6.2 关键覆盖项（MVP）
+
+1. 表/列/ordinal/default/nullable
+2. PK/unique/check 约束
+3. enum labels（按 sort order）
+4. index definition（含唯一、表达式索引标记）
+
+建议接口：
 
 ```go
-func LoadFromDB(conn *pgx.Conn) (*model.Schema, error)
-```
-
----
-
-# 🔍 四、Diff 引擎（核心）
-
-类似 migra 的思想，但 **结构化 diff**：
-
-```
-SchemaModel(A) vs SchemaModel(B)
-↓
-[]DiffOp (AddTable, DropColumn, AlterColumnType…)
-↓
-SQL Renderer
-```
-
-Diff 模块：
-
-```
-/diff
-    diff_tables.go
-    diff_columns.go
-    diff_constraints.go
-    diff_indexes.go
-```
-
-一个 DiffOp：
-
-```go
-type DiffOp struct {
-    Kind    OperationKind
-    Obj     string
-    Details map[string]string
+type LoadOptions struct {
+    Schemas []string
 }
 
-type OperationKind string
-const (
-    AddTable OperationKind = "add_table"
-    DropTable
-    AddColumn
-    AlterColumn
-    DropColumn
-    AddIndex
-    DropIndex
-)
+func LoadFromDB(ctx context.Context, conn *pgx.Conn, opt LoadOptions) (*model.Schema, error)
 ```
 
----
+## 7. Diff 引擎（强类型）
 
-# 🧾 五、SQL Renderer（生成可执行 migration）
+禁止 `map[string]string` 弱类型细节。
 
-方式：
-
-* 每个 DiffOp 知道如何转成 SQL
-* 按依赖排序（先 type，再 table，再 column，再 index）
+建议：
 
 ```go
-func Render(op DiffOp) string {
-    switch op.Kind {
-    case AddTable:
-        return fmt.Sprintf("CREATE TABLE %s (...)", op.Obj)
-    case AddColumn:
-        return fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s ...", ...)
-    }
+type Operation interface {
+    Kind() Kind
+    ObjectKey() model.ObjectKey
 }
+
+type AddTableOp struct { Table model.Table }
+type DropTableOp struct { Schema, Name string }
+type AddColumnOp struct { Schema, Table string; Column model.Column }
+type AlterColumnTypeOp struct { Schema, Table, Column, From, To string }
+type SetNotNullOp struct { Schema, Table, Column string }
+type DropNotNullOp struct { Schema, Table, Column string }
+type CreateIndexOp struct { Index model.Index }
+type DropIndexOp struct { Schema, Name string }
 ```
 
-最终输出：
+Diff 原则：
+
+1. 显式区分破坏性与非破坏性操作
+2. 避免把 rename 误判为 drop+add（MVP 可先不做 rename 自动识别，但要标注风险）
+3. 同一对象只产生最小必要操作集
+
+## 8. 迁移计划与排序（plan）
+
+不是简单线性规则，而是依赖图。
+
+执行策略：
+
+1. 构建 `Operation DAG`
+2. 拓扑排序
+3. 对可能循环依赖的约束使用延迟策略（先建对象后补约束）
+
+分阶段输出建议：
+
+1. pre-deploy（新增对象）
+2. deploy（结构修改）
+3. post-deploy（高风险 drop，可人工确认）
+
+## 9. SQL 渲染（render）
+
+要求：
+
+1. 输出幂等友好 SQL（尽可能使用 `IF EXISTS/IF NOT EXISTS`，视语义而定）
+2. 标准化引用方式（schema-qualified）
+3. 注释中标识操作类型与风险等级
+
+示例输出：
 
 ```sql
--- Begin Diff
-ALTER TABLE users ADD COLUMN age int;
-CREATE INDEX idx_users_age ON users (age);
--- End Diff
+-- op: add_column risk:low
+ALTER TABLE public.users ADD COLUMN age integer;
 ```
 
----
+## 10. CLI 设计
 
-# 🧪 六、测试体系（必须做到 MIGRA 级别）
+命令形态：
 
-三种测试：
+1. `schemadiff file.sql postgres://...`
+2. `schemadiff postgres://a postgres://b`
+3. `schemadiff file_a.sql file_b.sql`
 
-## 1. Golden Test（SQL → SchemaModel）
+建议参数：
 
-```
-testdata/
-    input.sql
-    want.schema.json
-```
+1. `--schema public,app`
+2. `--format sql|json`
+3. `--unsafe-drop`（默认 false）
+4. `--strict`（遇到未支持语句即失败）
 
-## 2. DB introspection test（启动 Docker PostgreSQL）
+## 11. 测试与验收
 
-使用 ory/dockertest：
+### 11.1 测试层次
 
-```go
-db := dockertest.StartPostgres("17")
-```
+1. 单元测试：normalize/diff/render
+2. Golden 测试：`SQL -> model.json`
+3. 集成测试：Docker PG introspection
+4. Roundtrip：`A -> diff -> apply -> B`，二次 diff 必须为空
 
-## 3. Diff Roundtrip Test
+### 11.2 MVP 验收标准
 
-```
-SQL A → Model A
-SQL B → Model B
-Diff(A,B) → SQL
-执行 SQL → 得到数据库 C
-C 和 B 应一致
-```
+1. 在至少 20 组 DDL 用例下，roundtrip 通过率 100%
+2. 同义 SQL 场景误报率为 0（基于基准用例集）
+3. CLI 对未支持语句能明确报错，不 silent ignore
+4. 生成 SQL 可在 PostgreSQL 15/16/17 上执行
 
----
+## 12. 里程碑计划（建议）
 
-# 💡 七、CLI 设计（类似 migra）
+### Phase 1（4-6 天）
 
-```
-schemadiff file.sql postgres://conn
-schemadiff pg://A pg://B
-schemadiff fileA.sql fileB.sql
-```
+1. model + normalize 基础
+2. introspect MVP
+3. golden 序列化框架
 
----
+### Phase 2（4-6 天）
 
-# 🚀 八、额外功能规划（Go 版可超越 migra）
+1. diff MVP（table/column/pk/index/enum）
+2. render MVP
+3. plan DAG 排序
 
-| 功能                  | 是否加入 |
-| ------------------- | ---- |
-| YAML/JSON schema 支持 | ✓    |
-| 输出“破坏性变更”诊断         | ✓    |
-| 生成 rollback SQL     | ✓    |
-| 输出图形化 DOT schema    | 可选   |
-| LSP 插件（VSCode 完成）   | 可选   |
+### Phase 3（3-5 天）
 
----
+1. parser MVP（CREATE/ALTER/INDEX/ENUM）
+2. file->db、file->file 链路打通
 
-# 📌 九、实现优先级路线图（给你真实可执行的计划）
+### Phase 4（3-4 天）
 
-### **Phase 1 (3–5 天)：核心 SchemaModel + Parser**
+1. 破坏性变更诊断
+2. CLI 参数完善
+3. 文档与示例
 
-* pg_query_go 解析 CREATE TABLE
-* 构建 SchemaModel
+## 13. 风险清单与缓解
 
-### **Phase 2 (3 天)：DB introspection**
+1. `pg_query_go` 构建链复杂
+   - 缓解：锁定版本、在 CI 做 cgo 构建矩阵
+2. SQL 语义同义表达太多导致误报
+   - 缓解：先做 normalize 基线 + 回归用例集
+3. drop 类操作误伤风险
+   - 缓解：默认不输出危险 drop，需 `--unsafe-drop`
 
-* tables, columns, constraints, indexes
+## 14. 下一步落地建议
 
-### **Phase 3 (5–7 天)：Diff 引擎**
+先实现以下最小切片并合并到主分支：
 
-* table/column/index
-* 结构化 diff
+1. `internal/model` + JSON snapshot
+2. `internal/introspect`（仅 public + 可扩 schema 参数）
+3. `internal/diff`（table/column/index）
+4. `internal/render`（add/alter 基础 SQL）
+5. 首个 roundtrip 集成测试
 
-### **Phase 4 (3–4 天)：SQL Renderer**
+完成后再扩 parser，能显著降低返工概率。
 
-### **Phase 5 (2–3 天)：CLI + 文档**
+## 15. 后续扩展（超越 Migra）
 
----
-
-# 你继续告诉我：
-
-## ✔️ 你想让我先为你**生成完整项目骨架**吗？
-
-我可以直接生成：
-
-* 完整目录结构
-* 初始代码（编译可运行）
-* go.mod
-* CLI 主程序
-  甚至可以生成一个最小可运行的 “file.sql ↔ pg” diff demo。
-
+1. 覆盖 view/function/trigger/rule 的 diff 与渲染
+2. YAML/JSON schema 输入支持
+3. rollback SQL 生成（结合风险分级）
+4. 输出 schema 依赖图（DOT）
+5. LSP/IDE 辅助能力

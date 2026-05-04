@@ -6,19 +6,19 @@ import "github.com/migra-go/migra-go/internal/model"
 type Kind string
 
 const (
-	KindAddTable       Kind = "add_table"
-	KindDropTable      Kind = "drop_table"
-	KindAddColumn      Kind = "add_column"
-	KindDropColumn     Kind = "drop_column"
+	KindAddTable        Kind = "add_table"
+	KindDropTable       Kind = "drop_table"
+	KindAddColumn       Kind = "add_column"
+	KindDropColumn      Kind = "drop_column"
 	KindAlterColumnType Kind = "alter_column_type"
-	KindSetNotNull     Kind = "set_not_null"
-	KindDropNotNull    Kind = "drop_not_null"
-	KindAddIndex       Kind = "add_index"
-	KindDropIndex      Kind = "drop_index"
-	KindAddConstraint  Kind = "add_constraint"
-	KindDropConstraint Kind = "drop_constraint"
-	KindAddEnumType    Kind = "add_enum_type"
-	KindDropEnumType   Kind = "drop_enum_type"
+	KindSetNotNull      Kind = "set_not_null"
+	KindDropNotNull     Kind = "drop_not_null"
+	KindAddIndex        Kind = "add_index"
+	KindDropIndex       Kind = "drop_index"
+	KindAddConstraint   Kind = "add_constraint"
+	KindDropConstraint  Kind = "drop_constraint"
+	KindAddEnumType     Kind = "add_enum_type"
+	KindDropEnumType    Kind = "drop_enum_type"
 )
 
 // Operation is the interface for all diff operations
@@ -187,16 +187,18 @@ func (op *DropNotNullOp) IsDestructive() bool {
 // CreateIndexOp represents creating a new index
 type CreateIndexOp struct {
 	baseOperation
-	Index *model.Index
+	Schema string
+	Index  *model.Index
 }
 
-func NewCreateIndexOp(index *model.Index) *CreateIndexOp {
+func NewCreateIndexOp(schema string, index *model.Index) *CreateIndexOp {
 	return &CreateIndexOp{
 		baseOperation: baseOperation{
 			kind:      KindAddIndex,
-			objectKey: model.NewObjectKey("", index.Name, model.KindIndex),
+			objectKey: model.NewObjectKey(schema, index.Name, model.KindIndex),
 		},
-		Index: index,
+		Schema: schema,
+		Index:  index,
 	}
 }
 

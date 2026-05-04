@@ -78,7 +78,7 @@ func (d *Differ) diffTableIndexes(schema string, source, target *model.Table) {
 	// Find indexes to add
 	for name, index := range target.Indexes {
 		if _, exists := source.Indexes[name]; !exists {
-			d.addOp(NewCreateIndexOp(index))
+			d.addOp(NewCreateIndexOp(schema, index))
 		}
 	}
 
