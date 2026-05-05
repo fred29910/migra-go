@@ -24,6 +24,8 @@ func (d *Differ) diffColumn(schema, table string, source, target *model.Column) 
 	if !sameDefault(source.DefaultExpr, target.DefaultExpr) {
 		// MVP: handle default changes as part of alter column
 		// TODO: implement SetDefaultOp and DropDefaultOp
+		_ = source.DefaultExpr
+		_ = target.DefaultExpr
 	}
 }
 

@@ -21,7 +21,7 @@ func LoadFromDB(ctx context.Context, connStr string, opt LoadOptions) (*model.Sc
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	return LoadFromDBWithConn(ctx, conn, opt)
 }

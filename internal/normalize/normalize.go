@@ -170,9 +170,10 @@ func normalizeConstraintDef(def string) string {
 func isBalancedParens(s string) bool {
 	count := 0
 	for _, ch := range s {
-		if ch == '(' {
+		switch ch {
+		case '(':
 			count++
-		} else if ch == ')' {
+		case ')':
 			count--
 			if count < 0 {
 				return false

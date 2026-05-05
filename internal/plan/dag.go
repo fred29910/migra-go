@@ -74,50 +74,38 @@ func BuildDAG(ops []diff.Operation) *DAG {
 
 // addDependencies adds dependencies for a node based on operation type
 func (d *DAG) addDependencies(node *Node) {
-	op := node.Op
-
-	switch op.(type) {
+	switch op := node.Op.(type) {
 	case *diff.AddColumnOp:
 		// AddColumn depends on its table being created first
-		if addColOp, ok := op.(*diff.AddColumnOp); ok {
-			tableKey := model.NewObjectKey(addColOp.Schema, addColOp.Table, model.KindTable)
-			if tableNode := d.findNodeByOpKind(tableKey, diff.KindAddTable); tableNode != nil {
-				d.AddDependency(node, tableNode)
-			}
+		tableKey := model.NewObjectKey(op.Schema, op.Table, model.KindTable)
+		if tableNode := d.findNodeByOpKind(tableKey, diff.KindAddTable); tableNode != nil {
+			d.AddDependency(node, tableNode)
 		}
 
 	case *diff.CreateIndexOp:
 		// CreateIndex depends on its table being created
-		if createIdxOp, ok := op.(*diff.CreateIndexOp); ok {
-			tableKey := model.NewObjectKey(createIdxOp.Schema, createIdxOp.Index.Table, model.KindTable)
-			if tableNode := d.findNodeByOpKind(tableKey, diff.KindAddTable); tableNode != nil {
-				d.AddDependency(node, tableNode)
-			}
+		tableKey := model.NewObjectKey(op.Schema, op.Index.Table, model.KindTable)
+		if tableNode := d.findNodeByOpKind(tableKey, diff.KindAddTable); tableNode != nil {
+			d.AddDependency(node, tableNode)
 		}
 
 	case *diff.AlterColumnTypeOp:
 		// AlterColumnType depends on the table existing
-		if alterOp, ok := op.(*diff.AlterColumnTypeOp); ok {
-			tableKey := model.NewObjectKey(alterOp.Schema, alterOp.Table, model.KindTable)
-			if tableNode := d.findNodeByOpKind(tableKey, diff.KindAddTable); tableNode != nil {
-				d.AddDependency(node, tableNode)
-			}
+		tableKey := model.NewObjectKey(op.Schema, op.Table, model.KindTable)
+		if tableNode := d.findNodeByOpKind(tableKey, diff.KindAddTable); tableNode != nil {
+			d.AddDependency(node, tableNode)
 		}
 
 	case *diff.SetNotNullOp:
-		if setNotNullOp, ok := op.(*diff.SetNotNullOp); ok {
-			tableKey := model.NewObjectKey(setNotNullOp.Schema, setNotNullOp.Table, model.KindTable)
-			if tableNode := d.findNodeByOpKind(tableKey, diff.KindAddTable); tableNode != nil {
-				d.AddDependency(node, tableNode)
-			}
+		tableKey := model.NewObjectKey(op.Schema, op.Table, model.KindTable)
+		if tableNode := d.findNodeByOpKind(tableKey, diff.KindAddTable); tableNode != nil {
+			d.AddDependency(node, tableNode)
 		}
 
 	case *diff.DropNotNullOp:
-		if dropNotNullOp, ok := op.(*diff.DropNotNullOp); ok {
-			tableKey := model.NewObjectKey(dropNotNullOp.Schema, dropNotNullOp.Table, model.KindTable)
-			if tableNode := d.findNodeByOpKind(tableKey, diff.KindAddTable); tableNode != nil {
-				d.AddDependency(node, tableNode)
-			}
+		tableKey := model.NewObjectKey(op.Schema, op.Table, model.KindTable)
+		if tableNode := d.findNodeByOpKind(tableKey, diff.KindAddTable); tableNode != nil {
+			d.AddDependency(node, tableNode)
 		}
 
 	case *diff.AddEnumTypeOp:
