@@ -131,16 +131,12 @@ func runDiffWithDeps(parent context.Context, cfg diffConfig, deps runnerDeps) er
 // computeDiff runs the normalize → diff → plan pipeline and returns operations and warnings
 func computeDiff(source, target *model.Schema, cfg diffConfig) ([]diff.Operation, []string, error) {
 	// Normalize schemas
-	normalizedSource, err := normalize.CanonicalizeSchema(source)
-	if err != nil {
+	if err := normalize.CanonicalizeSchema(source); err != nil {
 		return nil, nil, fmt.Errorf("failed to normalize source schema: %w", err)
 	}
-	normalizedTarget, err := normalize.CanonicalizeSchema(target)
-	if err != nil {
+	if err := normalize.CanonicalizeSchema(target); err != nil {
 		return nil, nil, fmt.Errorf("failed to normalize target schema: %w", err)
 	}
-	source = normalizedSource
-	target = normalizedTarget
 
 	// Diff schemas
 	differ := diff.NewDiffer()

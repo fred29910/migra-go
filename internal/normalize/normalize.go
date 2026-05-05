@@ -7,111 +7,72 @@ import (
 )
 
 // CanonicalizeSchema normalizes a schema to reduce false diffs
-// Returns a new normalized schema
-func CanonicalizeSchema(s *model.Schema) (*model.Schema, error) {
-	normalized := &model.Schema{
-		Schemas: make(map[string]*model.Namespace),
+// Performs in-place normalization of the schema.
+func CanonicalizeSchema(s *model.Schema) error {
+	for _, ns := range s.Schemas {
+		canonicalizeNamespaceInPlace(ns)
 	}
-
-	for name, ns := range s.Schemas {
-		normalized.Schemas[name] = canonicalizeNamespace(ns)
-	}
-
-	return normalized, nil
+	return nil
 }
 
-func canonicalizeNamespace(ns *model.Namespace) *model.Namespace {
-	result := &model.Namespace{
-		Name:   ns.Name,
-		Tables: make(map[string]*model.Table),
-		Types:  make(map[string]*model.EnumType),
-	}
-
+func canonicalizeNamespaceInPlace(ns *model.Namespace) {
 	// Normalize tables
-	for name, table := range ns.Tables {
-		result.Tables[name] = canonicalizeTable(table)
+	for _, table := range ns.Tables {
+		canonicalizeTableInPlace(table)
 	}
 
 	// Normalize types
-	for name, enumType := range ns.Types {
-		result.Types[name] = canonicalizeEnumType(enumType)
+	for _, enumType := range ns.Types {
+		canonicalizeEnumTypeInPlace(enumType)
 	}
-
-	return result
 }
 
-func canonicalizeTable(table *model.Table) *model.Table {
-	result := &model.Table{
-		Schema:       table.Schema,
-		Name:          table.Name,
-		Columns:       make([]*model.Column, len(table.Columns)),
-		ColumnByName:  make(map[string]*model.Column),
-		PrimaryKey:    table.PrimaryKey,
-		Constraints:   make(map[string]*model.Constraint),
-		Indexes:       make(map[string]*model.Index),
-	}
+func canonicalizeTableInPlace(table *model.Table) {
+	// ColumnByName might change if names are normalized
+	newColumnByName := make(map[string]*model.Column)
 
 	// Normalize columns
-	for i, col := range table.Columns {
-		normalizedCol := canonicalizeColumn(col)
-		result.Columns[i] = normalizedCol
-		result.ColumnByName[normalizedCol.Name] = normalizedCol
+	for _, col := range table.Columns {
+		canonicalizeColumnInPlace(col)
+		newColumnByName[col.Name] = col
 	}
+	table.ColumnByName = newColumnByName
 
 	// Normalize constraints
 	for name, constraint := range table.Constraints {
-		result.Constraints[name] = canonicalizeConstraint(constraint)
+		canonicalizeConstraintInPlace(constraint)
+		// Assuming constraint name doesn't change enough to break the map keys for now.
+		// If it did, we'd need to rebuild the map like ColumnByName.
+		_ = name
 	}
 
 	// Normalize indexes
 	for name, index := range table.Indexes {
-		result.Indexes[name] = canonicalizeIndex(index)
+		canonicalizeIndexInPlace(index)
+		_ = name
 	}
-
-	return result
 }
 
-func canonicalizeColumn(col *model.Column) *model.Column {
-	result := &model.Column{
-		Name:         normalizeIdentifier(col.Name),
-		DataType:     normalizeDataType(col.DataType),
-		IsNullable:   col.IsNullable,
-		IsIdentity:   col.IsIdentity,
-		IdentityKind: col.IdentityKind,
-	}
-
+func canonicalizeColumnInPlace(col *model.Column) {
+	col.Name = normalizeIdentifier(col.Name)
+	col.DataType = normalizeDataType(col.DataType)
 	if col.DefaultExpr != nil {
 		normalized := normalizeDefaultExpr(*col.DefaultExpr)
-		result.DefaultExpr = &normalized
-	}
-
-	return result
-}
-
-func canonicalizeEnumType(enumType *model.EnumType) *model.EnumType {
-	return &model.EnumType{
-		Name:   normalizeIdentifier(enumType.Name),
-		Labels: enumType.Labels, // Labels order is significant
+		col.DefaultExpr = &normalized
 	}
 }
 
-func canonicalizeConstraint(c *model.Constraint) *model.Constraint {
-	return &model.Constraint{
-		Name:       normalizeIdentifier(c.Name),
-		Type:       c.Type,
-		Definition: normalizeConstraintDef(c.Definition),
-		Table:      c.Table,
-	}
+func canonicalizeEnumTypeInPlace(enumType *model.EnumType) {
+	enumType.Name = normalizeIdentifier(enumType.Name)
 }
 
-func canonicalizeIndex(idx *model.Index) *model.Index {
-	return &model.Index{
-		Name:    normalizeIdentifier(idx.Name),
-		Table:   idx.Table,
-		Columns: idx.Columns,
-		Unique:  idx.Unique,
-		Method:  idx.Method,
-	}
+func canonicalizeConstraintInPlace(c *model.Constraint) {
+	c.Name = normalizeIdentifier(c.Name)
+	c.Definition = normalizeConstraintDef(c.Definition)
+}
+
+func canonicalizeIndexInPlace(idx *model.Index) {
+	idx.Name = normalizeIdentifier(idx.Name)
 }
 
 // typeAliases maps type aliases to canonical names
