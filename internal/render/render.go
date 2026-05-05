@@ -19,7 +19,6 @@ var _ SQLEngine = (*Renderer)(nil)
 
 // Renderer converts diff operations into SQL statements
 type Renderer struct {
-	sql         []string
 	format      string // "sql" or "json"
 	useIfExists bool
 }
@@ -27,7 +26,6 @@ type Renderer struct {
 // NewRenderer creates a new Renderer
 func NewRenderer() *Renderer {
 	return &Renderer{
-		sql:         make([]string, 0),
 		format:      "sql",
 		useIfExists: true,
 	}
@@ -40,17 +38,25 @@ func (r *Renderer) SetFormat(format string) {
 
 // RenderAll converts all operations to SQL
 func (r *Renderer) RenderAll(ops []diff.Operation) string {
-	// Sort operations by dependency order (TODO: implement proper sorting)
-	r.sql = r.sql[:0]
-
+	var b strings.Builder
 	for _, op := range ops {
 		sql := r.Render(op)
-		if sql != "" {
-			r.sql = append(r.sql, sql)
+		if sql == "" {
+			continue
 		}
+		if b.Len() == 0 {
+			b.WriteString("-- Begin Diff\n")
+		} else {
+			b.WriteByte('\n')
+		}
+		b.WriteString(sql)
 	}
 
-	return r.String()
+	if b.Len() == 0 {
+		return "-- No changes detected"
+	}
+	b.WriteString("\n-- End Diff")
+	return b.String()
 }
 
 // Render converts a single operation to SQL
@@ -186,15 +192,6 @@ func (r *Renderer) renderAddEnumType(op *diff.AddEnumTypeOp) string {
 func (r *Renderer) renderDropEnumType(op *diff.DropEnumTypeOp) string {
 	return fmt.Sprintf("-- op: drop_enum_type risk:high\nDROP TYPE %s%s;",
 		ifExistsPrefix(r.useIfExists), quoteQualifiedIdentifier(op.Schema, op.Name))
-}
-
-// String returns the rendered SQL as a string
-func (r *Renderer) String() string {
-	if len(r.sql) == 0 {
-		return "-- No changes detected"
-	}
-
-	return "-- Begin Diff\n" + strings.Join(r.sql, "\n") + "\n-- End Diff"
 }
 
 // Helper functions
