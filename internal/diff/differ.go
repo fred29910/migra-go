@@ -82,21 +82,31 @@ func (d *Differ) diffNamespace(source, target *model.Namespace) {
 func (d *Differ) diffTypes(source, target *model.Namespace) {
 	if source == nil {
 		// All types in target are new
-		for name, enumType := range target.Types {
+		targetTypeNames := make([]string, 0, len(target.Types))
+		for name := range target.Types {
+			targetTypeNames = append(targetTypeNames, name)
+		}
+		sort.Strings(targetTypeNames)
+		for _, name := range targetTypeNames {
 			d.addOp(&AddEnumTypeOp{
 				baseOperation: baseOperation{
 					kind:      KindAddEnumType,
 					objectKey: model.NewObjectKey(target.Name, name, model.KindType),
 				},
 				Schema: target.Name,
-				Type:   enumType,
+				Type:   target.Types[name],
 			})
 		}
 		return
 	}
 
 	// Find types to add
-	for name, enumType := range target.Types {
+	targetTypeNames := make([]string, 0, len(target.Types))
+	for name := range target.Types {
+		targetTypeNames = append(targetTypeNames, name)
+	}
+	sort.Strings(targetTypeNames)
+	for _, name := range targetTypeNames {
 		if _, exists := source.Types[name]; !exists {
 			d.addOp(&AddEnumTypeOp{
 				baseOperation: baseOperation{
@@ -104,13 +114,18 @@ func (d *Differ) diffTypes(source, target *model.Namespace) {
 					objectKey: model.NewObjectKey(target.Name, name, model.KindType),
 				},
 				Schema: target.Name,
-				Type:   enumType,
+				Type:   target.Types[name],
 			})
 		}
 	}
 
 	// Find types to drop
+	sourceTypeNames := make([]string, 0, len(source.Types))
 	for name := range source.Types {
+		sourceTypeNames = append(sourceTypeNames, name)
+	}
+	sort.Strings(sourceTypeNames)
+	for _, name := range sourceTypeNames {
 		if _, exists := target.Types[name]; !exists {
 			d.addOp(&DropEnumTypeOp{
 				baseOperation: baseOperation{
