@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
 )
 
 func TestIsPostgresURL_AcceptsPgScheme(t *testing.T) {
@@ -43,5 +45,14 @@ func TestLoadFromSQLFile_NonStrictReturnsSchemaAndLogsWarnings(t *testing.T) {
 	}
 	if !strings.Contains(string(out), "Warning") {
 		t.Fatalf("expected warning output, got: %s", string(out))
+	}
+}
+
+func TestSetupFlags_BindsViperKeys(t *testing.T) {
+	cmd := &cobra.Command{Use: "test"}
+	cmd.PersistentFlags().String("config", "", "")
+	cmd.PersistentFlags().Bool("verbose", false, "")
+	if err := setupFlags(cmd); err != nil {
+		t.Fatalf("setupFlags failed: %v", err)
 	}
 }
