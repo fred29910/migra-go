@@ -178,16 +178,14 @@ func loadFromSQLFile(path string, strict bool) (*model.Schema, error) {
 	}
 
 	p := parser.NewParser()
-	schema, err := p.ParseSQL(string(data))
-	if err != nil && strict {
-		return nil, fmt.Errorf("failed to parse SQL file %s: %w", path, err)
+	schema, parseErr := p.ParseSQL(string(data))
+	if parseErr != nil && strict {
+		return nil, fmt.Errorf("failed to parse SQL file %s: %w", path, parseErr)
 	}
 
 	// Log errors if any
-	if err := p.Errors(); len(err) > 0 {
-		for _, e := range err {
-			fmt.Fprintf(os.Stderr, "Warning: %v\n", e)
-		}
+	for _, warnErr := range p.Errors() {
+		fmt.Fprintf(os.Stderr, "Warning [%s]: %v\n", path, warnErr)
 	}
 
 	return schema, nil
@@ -195,7 +193,7 @@ func loadFromSQLFile(path string, strict bool) (*model.Schema, error) {
 
 // isPostgresURL checks if the string is a PostgreSQL connection URL
 func isPostgresURL(s string) bool {
-	return len(s) > 8 && (strings.HasPrefix(s, "postgres://") || strings.HasPrefix(s, "pg://"))
+	return strings.HasPrefix(s, "postgres://") || strings.HasPrefix(s, "pg://")
 }
 
 // isSQLFile checks if the string is a SQL file
