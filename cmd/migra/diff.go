@@ -6,13 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/fred29910/migra-go/internal/diff"
 	"github.com/fred29910/migra-go/internal/introspect"
 	"github.com/fred29910/migra-go/internal/model"
-	"github.com/fred29910/migra-go/internal/normalize"
 	"github.com/fred29910/migra-go/internal/parser"
-	"github.com/fred29910/migra-go/internal/plan"
-	"github.com/fred29910/migra-go/internal/render"
 	"github.com/spf13/cobra"
 )
 
@@ -39,121 +35,21 @@ func init() {
 	diffCmd.Flags().Bool("unsafe-drop", false, "allow destructive drop operations")
 	diffCmd.Flags().Bool("strict", false, "fail on unsupported statements")
 	diffCmd.Flags().StringP("output", "o", "", "output file (default: stdout)")
+	diffCmd.Flags().Duration("timeout", defaultDiffTimeout, "timeout for schema loading (e.g. 30s, 2m)")
 }
 
 func runDiff(cmd *cobra.Command, args []string) error {
-	source := args[0]
-	target := args[1]
-
-	// Get flags
-	schemas, _ := cmd.Flags().GetStringSlice("schema")
-	format, _ := cmd.Flags().GetString("format")
-	unsafeDrop, _ := cmd.Flags().GetBool("unsafe-drop")
-	strict, _ := cmd.Flags().GetBool("strict")
-	output, _ := cmd.Flags().GetString("output")
-
-	// Load source schema
-	sourceSchema, err := loadSchema(source, schemas, strict)
+	cfg, err := parseDiffConfig(cmd, args)
 	if err != nil {
-		return fmt.Errorf("failed to load source: %w", err)
+		return err
 	}
-
-	// Load target schema
-	targetSchema, err := loadSchema(target, schemas, strict)
-	if err != nil {
-		return fmt.Errorf("failed to load target: %w", err)
-	}
-
-	// Normalize schemas
-	sourceSchema, err = normalize.CanonicalizeSchema(sourceSchema)
-	if err != nil {
-		return fmt.Errorf("failed to normalize source schema: %w", err)
-	}
-	targetSchema, err = normalize.CanonicalizeSchema(targetSchema)
-	if err != nil {
-		return fmt.Errorf("failed to normalize target schema: %w", err)
-	}
-
-	// Diff schemas
-	differ := diff.NewDiffer()
-	operations := differ.Diff(sourceSchema, targetSchema)
-
-	for _, w := range differ.Warnings() {
-		fmt.Fprintf(os.Stderr, "Warning: %s\n", w)
-	}
-
-	// Analyze destructive changes
-	destructiveCount := 0
-	for _, op := range operations {
-		if op.IsDestructive() {
-			destructiveCount++
-		}
-	}
-
-	// Report destructive changes summary
-	if destructiveCount > 0 {
-		fmt.Fprintf(os.Stderr, "Warning: %d destructive operation(s) detected!\n", destructiveCount)
-		for _, op := range operations {
-			if op.IsDestructive() {
-				fmt.Fprintf(os.Stderr, "  - %s: %s (destructive)\n", op.Kind(), op.ObjectKey())
-			}
-		}
-		if !unsafeDrop {
-			fmt.Fprintln(os.Stderr, "Use --unsafe-drop to include destructive DROP operations in output")
-		}
-	}
-
-	// Plan execution
-	planner := plan.NewPlanner(unsafeDrop)
-	stages := planner.Plan(operations)
-
-	// Build execution list with deterministic stage order and topo sorting.
-	stageOrder := []plan.Stage{
-		plan.StagePreDeploy,
-		plan.StageDeploy,
-		plan.StagePostDeploy,
-	}
-	var allOps []diff.Operation
-	for _, stage := range stageOrder {
-		stageOps := stages[stage]
-		if len(stageOps) == 0 {
-			continue
-		}
-		sortedStageOps, err := plan.TopoSort(stageOps)
-		if err != nil {
-			return fmt.Errorf("failed to topologically sort %s operations: %w", stage, err)
-		}
-		allOps = append(allOps, sortedStageOps...)
-	}
-
-	var outputText string
-	switch format {
-	case "sql":
-		renderer := render.NewRenderer()
-		outputText = renderer.RenderAll(allOps)
-	case "json":
-		jsonStr, err := render.RenderJSON(allOps)
-		if err != nil {
-			return fmt.Errorf("failed to render json: %w", err)
-		}
-		outputText = jsonStr
-	default:
-		return fmt.Errorf("unsupported format: %s (allowed: sql, json)", format)
-	}
-
-	// Output
-	if output != "" {
-		return os.WriteFile(output, []byte(outputText), 0644)
-	}
-
-	fmt.Println(outputText)
-	return nil
+	return runDiffWithDeps(cmd.Context(), cfg, newDefaultDeps())
 }
 
-// loadSchema loads a schema from either a SQL file or PostgreSQL connection
-func loadSchema(source string, schemas []string, strict bool) (*model.Schema, error) {
+// loadSchemaWithContext loads a schema from either a SQL file or PostgreSQL connection
+func loadSchemaWithContext(ctx context.Context, source string, schemas []string, strict bool) (*model.Schema, error) {
 	if isPostgresURL(source) {
-		return loadFromDB(source, schemas)
+		return loadFromDB(ctx, source, schemas)
 	}
 	if isSQLFile(source) {
 		return loadFromSQLFile(source, strict)
@@ -162,8 +58,7 @@ func loadSchema(source string, schemas []string, strict bool) (*model.Schema, er
 }
 
 // loadFromDB loads schema from a PostgreSQL database
-func loadFromDB(connStr string, schemas []string) (*model.Schema, error) {
-	ctx := context.Background()
+func loadFromDB(ctx context.Context, connStr string, schemas []string) (*model.Schema, error) {
 	opt := introspect.LoadOptions{
 		Schemas: schemas,
 	}
