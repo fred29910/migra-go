@@ -9,6 +9,14 @@ import (
 	"github.com/fred29910/migra-go/internal/model"
 )
 
+// SQLEngine defines the interface for SQL rendering.
+type SQLEngine interface {
+	RenderAll(ops []diff.Operation) string
+}
+
+// Compile-time check: Renderer must satisfy SQLEngine.
+var _ SQLEngine = (*Renderer)(nil)
+
 // Renderer converts diff operations into SQL statements
 type Renderer struct {
 	sql         []string

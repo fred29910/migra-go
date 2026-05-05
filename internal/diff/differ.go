@@ -7,6 +7,15 @@ import (
 	"github.com/fred29910/migra-go/internal/model"
 )
 
+// Engine defines the interface for schema diff computation.
+type Engine interface {
+	Diff(source, target *model.Schema) []Operation
+	Warnings() []string
+}
+
+// Compile-time check: Differ must satisfy Engine.
+var _ Engine = (*Differ)(nil)
+
 // Differ performs diff between two schemas
 type Differ struct {
 	ops      []Operation

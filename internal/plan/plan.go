@@ -20,6 +20,14 @@ type PlannedOp struct {
 	Stage Stage
 }
 
+// Engine defines the interface for execution plan creation.
+type Engine interface {
+	Plan(ops []diff.Operation) map[Stage][]diff.Operation
+}
+
+// Compile-time check: Planner must satisfy Engine.
+var _ Engine = (*Planner)(nil)
+
 // Planner creates execution plans from diff operations
 type Planner struct {
 	unsafeDrops bool
