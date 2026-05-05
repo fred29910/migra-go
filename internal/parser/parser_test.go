@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/migra-go/migra-go/internal/diff"
-	"github.com/migra-go/migra-go/internal/render"
+	"github.com/fred29910/migra-go/internal/diff"
+	"github.com/fred29910/migra-go/internal/render"
 )
 
 // TestParseCreateTable tests parsing CREATE TABLE statements

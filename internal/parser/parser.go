@@ -16,7 +16,7 @@ import (
 
 	pg "github.com/lfittl/pg_query_go"
 	pg_nodes "github.com/lfittl/pg_query_go/nodes"
-	"github.com/migra-go/migra-go/internal/model"
+	"github.com/fred29910/migra-go/internal/model"
 )
 
 // ParseError represents a parsing error with position information

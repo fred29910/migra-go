@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/migra-go/migra-go/internal/model"
+	"github.com/fred29910/migra-go/internal/model"
 )
 
 // loadIndexes loads indexes from pg_indexes

@@ -1,4 +1,4 @@
-module github.com/migra-go/migra-go
+module github.com/fred29910/migra-go
 
 go 1.26.2
 

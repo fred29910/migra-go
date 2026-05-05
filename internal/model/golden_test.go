@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/migra-go/migra-go/internal/model"
-	"github.com/migra-go/migra-go/internal/testutil"
+	"github.com/fred29910/migra-go/internal/model"
+	"github.com/fred29910/migra-go/internal/testutil"
 )
 
 // TestGoldenSchema demonstrates golden file testing

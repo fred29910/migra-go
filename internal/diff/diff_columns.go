@@ -1,7 +1,7 @@
 package diff
 
 import (
-	"github.com/migra-go/migra-go/internal/model"
+	"github.com/fred29910/migra-go/internal/model"
 )
 
 // diffColumn compares two columns and generates operations for differences

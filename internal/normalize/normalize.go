@@ -3,7 +3,7 @@ package normalize
 import (
 	"strings"
 
-	"github.com/migra-go/migra-go/internal/model"
+	"github.com/fred29910/migra-go/internal/model"
 )
 
 // CanonicalizeSchema normalizes a schema to reduce false diffs

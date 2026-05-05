@@ -3,8 +3,8 @@ package plan
 import (
 	"fmt"
 
-	"github.com/migra-go/migra-go/internal/diff"
-	"github.com/migra-go/migra-go/internal/model"
+	"github.com/fred29910/migra-go/internal/diff"
+	"github.com/fred29910/migra-go/internal/model"
 )
 
 // Node represents a node in the dependency graph

@@ -1,6 +1,6 @@
 package diff
 
-import "github.com/migra-go/migra-go/internal/model"
+import "github.com/fred29910/migra-go/internal/model"
 
 // Kind represents the type of diff operation
 type Kind string
