@@ -1,7 +1,6 @@
 package diff
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/fred29910/migra-go/internal/model"
@@ -18,43 +17,32 @@ var _ Engine = (*Differ)(nil)
 
 // Differ performs diff between two schemas
 type Differ struct {
-	ops      []Operation
-	warnings []string
+	lastWarnings []string
 }
 
 // NewDiffer creates a new Differ
 func NewDiffer() *Differ {
 	return &Differ{
-		ops:      make([]Operation, 0),
-		warnings: make([]string, 0),
+		lastWarnings: make([]string, 0),
 	}
 }
 
-func (d *Differ) warnf(format string, args ...any) {
-	d.warnings = append(d.warnings, fmt.Sprintf(format, args...))
-}
-
 func (d *Differ) Warnings() []string {
-	out := make([]string, len(d.warnings))
-	copy(out, d.warnings)
+	out := make([]string, len(d.lastWarnings))
+	copy(out, d.lastWarnings)
 	return out
 }
 
 // Diff compares two schemas and returns a list of operations
-// source: the source schema (e.g., from SQL files)
-// target: the target schema (e.g., from database)
-// Returns operations needed to transform source -> target
 func (d *Differ) Diff(source, target *model.Schema) []Operation {
-	d.ops = make([]Operation, 0)
-
-	// Compare namespaces (schemas)
-	d.diffSchemas(source, target)
-
-	return d.ops
+	ctx := &diffContext{ops: make([]Operation, 0, 16), warnings: make([]string, 0, 4)}
+	ctx.diffSchemas(source, target)
+	d.lastWarnings = append(d.lastWarnings[:0], ctx.warnings...)
+	return ctx.ops
 }
 
 // diffSchemas compares namespaces in two schemas
-func (d *Differ) diffSchemas(source, target *model.Schema) {
+func (c *diffContext) diffSchemas(source, target *model.Schema) {
 	// Check all namespaces in target (sorted for deterministic output)
 	targetNames := make([]string, 0, len(target.Schemas))
 	for name := range target.Schemas {
@@ -65,10 +53,10 @@ func (d *Differ) diffSchemas(source, target *model.Schema) {
 	for _, name := range targetNames {
 		targetNs := target.Schemas[name]
 		if sourceNs, exists := source.Schemas[name]; exists {
-			d.diffNamespace(sourceNs, targetNs)
+			c.diffNamespace(sourceNs, targetNs)
 		} else {
 			// Entire namespace needs to be created
-			d.diffNamespace(nil, targetNs)
+			c.diffNamespace(nil, targetNs)
 		}
 	}
 
@@ -83,26 +71,26 @@ func (d *Differ) diffSchemas(source, target *model.Schema) {
 		if _, exists := target.Schemas[name]; !exists {
 			// Namespace dropped - MVP: skip or handle explicitly
 			_ = source.Schemas[name]
-			d.warnf("namespace drop is not implemented yet (ignored): %s", name)
+			c.warnf("namespace drop is not implemented yet (ignored): %s", name)
 		}
 	}
 }
 
 // diffNamespace compares two namespaces
-func (d *Differ) diffNamespace(source, target *model.Namespace) {
+func (c *diffContext) diffNamespace(source, target *model.Namespace) {
 	if target == nil {
 		return
 	}
 
 	// Compare tables
-	d.diffTables(source, target)
+	c.diffTables(source, target)
 
 	// Compare types (enums)
-	d.diffTypes(source, target)
+	c.diffTypes(source, target)
 }
 
 // diffTypes compares enum types between two namespaces
-func (d *Differ) diffTypes(source, target *model.Namespace) {
+func (c *diffContext) diffTypes(source, target *model.Namespace) {
 	if source == nil {
 		// All types in target are new
 		targetTypeNames := make([]string, 0, len(target.Types))
@@ -111,7 +99,7 @@ func (d *Differ) diffTypes(source, target *model.Namespace) {
 		}
 		sort.Strings(targetTypeNames)
 		for _, name := range targetTypeNames {
-			d.addOp(&AddEnumTypeOp{
+			c.addOp(&AddEnumTypeOp{
 				baseOperation: baseOperation{
 					kind:      KindAddEnumType,
 					objectKey: model.NewObjectKey(target.Name, name, model.KindType),
@@ -131,7 +119,7 @@ func (d *Differ) diffTypes(source, target *model.Namespace) {
 	sort.Strings(targetTypeNames)
 	for _, name := range targetTypeNames {
 		if _, exists := source.Types[name]; !exists {
-			d.addOp(&AddEnumTypeOp{
+			c.addOp(&AddEnumTypeOp{
 				baseOperation: baseOperation{
 					kind:      KindAddEnumType,
 					objectKey: model.NewObjectKey(target.Name, name, model.KindType),
@@ -150,7 +138,7 @@ func (d *Differ) diffTypes(source, target *model.Namespace) {
 	sort.Strings(sourceTypeNames)
 	for _, name := range sourceTypeNames {
 		if _, exists := target.Types[name]; !exists {
-			d.addOp(&DropEnumTypeOp{
+			c.addOp(&DropEnumTypeOp{
 				baseOperation: baseOperation{
 					kind:      KindDropEnumType,
 					objectKey: model.NewObjectKey(source.Name, name, model.KindType),
@@ -160,9 +148,4 @@ func (d *Differ) diffTypes(source, target *model.Namespace) {
 			})
 		}
 	}
-}
-
-// addOp adds a new operation
-func (d *Differ) addOp(op Operation) {
-	d.ops = append(d.ops, op)
 }

@@ -7,7 +7,7 @@ import (
 )
 
 // diffTables compares tables between two namespaces
-func (d *Differ) diffTables(source, target *model.Namespace) {
+func (c *diffContext) diffTables(source, target *model.Namespace) {
 	// If source is nil, all tables in target are new
 	if source == nil {
 		tableNames := make([]string, 0, len(target.Tables))
@@ -18,7 +18,7 @@ func (d *Differ) diffTables(source, target *model.Namespace) {
 
 		for _, name := range tableNames {
 			table := target.Tables[name]
-			d.addOp(NewAddTableOp(target.Name, name, table))
+			c.addOp(NewAddTableOp(target.Name, name, table))
 		}
 		return
 	}
@@ -33,7 +33,7 @@ func (d *Differ) diffTables(source, target *model.Namespace) {
 	sort.Strings(addNames)
 	for _, name := range addNames {
 		table := target.Tables[name]
-		d.addOp(NewAddTableOp(target.Name, name, table))
+		c.addOp(NewAddTableOp(target.Name, name, table))
 	}
 
 	// Find tables to drop (in source but not in target) - sorted for deterministic output
@@ -45,7 +45,7 @@ func (d *Differ) diffTables(source, target *model.Namespace) {
 	}
 	sort.Strings(dropNames)
 	for _, name := range dropNames {
-		d.addOp(NewDropTableOp(source.Name, name))
+		c.addOp(NewDropTableOp(source.Name, name))
 	}
 
 	// Compare tables that exist in both - sorted for deterministic output
@@ -59,28 +59,28 @@ func (d *Differ) diffTables(source, target *model.Namespace) {
 	for _, name := range bothNames {
 		targetTable := target.Tables[name]
 		sourceTable := source.Tables[name]
-		d.diffTableColumns(source.Name, sourceTable, targetTable)
-		d.diffTableIndexes(source.Name, sourceTable, targetTable)
-		d.diffTableConstraints(source.Name, sourceTable, targetTable)
+		c.diffTableColumns(source.Name, sourceTable, targetTable)
+		c.diffTableIndexes(source.Name, sourceTable, targetTable)
+		c.diffTableConstraints(source.Name, sourceTable, targetTable)
 	}
 }
 
 // diffTableConstraints compares constraints between two tables
-func (d *Differ) diffTableConstraints(schema string, source, target *model.Table) {
-	for name, c := range target.Constraints {
+func (c *diffContext) diffTableConstraints(schema string, source, target *model.Table) {
+	for name, constraint := range target.Constraints {
 		if _, exists := source.Constraints[name]; !exists {
-			d.addOp(NewAddConstraintOp(schema, target.Name, c))
+			c.addOp(NewAddConstraintOp(schema, target.Name, constraint))
 		}
 	}
 	for name := range source.Constraints {
 		if _, exists := target.Constraints[name]; !exists {
-			d.addOp(NewDropConstraintOp(schema, source.Name, name))
+			c.addOp(NewDropConstraintOp(schema, source.Name, name))
 		}
 	}
 }
 
 // diffTableColumns compares columns between two tables
-func (d *Differ) diffTableColumns(schema string, source, target *model.Table) {
+func (c *diffContext) diffTableColumns(schema string, source, target *model.Table) {
 	// Use ColumnByName index for quick lookup (avoid building temporary maps)
 	// Find columns to add (in target but not in source) - sorted for deterministic output
 	addColNames := make([]string, 0, len(target.ColumnByName))
@@ -92,7 +92,7 @@ func (d *Differ) diffTableColumns(schema string, source, target *model.Table) {
 	sort.Strings(addColNames)
 	for _, name := range addColNames {
 		col := target.ColumnByName[name]
-		d.addOp(NewAddColumnOp(schema, target.Name, col))
+		c.addOp(NewAddColumnOp(schema, target.Name, col))
 	}
 
 	// Find columns to drop (in source but not in target)
@@ -100,31 +100,31 @@ func (d *Differ) diffTableColumns(schema string, source, target *model.Table) {
 		if _, exists := target.ColumnByName[name]; !exists {
 			// MVP: skip column drops for safety
 			_ = name
-			d.warnf("column drop is not implemented yet (ignored): %s.%s.%s", schema, source.Name, name)
+			c.warnf("column drop is not implemented yet (ignored): %s.%s.%s", schema, source.Name, name)
 		}
 	}
 
 	// Compare columns that exist in both - iterate in target column order for consistency
 	for _, targetCol := range target.Columns {
 		if sourceCol, exists := source.ColumnByName[targetCol.Name]; exists {
-			d.diffColumn(schema, target.Name, sourceCol, targetCol)
+			c.diffColumn(schema, target.Name, sourceCol, targetCol)
 		}
 	}
 }
 
 // diffTableIndexes compares indexes between two tables
-func (d *Differ) diffTableIndexes(schema string, source, target *model.Table) {
+func (c *diffContext) diffTableIndexes(schema string, source, target *model.Table) {
 	// Find indexes to add
 	for name, index := range target.Indexes {
 		if _, exists := source.Indexes[name]; !exists {
-			d.addOp(NewCreateIndexOp(schema, index))
+			c.addOp(NewCreateIndexOp(schema, index))
 		}
 	}
 
 	// Find indexes to drop
 	for name := range source.Indexes {
 		if _, exists := target.Indexes[name]; !exists {
-			d.addOp(NewDropIndexOp(schema, name))
+			c.addOp(NewDropIndexOp(schema, name))
 		}
 	}
 }

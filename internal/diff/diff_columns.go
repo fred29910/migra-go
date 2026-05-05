@@ -5,19 +5,19 @@ import (
 )
 
 // diffColumn compares two columns and generates operations for differences
-func (d *Differ) diffColumn(schema, table string, source, target *model.Column) {
+func (c *diffContext) diffColumn(schema, table string, source, target *model.Column) {
 	// Check for data type change
 	if source.DataType != target.DataType {
-		d.addOp(NewAlterColumnTypeOp(schema, table, source.Name, source.DataType, target.DataType))
+		c.addOp(NewAlterColumnTypeOp(schema, table, source.Name, source.DataType, target.DataType))
 	}
 
 	// Check for nullable change
 	if source.IsNullable && !target.IsNullable {
 		// Column changed from nullable to not nullable
-		d.addOp(NewSetNotNullOp(schema, table, source.Name))
+		c.addOp(NewSetNotNullOp(schema, table, source.Name))
 	} else if !source.IsNullable && target.IsNullable {
 		// Column changed from not nullable to nullable
-		d.addOp(NewDropNotNullOp(schema, table, source.Name))
+		c.addOp(NewDropNotNullOp(schema, table, source.Name))
 	}
 
 	// Check for default expression change
@@ -26,7 +26,7 @@ func (d *Differ) diffColumn(schema, table string, source, target *model.Column) 
 		// TODO: implement SetDefaultOp and DropDefaultOp
 		_ = source.DefaultExpr
 		_ = target.DefaultExpr
-		d.warnf("column %s.%s.%s default change is not implemented yet (ignored)", schema, table, source.Name)
+		c.warnf("column %s.%s.%s default change is not implemented yet (ignored)", schema, table, source.Name)
 	}
 }
 
