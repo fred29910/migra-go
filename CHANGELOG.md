@@ -8,9 +8,15 @@
 ## [未发布]
 
 ### 重构 (Refactor)
+- refactor(app): introduce internal app service and thin cmd adapter
+- refactor(render): unify sql/json rendering entrypoint
+- refactor(diff): use local diff context, remove shared mutable ops path
 - refactor(cli): split diff pipeline into testable stages
 - refactor: inject diff/plan/render via interfaces
 - refactor(render): remove renderer mutable SQL buffer
+
+### 性能 (Performance)
+- perf(normalize): switch canonicalization to in-place mutation
 
 ### 特性 (Features)
 - feat(cli): add timeout flag and context propagation
