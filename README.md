@@ -61,11 +61,42 @@ migra diff file_a.sql file_b.sql
 ```bash
 # 复制示例配置
 cp examples/config.yaml ~/.migra.yaml
-# 或
+# 或使用环境变量
 cp examples/.env.example .env
 ```
 
-详见 [examples/](examples/) 目录。
+### 数据库连接方式
+
+migra 支持多种 PostgreSQL 连接方式：
+
+**1. 连接字符串**
+```bash
+migra diff file.sql "postgres://user:password@localhost:5432/dbname?sslmode=disable"
+```
+
+**2. 标准环境变量**（pgx 自动支持）
+```bash
+export PGHOST=localhost
+export PGPORT=5432
+export PGUSER=myuser
+export PGPASSWORD=mypassword
+export PGDATABASE=mydb
+migra diff file.sql "postgres://"
+```
+
+**3. pg_service.conf 服务名**
+```bash
+# ~/.pg_service.conf 中定义 [myservice]
+migra diff file.sql "postgres://?service=myservice"
+```
+
+**4. .pgpass 密码文件**（pgx 自动读取 `~/.pgpass`）
+```bash
+# ~/.pgpass 内容：localhost:5432:mydb:myuser:mypassword
+migra diff file.sql "postgres://myuser@localhost/mydb"
+```
+
+详见 [examples/](examples/) 目录和 [PostgreSQL 文档](https://www.postgresql.org/docs/current/libpq-envars.html)。
 
 ## 项目结构
 

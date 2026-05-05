@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/fred29910/migra-go/internal/diff"
+	"github.com/fred29910/migra-go/internal/introspect"
 	"github.com/fred29910/migra-go/internal/model"
 	"github.com/fred29910/migra-go/internal/parser"
 	"github.com/fred29910/migra-go/internal/plan"
@@ -151,11 +153,15 @@ func loadSchema(source string, schemas []string, strict bool) (*model.Schema, er
 
 // loadFromDB loads schema from a PostgreSQL database
 func loadFromDB(connStr string, schemas []string) (*model.Schema, error) {
-	// TODO: implement database introspection
-	_ = connStr
-	_ = schemas
-	fmt.Println("-- TODO: Implement database introspection")
-	return model.NewSchema(), nil
+	ctx := context.Background()
+	opt := introspect.LoadOptions{
+		Schemas: schemas,
+	}
+	schema, err := introspect.LoadFromDB(ctx, connStr, opt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load schema from database: %w", err)
+	}
+	return schema, nil
 }
 
 // loadFromSQLFile loads schema from a SQL file

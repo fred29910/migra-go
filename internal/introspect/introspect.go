@@ -14,7 +14,20 @@ type LoadOptions struct {
 }
 
 // LoadFromDB reads schema information from a PostgreSQL database
-func LoadFromDB(ctx context.Context, conn *pgx.Conn, opt LoadOptions) (*model.Schema, error) {
+func LoadFromDB(ctx context.Context, connStr string, opt LoadOptions) (*model.Schema, error) {
+	// Parse connection config (supports PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE env vars,
+	// as well as service= and .pgpass via pgx)
+	conn, err := pgx.Connect(ctx, connStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+	defer conn.Close(ctx)
+
+	return LoadFromDBWithConn(ctx, conn, opt)
+}
+
+// LoadFromDBWithConn reads schema using an existing connection
+func LoadFromDBWithConn(ctx context.Context, conn *pgx.Conn, opt LoadOptions) (*model.Schema, error) {
 	schema := model.NewSchema()
 
 	// Default to public schema if none specified
