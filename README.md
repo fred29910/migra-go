@@ -1,5 +1,10 @@
 # MIGRA-Go
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/fred29910/migra-go)](https://goreportcard.com/report/github.com/fred29910/migra-go)
+[![CI](https://github.com/fred29910/migra-go/actions/workflows/test.yml/badge.svg)](https://github.com/fred29910/migra-go/actions/workflows/test.yml)
+[![Lint](https://github.com/fred29910/migra-go/actions/workflows/lint.yml/badge.svg)](https://github.com/fred29910/migra-go/actions/workflows/lint.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 一个用 Go 编写的 PostgreSQL schema 差异比较工具，灵感来自 Python 版的 [migra](https://github.com/djrobstep/migra)。
 
 ## 功能特性
@@ -10,29 +15,31 @@
 - 🛡️ **安全保护**：标记破坏性操作，可选跳过危险变更
 - 🎯 **语义归一化**：减少因同义表达导致的误报
 
-## 安装
+## 快速开始
+
+### 安装
 
 ```bash
-git clone https://github.com/migra-go/migra-go.git
+# 从源码构建
+git clone https://github.com/fred29910/migra-go.git
 cd migra-go
-go build -o schemadiff ./cmd/schemadiff
+make build
+
+# 或直接下载二进制文件（Release）
+# https://github.com/fred29910/migra-go/releases
 ```
-
-或者直接从 releases 下载二进制文件（待发布）。
-
-## 使用方法
 
 ### 基本用法
 
 ```bash
 # 比较 SQL 文件和数据库
-schemadiff diff file.sql postgres://user:pass@localhost/dbname
+migra diff file.sql postgres://user:pass@localhost/dbname
 
 # 比较两个数据库
-schemadiff diff postgres://localhost/db1 postgres://localhost/db2
+migra diff postgres://localhost/db1 postgres://localhost/db2
 
 # 比较两个 SQL 文件
-schemadiff diff file_a.sql file_b.sql
+migra diff file_a.sql file_b.sql
 ```
 
 ### 命令行参数
@@ -44,29 +51,27 @@ schemadiff diff file_a.sql file_b.sql
 | `--unsafe-drop` | 允许输出危险的 DROP 操作 |
 | `--strict` | 遇到不支持的语句时失败 |
 | `-o, --output` | 输出到文件（默认：stdout） |
+| `-c, --config` | 指定配置文件路径 |
+| `-v, --verbose` | 详细输出 |
 
-### 示例
+### 配置文件
 
-1. **从 SQL 文件迁移到数据库**：
-   ```bash
-   schemadiff diff schema.sql postgres://localhost/myapp
-   ```
+支持配置文件 `~/.migra.yaml` 或 `./migra.yaml`，示例：
 
-2. **仅输出高风险操作警告**：
-   ```bash
-   schemadiff diff --unsafe-drop=false file.sql postgres://localhost/myapp
-   ```
+```bash
+# 复制示例配置
+cp examples/config.yaml ~/.migra.yaml
+# 或
+cp examples/.env.example .env
+```
 
-3. **输出 JSON 格式**：
-   ```bash
-   schemadiff diff -f json file.sql postgres://localhost/myapp
-   ```
+详见 [examples/](examples/) 目录。
 
 ## 项目结构
 
 ```
 .
-├── cmd/schemadiff        # CLI 入口（cobra + viper）
+├── cmd/migra/           # CLI 入口（cobra + viper）
 ├── internal/
 │   ├── model/          # 中间数据模型（Schema, Table, Column...）
 │   ├── parser/         # SQL 解析（pg_query_go）
@@ -76,20 +81,41 @@ schemadiff diff file_a.sql file_b.sql
 │   ├── plan/           # 执行计划（DAG 排序）
 │   ├── render/         # SQL 渲染器
 │   └── testutil/       # 测试工具
-├── docs/               # 设计文档
-└── testdata/           # 测试数据
+├── scripts/            # 辅助脚本
+├── examples/           # 示例配置
+├── docs/               # 使用手册、架构设计
+├── testdata/           # 测试数据
+├── Makefile            # 常用命令（build/test/lint）
+└── .github/            # CI/CD 配置
 ```
 
-## 开发进度
+## 开发
 
-- ✅ **Phase 1**：introspect MVP + golden 测试框架
-- ✅ **Phase 2**：diff/render + plan DAG 排序
-- ✅ **Phase 3**：parser MVP + file→db 链路
-- ✅ **Phase 4**：破坏性变更诊断 + CLI 完善
+### 环境搭建
 
-## 技术栈
+```bash
+# 使用初始化脚本
+./scripts/setup.sh
 
-- **语言**：Go 1.21+
+# 或手动设置
+make build
+make test
+```
+
+### 常用命令
+
+```bash
+make build    # 构建项目
+make test     # 运行测试
+make lint     # 代码检查
+make fmt      # 格式化代码
+make vet      # Go vet 检查
+make ci       # 运行完整 CI 检查
+```
+
+### 技术栈
+
+- **语言**：Go 1.26+
 - **CLI 框架**：[cobra](https://github.com/spf13/cobra) + [viper](https://github.com/spf13/viper)
 - **数据库驱动**：[pgx v5](https://github.com/jackc/pgx)
 - **SQL 解析**：[pg_query_go](https://github.com/lfittl/pg_query_go)
@@ -97,11 +123,23 @@ schemadiff diff file_a.sql file_b.sql
 
 ## 贡献
 
-欢迎提交 Issue 和 Pull Request！
+欢迎贡献！请阅读：
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) - 贡献指南
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) - 行为准则
+
+提交 Pull Request 前请确保：
+- ✅ 运行 `make ci` 通过所有检查
+- ✅ 添加必要的测试
+- ✅ 更新相关文档
+
+## 变更日志
+
+查看 [CHANGELOG.md](CHANGELOG.md) 了解版本变更。
 
 ## License
 
-[待定]
+本项目采用 [MIT License](LICENSE) 开源。
 
 ---
 
