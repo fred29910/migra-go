@@ -64,6 +64,18 @@ func (r *Renderer) Render(op diff.Operation) string {
 		return r.renderCreateIndex(v)
 	case *diff.DropIndexOp:
 		return r.renderDropIndex(v)
+	case *diff.AddConstraintOp:
+		return fmt.Sprintf("-- op: add_constraint risk:medium\nALTER TABLE %s ADD CONSTRAINT %s %s;",
+			quoteQualifiedIdentifier(v.Schema, v.Table),
+			quoteIdentifier(v.Constraint.Name),
+			v.Constraint.Definition,
+		)
+	case *diff.DropConstraintOp:
+		return fmt.Sprintf("-- op: drop_constraint risk:medium\nALTER TABLE %s DROP CONSTRAINT %s%s;",
+			quoteQualifiedIdentifier(v.Schema, v.Table),
+			ifExistsPrefix(r.useIfExists),
+			quoteIdentifier(v.Name),
+		)
 	case *diff.AddEnumTypeOp:
 		return r.renderAddEnumType(v)
 	case *diff.DropEnumTypeOp:

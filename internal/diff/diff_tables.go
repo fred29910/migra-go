@@ -61,6 +61,21 @@ func (d *Differ) diffTables(source, target *model.Namespace) {
 		sourceTable := source.Tables[name]
 		d.diffTableColumns(source.Name, sourceTable, targetTable)
 		d.diffTableIndexes(source.Name, sourceTable, targetTable)
+		d.diffTableConstraints(source.Name, sourceTable, targetTable)
+	}
+}
+
+// diffTableConstraints compares constraints between two tables
+func (d *Differ) diffTableConstraints(schema string, source, target *model.Table) {
+	for name, c := range target.Constraints {
+		if _, exists := source.Constraints[name]; !exists {
+			d.addOp(NewAddConstraintOp(schema, target.Name, c))
+		}
+	}
+	for name := range source.Constraints {
+		if _, exists := target.Constraints[name]; !exists {
+			d.addOp(NewDropConstraintOp(schema, source.Name, name))
+		}
 	}
 }
 

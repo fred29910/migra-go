@@ -83,3 +83,31 @@ func TestDiffer_WarnsOnUnsupportedDrops(t *testing.T) {
 		t.Fatalf("expected column warning, got: %s", warnings)
 	}
 }
+
+func TestDiffTableConstraints_AddAndDrop(t *testing.T) {
+	source := model.NewSchema()
+	target := model.NewSchema()
+	srcNs := source.GetOrCreateNamespace("public")
+	tgtNs := target.GetOrCreateNamespace("public")
+	srcTable := model.NewTable("public", "users")
+	tgtTable := model.NewTable("public", "users")
+	srcTable.Constraints["uq_users_email"] = &model.Constraint{Name: "uq_users_email", Type: "unique", Definition: "UNIQUE (email)", Table: "users"}
+	tgtTable.Constraints["ck_users_age"] = &model.Constraint{Name: "ck_users_age", Type: "check", Definition: "CHECK (age >= 0)", Table: "users"}
+	srcNs.Tables["users"] = srcTable
+	tgtNs.Tables["users"] = tgtTable
+
+	d := NewDiffer()
+	ops := d.Diff(source, target)
+	var hasAdd, hasDrop bool
+	for _, op := range ops {
+		if op.Kind() == KindAddConstraint {
+			hasAdd = true
+		}
+		if op.Kind() == KindDropConstraint {
+			hasDrop = true
+		}
+	}
+	if !hasAdd || !hasDrop {
+		t.Fatalf("expected add/drop constraint ops, got add=%v drop=%v", hasAdd, hasDrop)
+	}
+}
