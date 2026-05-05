@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/fred29910/migra-go/internal/model"
@@ -8,14 +9,26 @@ import (
 
 // Differ performs diff between two schemas
 type Differ struct {
-	ops []Operation
+	ops      []Operation
+	warnings []string
 }
 
 // NewDiffer creates a new Differ
 func NewDiffer() *Differ {
 	return &Differ{
-		ops: make([]Operation, 0),
+		ops:      make([]Operation, 0),
+		warnings: make([]string, 0),
 	}
+}
+
+func (d *Differ) warnf(format string, args ...any) {
+	d.warnings = append(d.warnings, fmt.Sprintf(format, args...))
+}
+
+func (d *Differ) Warnings() []string {
+	out := make([]string, len(d.warnings))
+	copy(out, d.warnings)
+	return out
 }
 
 // Diff compares two schemas and returns a list of operations
@@ -61,6 +74,7 @@ func (d *Differ) diffSchemas(source, target *model.Schema) {
 		if _, exists := target.Schemas[name]; !exists {
 			// Namespace dropped - MVP: skip or handle explicitly
 			_ = source.Schemas[name]
+			d.warnf("namespace drop is not implemented yet (ignored): %s", name)
 		}
 	}
 }

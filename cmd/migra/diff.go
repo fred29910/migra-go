@@ -78,6 +78,10 @@ func runDiff(cmd *cobra.Command, args []string) error {
 	differ := diff.NewDiffer()
 	operations := differ.Diff(sourceSchema, targetSchema)
 
+	for _, w := range differ.Warnings() {
+		fmt.Fprintf(os.Stderr, "Warning: %s\n", w)
+	}
+
 	// Analyze destructive changes
 	destructiveCount := 0
 	for _, op := range operations {

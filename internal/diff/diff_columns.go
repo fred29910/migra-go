@@ -26,6 +26,7 @@ func (d *Differ) diffColumn(schema, table string, source, target *model.Column) 
 		// TODO: implement SetDefaultOp and DropDefaultOp
 		_ = source.DefaultExpr
 		_ = target.DefaultExpr
+		d.warnf("column %s.%s.%s default change is not implemented yet (ignored)", schema, table, source.Name)
 	}
 }
 

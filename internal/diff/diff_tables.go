@@ -85,6 +85,7 @@ func (d *Differ) diffTableColumns(schema string, source, target *model.Table) {
 		if _, exists := target.ColumnByName[name]; !exists {
 			// MVP: skip column drops for safety
 			_ = name
+			d.warnf("column drop is not implemented yet (ignored): %s.%s.%s", schema, source.Name, name)
 		}
 	}
 
