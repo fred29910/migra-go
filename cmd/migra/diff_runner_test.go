@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fred29910/migra-go/internal/app"
 	"github.com/fred29910/migra-go/internal/diff"
 	"github.com/fred29910/migra-go/internal/model"
 	"github.com/spf13/cobra"
@@ -37,7 +38,7 @@ func TestParseDiffConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.source != "a.sql" || cfg.target != "b.sql" || cfg.format != "json" {
+	if cfg.Source != "a.sql" || cfg.Target != "b.sql" || cfg.Format != "json" {
 		t.Fatalf("unexpected cfg: %+v", cfg)
 	}
 }
@@ -45,25 +46,21 @@ func TestParseDiffConfig(t *testing.T) {
 // fakeDeps is a test double for runnerDeps with call tracking
 type fakeDeps struct {
 	computeCalled int
-	deps          runnerDeps
+	deps          app.RunnerDeps
 }
 
 func newFakeDeps() *fakeDeps {
 	fd := &fakeDeps{}
-	fd.deps = runnerDeps{
-		loadSchema: func(ctx context.Context, source string, schemas []string, strict bool) (*model.Schema, error) {
+	fd.deps = app.RunnerDeps{
+		LoadSchema: func(ctx context.Context, source string, schemas []string, strict bool) (*model.Schema, error) {
 			return model.NewSchema(), nil
 		},
-		compute: func(source, target *model.Schema, cfg diffConfig) ([]diff.Operation, []string, error) {
+		Compute: func(source, target *model.Schema, cfg app.Config) ([]diff.Operation, []string, error) {
 			fd.computeCalled++
 			return []diff.Operation{}, []string{}, nil
 		},
-		reportWarnings: func(warnings []string) {},
-		render: func(ops []diff.Operation, format string) (string, error) {
+		Render: func(ops []diff.Operation, format string) (string, error) {
 			return "-- No changes detected", nil
-		},
-		writeOutput: func(output string, outputFile string) error {
-			return nil
 		},
 	}
 	return fd
@@ -75,15 +72,17 @@ func TestParseDiffConfig_DefaultTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.timeout != 30*time.Second {
-		t.Fatalf("expected 30s, got %s", cfg.timeout)
+	if cfg.Timeout != 30*time.Second {
+		t.Fatalf("expected 30s, got %s", cfg.Timeout)
 	}
 }
 
 func TestRunDiffWithDeps_UsesInjectedEngines(t *testing.T) {
 	fd := newFakeDeps()
-	cfg := diffConfig{source: "a.sql", target: "b.sql", format: "sql", timeout: time.Second}
-	if err := runDiffWithDeps(context.Background(), cfg, fd.deps); err != nil {
+	cfg := app.Config{Source: "a.sql", Target: "b.sql", Format: "sql", Timeout: time.Second}
+	svc := app.NewDiffService(fd.deps)
+	_, _, err := svc.Run(context.Background(), cfg)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if fd.computeCalled == 0 {

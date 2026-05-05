@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/fred29910/migra-go/internal/app"
 	"github.com/fred29910/migra-go/internal/introspect"
 	"github.com/fred29910/migra-go/internal/model"
 	"github.com/fred29910/migra-go/internal/parser"
@@ -43,7 +44,14 @@ func runDiff(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return runDiffWithDeps(cmd.Context(), cfg, newDefaultDeps())
+	out, warns, err := app.NewDiffService(newDefaultDeps()).Run(cmd.Context(), cfg)
+	if err != nil {
+		return err
+	}
+	for _, w := range warns {
+		fmt.Fprintf(os.Stderr, "Warning: %s\n", w)
+	}
+	return writeOutput(out, cfg.OutputFile)
 }
 
 // loadSchemaWithContext loads a schema from either a SQL file or PostgreSQL connection
