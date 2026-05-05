@@ -7,6 +7,18 @@
 
 ## [未发布]
 
+### 修复 (Fixes)
+- fix(cli): accept `pg://` short postgres URLs
+- fix(diff): deterministic enum diff ordering
+- refactor(cli): replace init panic with setup error handling
+
+### 特性 (Features)
+- feat(diff): report warnings for unsupported changes
+- feat(diff): add minimal add/drop constraint pipeline
+
+### 性能 (Performance)
+- perf(plan): optimize DAG dedupe and queue traversal
+
 ### 新增
 - 添加 GitHub Actions CI/CD 配置（test、lint、release）
 - 添加开源规范文件（LICENSE、CONTRIBUTING.md、CODE_OF_CONDUCT.md）
