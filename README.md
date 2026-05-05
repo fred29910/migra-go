@@ -5,15 +5,16 @@
 [![Lint](https://github.com/fred29910/migra-go/actions/workflows/lint.yml/badge.svg)](https://github.com/fred29910/migra-go/actions/workflows/lint.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-一个用 Go 编写的 PostgreSQL schema 差异比较工具，灵感来自 Python 版的 [migra](https://github.com/djrobstep/migra)。
+一个用 Go 编写的 PostgreSQL Schema 差异比较工具，灵感来自 Python 版的 [migra](https://github.com/djrobstep/migra)。
 
 ## 功能特性
 
-- 🔍 **双向 Diff**：比较 SQL 文件、PostgreSQL 实例或两者之间的差异
-- 🏗️ **结构化模型**：使用中间 SchemaModel 表示数据库结构
-- 📋 **SQL 生成**：输出可执行的迁移 SQL
-- 🛡️ **安全保护**：标记破坏性操作，可选跳过危险变更
-- 🎯 **语义归一化**：减少因同义表达导致的误报
+- 🔍 **双向 Diff**：比较 SQL 文件、PostgreSQL 实例或两者之间的差异。
+- 🏗️ **结构化模型**：使用中间 SchemaModel 表示数据库结构。
+- 📋 **SQL 生成**：输出可执行的迁移 SQL，支持枚举类型、索引、数据列和约束的精确变更。
+- 🛡️ **安全保护**：标记破坏性操作，默认抛出告警提示，可选跳过危险变更。
+- 🎯 **语义归一化**：减少因同义表达导致的误报。
+- 🚀 **高性能**：基于 Kahn 算法实现的 DAG（有向无环图）拓扑排序，保证生成脚本的执行顺序确定且高效。
 
 ## 快速开始
 
@@ -32,8 +33,9 @@ make build
 ### 基本用法
 
 ```bash
-# 比较 SQL 文件和数据库
+# 比较 SQL 文件和数据库（支持 pg:// 等短连接格式）
 migra diff file.sql postgres://user:pass@localhost/dbname
+migra diff file.sql pg://localhost/dbname
 
 # 比较两个数据库
 migra diff postgres://localhost/db1 postgres://localhost/db2
@@ -46,13 +48,13 @@ migra diff file_a.sql file_b.sql
 
 | 参数 | 说明 |
 |------|------|
-| `-s, --schema` | 指定要比较的 schema（可多个） |
-| `-f, --format` | 输出格式：sql 或 json |
+| `-s, --schema` | 指定要比较的 Schema 列表（可指定多个） |
+| `-f, --format` | 输出格式：`sql` 或 `json` |
 | `--unsafe-drop` | 允许输出危险的 DROP 操作 |
-| `--strict` | 遇到不支持的语句时失败 |
-| `-o, --output` | 输出到文件（默认：stdout） |
+| `--strict` | 遇到不支持的语句时直接失败退出 |
+| `-o, --output` | 输出到文件（默认输出到 stdout） |
 | `-c, --config` | 指定配置文件路径 |
-| `-v, --verbose` | 详细输出 |
+| `-v, --verbose` | 输出详细日志 |
 
 ### 配置文件
 
@@ -67,7 +69,7 @@ cp examples/.env.example .env
 
 ### 数据库连接方式
 
-migra 支持多种 PostgreSQL 连接方式：
+MIGRA-Go 支持多种 PostgreSQL 连接方式：
 
 **1. 连接字符串**
 ```bash
@@ -96,31 +98,31 @@ migra diff file.sql "postgres://?service=myservice"
 migra diff file.sql "postgres://myuser@localhost/mydb"
 ```
 
-详见 [examples/](examples/) 目录和 [PostgreSQL 文档](https://www.postgresql.org/docs/current/libpq-envars.html)。
+详见 [examples/](examples/) 目录和 [PostgreSQL 官方文档](https://www.postgresql.org/docs/current/libpq-envars.html)。
 
 ## 项目结构
 
 ```
 .
-├── cmd/migra/           # CLI 入口（cobra + viper）
+├── cmd/migra/          # CLI 入口（Cobra + Viper）
 ├── internal/
-│   ├── model/          # 中间数据模型（Schema, Table, Column...）
-│   ├── parser/         # SQL 解析（pg_query_go）
-│   ├── introspect/     # 数据库内省（pg_catalog）
+│   ├── model/          # 中间数据模型（Schema、Table、Column 等）
+│   ├── parser/         # SQL 解析（基于 pg_query_go）
+│   ├── introspect/     # 数据库内省（读取 pg_catalog）
 │   ├── normalize/      # 语义归一化
-│   ├── diff/           # 差异比较引擎
-│   ├── plan/           # 执行计划（DAG 排序）
-│   ├── render/         # SQL 渲染器
-│   └── testutil/       # 测试工具
-├── scripts/            # 辅助脚本
-├── examples/           # 示例配置
-├── docs/               # 使用手册、架构设计
-├── testdata/           # 测试数据
-├── Makefile            # 常用命令（build/test/lint）
-└── .github/            # CI/CD 配置
+│   ├── diff/           # 差异比较引擎（包含操作收集与警告反馈）
+│   ├── plan/           # 执行计划与拓扑排序（DAG）
+│   ├── render/         # SQL / JSON 渲染器
+│   └── testutil/       # 测试工具集
+├── scripts/            # 辅助构建脚本
+├── examples/           # 示例配置与环境变量
+├── docs/               # 使用手册、架构设计及评审纪要
+├── testdata/           # 单元测试与集成测试用例
+├── Makefile            # 常用构建命令集合
+└── .github/            # GitHub Actions CI/CD 工作流
 ```
 
-## 开发
+## 开发指南
 
 ### 环境搭建
 
@@ -136,42 +138,42 @@ make test
 ### 常用命令
 
 ```bash
-make build    # 构建项目
-make test     # 运行测试
-make lint     # 代码检查
-make fmt      # 格式化代码
-make vet      # Go vet 检查
-make ci       # 运行完整 CI 检查
+make build    # 构建项目可执行文件
+make test     # 运行单元与集成测试
+make lint     # 运行代码规范检查
+make fmt      # 格式化 Go 代码
+make vet      # 运行 go vet 静态检查
+make ci       # 本地运行完整 CI 检查流程
 ```
 
 ### 技术栈
 
-- **语言**：Go 1.26+
-- **CLI 框架**：[cobra](https://github.com/spf13/cobra) + [viper](https://github.com/spf13/viper)
+- **语言**：Go 1.24+
+- **CLI 框架**：[Cobra](https://github.com/spf13/cobra) + [Viper](https://github.com/spf13/viper)
 - **数据库驱动**：[pgx v5](https://github.com/jackc/pgx)
 - **SQL 解析**：[pg_query_go](https://github.com/lfittl/pg_query_go)
-- **测试**：[testify](https://github.com/stretchr/testify)
+- **测试框架**：[testify](https://github.com/stretchr/testify)
 
-## 贡献
+## 参与贡献
 
-欢迎贡献！请阅读：
+欢迎大家提交 Issue 和 Pull Request！参与前请先阅读：
 
-- [CONTRIBUTING.md](CONTRIBUTING.md) - 贡献指南
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) - 行为准则
+- [贡献指南](./CONTRIBUTING.md)
+- [行为准则](./CODE_OF_CONDUCT.md)
 
-提交 Pull Request 前请确保：
-- ✅ 运行 `make ci` 通过所有检查
-- ✅ 添加必要的测试
-- ✅ 更新相关文档
+提交 Pull Request 前，请确保：
+- ✅ 运行 `make ci` 且通过所有检查
+- ✅ 补充了必要的单元测试或集成测试
+- ✅ 更新了相关的 Markdown 文档
 
 ## 变更日志
 
-查看 [CHANGELOG.md](CHANGELOG.md) 了解版本变更。
+查看 [CHANGELOG.md](CHANGELOG.md) 了解详细的版本迭代与变更历史。
 
-## License
+## 许可证
 
-本项目采用 [MIT License](LICENSE) 开源。
+本项目采用 [MIT License](LICENSE) 开源协议。
 
 ---
 
-**注意**：本项目仍在积极开发中，API 和功能可能会发生变化。
+**注意**：本项目仍在积极迭代中，部分 API 和内部实现可能随时进行演进与优化。
