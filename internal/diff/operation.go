@@ -282,9 +282,9 @@ type AddConstraintOp struct {
 func NewAddConstraintOp(schema, table string, c *model.Constraint) *AddConstraintOp {
 	return &AddConstraintOp{
 		baseOperation: baseOperation{kind: KindAddConstraint, objectKey: model.NewObjectKey(schema, table+"."+c.Name, model.KindConstraint)},
-		Schema:     schema,
-		Table:      table,
-		Constraint: c,
+		Schema:        schema,
+		Table:         table,
+		Constraint:    c,
 	}
 }
 
@@ -302,9 +302,9 @@ type DropConstraintOp struct {
 func NewDropConstraintOp(schema, table, name string) *DropConstraintOp {
 	return &DropConstraintOp{
 		baseOperation: baseOperation{kind: KindDropConstraint, objectKey: model.NewObjectKey(schema, table+"."+name, model.KindConstraint)},
-		Schema: schema,
-		Table:  table,
-		Name:   name,
+		Schema:        schema,
+		Table:         table,
+		Name:          name,
 	}
 }
 

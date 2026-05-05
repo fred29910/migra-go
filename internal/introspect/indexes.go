@@ -34,11 +34,11 @@ func loadIndexes(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mod
 	defer rows.Close()
 
 	var (
-		indexName  string
-		tableName  string
+		indexName   string
+		tableName   string
 		columnNames []string
-		isUnique   bool
-		method     string
+		isUnique    bool
+		method      string
 	)
 
 	for rows.Next() {

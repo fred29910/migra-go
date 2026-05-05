@@ -202,14 +202,14 @@ func (p *Parser) parseColumnDef(colDef pg_nodes.ColumnDef) *model.Column {
 			switch c.Contype {
 			case pg_nodes.CONSTR_NOTNULL:
 				col.IsNullable = false
-		case pg_nodes.CONSTR_DEFAULT:
-			// Extract default value expression
-			if c.RawExpr != nil {
-				expr, ok := p.parseExpression(c.RawExpr)
-				if ok {
-					col.DefaultExpr = &expr
+			case pg_nodes.CONSTR_DEFAULT:
+				// Extract default value expression
+				if c.RawExpr != nil {
+					expr, ok := p.parseExpression(c.RawExpr)
+					if ok {
+						col.DefaultExpr = &expr
+					}
 				}
-			}
 			}
 		}
 	}

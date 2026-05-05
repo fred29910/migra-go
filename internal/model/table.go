@@ -4,7 +4,7 @@ package model
 type Table struct {
 	Schema       string
 	Name         string
-	Columns      []*Column // Preserve order for column ordering strategies
+	Columns      []*Column          // Preserve order for column ordering strategies
 	ColumnByName map[string]*Column `json:"-"` // Index for quick lookup by name, excluded from JSON
 	PrimaryKey   *PrimaryKey
 	Constraints  map[string]*Constraint
@@ -38,11 +38,11 @@ type Constraint struct {
 func NewTable(schema, name string) *Table {
 	return &Table{
 		Schema:       schema,
-		Name:          name,
-		Columns:       make([]*Column, 0),
-		ColumnByName:  make(map[string]*Column),
-		Constraints:   make(map[string]*Constraint),
-		Indexes:       make(map[string]*Index),
+		Name:         name,
+		Columns:      make([]*Column, 0),
+		ColumnByName: make(map[string]*Column),
+		Constraints:  make(map[string]*Constraint),
+		Indexes:      make(map[string]*Index),
 	}
 }
 
