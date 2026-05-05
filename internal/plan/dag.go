@@ -9,9 +9,10 @@ import (
 
 // Node represents a node in the dependency graph
 type Node struct {
-	Op           diff.Operation
-	Dependencies []*Node // Nodes that this node depends on
-	Dependents   []*Node // Nodes that depend on this node
+	Op            diff.Operation
+	Dependencies  []*Node // Nodes that this node depends on
+	Dependents    []*Node // Nodes that depend on this node
+	DependencySet map[*Node]struct{}
 }
 
 // DAG represents a directed acyclic graph of operations
@@ -31,9 +32,10 @@ func NewDAG() *DAG {
 // AddNode adds an operation to the DAG
 func (d *DAG) AddNode(op diff.Operation) *Node {
 	node := &Node{
-		Op:           op,
-		Dependencies: make([]*Node, 0),
-		Dependents:   make([]*Node, 0),
+		Op:            op,
+		Dependencies:  make([]*Node, 0),
+		Dependents:    make([]*Node, 0),
+		DependencySet: make(map[*Node]struct{}),
 	}
 	d.nodes = append(d.nodes, node)
 	key := op.ObjectKey()
@@ -46,11 +48,10 @@ func (d *DAG) AddDependency(from, to *Node) {
 	if from == nil || to == nil || from == to {
 		return
 	}
-	for _, dep := range from.Dependencies {
-		if dep == to {
-			return
-		}
+	if _, exists := from.DependencySet[to]; exists {
+		return
 	}
+	from.DependencySet[to] = struct{}{}
 	from.Dependencies = append(from.Dependencies, to)
 	to.Dependents = append(to.Dependents, from)
 }
@@ -139,19 +140,19 @@ func (d *DAG) GetExecutionOrder() ([]diff.Operation, error) {
 	}
 
 	// Queue for nodes with in-degree 0
-	queue := make([]*Node, 0)
+	queue := make([]*Node, 0, len(d.nodes))
 	for _, node := range d.nodes {
 		if inDegree[node] == 0 {
 			queue = append(queue, node)
 		}
 	}
 
-	result := make([]diff.Operation, 0)
+	result := make([]diff.Operation, 0, len(d.nodes))
 
-	for len(queue) > 0 {
-		// Remove from queue
-		node := queue[0]
-		queue = queue[1:]
+	head := 0
+	for head < len(queue) {
+		node := queue[head]
+		head++
 		result = append(result, node.Op)
 
 		// For each dependent, reduce in-degree

@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/fred29910/migra-go/internal/diff"
@@ -53,5 +54,38 @@ func TestTopoSortCreateIndexDependsOnAddTable(t *testing.T) {
 	}
 	if sorted[1].Kind() != diff.KindAddIndex {
 		t.Fatalf("expected second op to be add_index, got %s", sorted[1].Kind())
+	}
+}
+
+func TestDAGAddDependency_DeduplicatesEdges(t *testing.T) {
+	dag := NewDAG()
+	a := dag.AddNode(diff.NewAddTableOp("public", "a", model.NewTable("public", "a")))
+	b := dag.AddNode(diff.NewAddTableOp("public", "b", model.NewTable("public", "b")))
+	dag.AddDependency(a, b)
+	dag.AddDependency(a, b)
+	if len(a.Dependencies) != 1 {
+		t.Fatalf("expected 1 dependency, got %d", len(a.Dependencies))
+	}
+	if len(b.Dependents) != 1 {
+		t.Fatalf("expected 1 dependent, got %d", len(b.Dependents))
+	}
+}
+
+func TestDAGGetExecutionOrder_StableForLinearChain(t *testing.T) {
+	dag := NewDAG()
+	c := dag.AddNode(diff.NewAddTableOp("public", "c", model.NewTable("public", "c")))
+	b := dag.AddNode(diff.NewAddTableOp("public", "b", model.NewTable("public", "b")))
+	a := dag.AddNode(diff.NewAddTableOp("public", "a", model.NewTable("public", "a")))
+	dag.AddDependency(a, b)
+	dag.AddDependency(b, c)
+
+	ops, err := dag.GetExecutionOrder()
+	if err != nil {
+		t.Fatalf("GetExecutionOrder failed: %v", err)
+	}
+	got := []string{ops[0].ObjectKey().Name, ops[1].ObjectKey().Name, ops[2].ObjectKey().Name}
+	want := []string{"c", "b", "a"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("unexpected order: got=%v want=%v", got, want)
 	}
 }
