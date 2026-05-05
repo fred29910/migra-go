@@ -19,10 +19,10 @@ func TestSchemaSerialization(t *testing.T) {
 		IsNullable: false,
 	})
 	table.AddColumn(&Column{
-		Name:         "name",
-		DataType:     "varchar",
-		IsNullable:   true,
-		DefaultExpr:  nil,
+		Name:        "name",
+		DataType:    "varchar",
+		IsNullable:  true,
+		DefaultExpr: nil,
 	})
 	ns.Tables["users"] = table
 

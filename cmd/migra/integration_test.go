@@ -27,8 +27,8 @@ func TestIntegrationDiffRender(t *testing.T) {
 	targetNs := target.GetOrCreateNamespace("public")
 	targetTable := model.NewTable("public", "users")
 	targetTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: false})
-	targetTable.AddColumn(&model.Column{Name: "name", DataType: "text", IsNullable: false}) // Type changed
-	targetTable.AddColumn(&model.Column{Name: "age", DataType: "integer", IsNullable: true})  // New column
+	targetTable.AddColumn(&model.Column{Name: "name", DataType: "text", IsNullable: false})  // Type changed
+	targetTable.AddColumn(&model.Column{Name: "age", DataType: "integer", IsNullable: true}) // New column
 	targetTable.PrimaryKey = &model.PrimaryKey{Name: "users_pkey", Columns: []string{"id"}}
 	targetNs.Tables["users"] = targetTable
 

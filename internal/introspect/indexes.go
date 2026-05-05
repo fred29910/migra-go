@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/fred29910/migra-go/internal/model"
+	"github.com/jackc/pgx/v5"
 )
 
 // loadIndexes loads indexes from pg_indexes

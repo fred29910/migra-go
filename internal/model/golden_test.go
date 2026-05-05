@@ -24,16 +24,16 @@ func TestGoldenSchema(t *testing.T) {
 		IsNullable: false,
 	})
 	table.AddColumn(&model.Column{
-		Name:         "username",
-		DataType:     "varchar",
-		IsNullable:   false,
-		DefaultExpr:  nil,
+		Name:        "username",
+		DataType:    "varchar",
+		IsNullable:  false,
+		DefaultExpr: nil,
 	})
 	table.AddColumn(&model.Column{
-		Name:       "created_at",
-		DataType:   "timestamp",
-		IsNullable: true,
-		DefaultExpr:  stringPtr("now()"),
+		Name:        "created_at",
+		DataType:    "timestamp",
+		IsNullable:  true,
+		DefaultExpr: stringPtr("now()"),
 	})
 	ns.Tables["users"] = table
 

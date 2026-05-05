@@ -10,8 +10,8 @@ type Stage string
 
 const (
 	StagePreDeploy  Stage = "pre-deploy"  // Create objects
-	StageDeploy     Stage = "deploy"       // Alter objects
-	StagePostDeploy Stage = "post-deploy"  // Drop objects (dangerous)
+	StageDeploy     Stage = "deploy"      // Alter objects
+	StagePostDeploy Stage = "post-deploy" // Drop objects (dangerous)
 )
 
 // PlannedOp wraps an operation with its stage

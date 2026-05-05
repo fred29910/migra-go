@@ -11,16 +11,16 @@ import (
 
 // Renderer converts diff operations into SQL statements
 type Renderer struct {
-	sql        []string
-	format     string // "sql" or "json"
+	sql         []string
+	format      string // "sql" or "json"
 	useIfExists bool
 }
 
 // NewRenderer creates a new Renderer
 func NewRenderer() *Renderer {
 	return &Renderer{
-		sql:        make([]string, 0),
-		format:     "sql",
+		sql:         make([]string, 0),
+		format:      "sql",
 		useIfExists: true,
 	}
 }
@@ -33,7 +33,7 @@ func (r *Renderer) SetFormat(format string) {
 // RenderAll converts all operations to SQL
 func (r *Renderer) RenderAll(ops []diff.Operation) string {
 	// Sort operations by dependency order (TODO: implement proper sorting)
-	
+
 	for _, op := range ops {
 		sql := r.Render(op)
 		if sql != "" {
@@ -75,7 +75,7 @@ func (r *Renderer) Render(op diff.Operation) string {
 func (r *Renderer) renderAddTable(op *diff.AddTableOp) string {
 	table := op.Table
 	columns := make([]string, 0)
-	
+
 	for _, col := range table.Columns {
 		colDef := fmt.Sprintf("    %s %s", quoteIdentifier(col.Name), col.DataType)
 		if !col.IsNullable {
@@ -88,7 +88,7 @@ func (r *Renderer) renderAddTable(op *diff.AddTableOp) string {
 	}
 
 	// TODO: Add primary key, constraints
-	
+
 	sql := fmt.Sprintf("-- op: add_table risk:low\nCREATE TABLE %s (\n%s\n);",
 		quoteIdentifier(table.Name),
 		strings.Join(columns, ",\n"))
@@ -107,14 +107,14 @@ func (r *Renderer) renderAddColumn(op *diff.AddColumnOp) string {
 	col := op.Column
 	sql := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s",
 		quoteIdentifier(op.Table), quoteIdentifier(col.Name), col.DataType)
-	
+
 	if !col.IsNullable {
 		sql += " NOT NULL"
 	}
 	if col.DefaultExpr != nil {
 		sql += fmt.Sprintf(" DEFAULT %s", *col.DefaultExpr)
 	}
-	
+
 	return fmt.Sprintf("-- op: add_column risk:low\n%s;", sql)
 }
 
@@ -148,7 +148,7 @@ func (r *Renderer) renderCreateIndex(op *diff.CreateIndexOp) string {
 }
 
 func (r *Renderer) renderDropIndex(op *diff.DropIndexOp) string {
-	return fmt.Sprintf("-- op: drop_index risk:medium\nDROP INDEX %s%s;", 
+	return fmt.Sprintf("-- op: drop_index risk:medium\nDROP INDEX %s%s;",
 		ifExistsPrefix(r.useIfExists), quoteIdentifier(op.Name))
 }
 
@@ -198,24 +198,24 @@ func ifExistsPrefix(use bool) string {
 func RenderJSON(ops []diff.Operation) (string, error) {
 	// Convert operations to a JSON-friendly format
 	type OpInfo struct {
-		Kind       string           `json:"kind"`
-		Object     model.ObjectKey  `json:"object"`
+		Kind        string          `json:"kind"`
+		Object      model.ObjectKey `json:"object"`
 		Destructive bool            `json:"destructive"`
 	}
-	
+
 	infos := make([]OpInfo, len(ops))
 	for i, op := range ops {
 		infos[i] = OpInfo{
-			Kind:       string(op.Kind()),
-			Object:     op.ObjectKey(),
+			Kind:        string(op.Kind()),
+			Object:      op.ObjectKey(),
 			Destructive: op.IsDestructive(),
 		}
 	}
-	
+
 	data, err := json.MarshalIndent(infos, "", "  ")
 	if err != nil {
 		return "", err
 	}
-	
+
 	return string(data), nil
 }

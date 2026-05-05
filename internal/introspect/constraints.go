@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/fred29910/migra-go/internal/model"
+	"github.com/jackc/pgx/v5"
 )
 
 // loadConstraints loads constraints from pg_constraint
@@ -30,10 +30,10 @@ func loadConstraints(ctx context.Context, conn *pgx.Conn, schemaName string, ns 
 	defer rows.Close()
 
 	var (
-		conName     string
-		conType     string
-		definition  string
-		tableName   string
+		conName    string
+		conType    string
+		definition string
+		tableName  string
 	)
 
 	for rows.Next() {

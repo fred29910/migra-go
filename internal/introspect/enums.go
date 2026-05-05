@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/fred29910/migra-go/internal/model"
+	"github.com/jackc/pgx/v5"
 )
 
 // loadEnumTypes loads enum types from pg_type and pg_enum
@@ -31,9 +31,9 @@ func loadEnumTypes(ctx context.Context, conn *pgx.Conn, schemaName string, ns *m
 	enumMap := make(map[string]*enumInfo)
 
 	var (
-		typeName   string
-		label      string
-		sortOrder  float32
+		typeName  string
+		label     string
+		sortOrder float32
 	)
 
 	for rows.Next() {

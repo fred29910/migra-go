@@ -4,7 +4,7 @@ package model
 type Table struct {
 	Schema      string
 	Name        string
-	Columns     []*Column         // Preserve order for column ordering strategies
+	Columns     []*Column // Preserve order for column ordering strategies
 	PrimaryKey  *PrimaryKey
 	Constraints map[string]*Constraint
 	Indexes     map[string]*Index

@@ -114,18 +114,18 @@ func canonicalizeIndex(idx *model.Index) *model.Index {
 // normalizeDataType normalizes type aliases to canonical names
 func normalizeDataType(dt string) string {
 	dt = strings.ToLower(strings.TrimSpace(dt))
-	
+
 	// Type aliases mapping
 	aliases := map[string]string{
-		"int4":         "integer",
-		"int8":         "bigint",
-		"int2":         "smallint",
-		"bool":          "boolean",
-		"character varying": "varchar",
+		"int4":                        "integer",
+		"int8":                        "bigint",
+		"int2":                        "smallint",
+		"bool":                        "boolean",
+		"character varying":           "varchar",
 		"timestamp without time zone": "timestamp",
-		"timestamp with time zone":   "timestamptz",
+		"timestamp with time zone":    "timestamptz",
 	}
-	
+
 	if canonical, ok := aliases[dt]; ok {
 		return canonical
 	}

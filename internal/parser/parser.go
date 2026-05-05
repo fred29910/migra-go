@@ -14,9 +14,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/fred29910/migra-go/internal/model"
 	pg "github.com/lfittl/pg_query_go"
 	pg_nodes "github.com/lfittl/pg_query_go/nodes"
-	"github.com/fred29910/migra-go/internal/model"
 )
 
 // ParseError represents a parsing error with position information
@@ -118,7 +118,7 @@ func (p *Parser) handleCreateTable(stmt pg_nodes.CreateStmt) error {
 			if col != nil {
 				table.AddColumn(col)
 			}
-		// MVP: Skip constraints for now
+			// MVP: Skip constraints for now
 		}
 	}
 
@@ -162,7 +162,7 @@ func (p *Parser) handleAlterTable(stmt pg_nodes.AlterTableStmt) error {
 					}
 				}
 			}
-		// MVP: Skip other alter commands
+			// MVP: Skip other alter commands
 		}
 	}
 
