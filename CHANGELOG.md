@@ -7,12 +7,13 @@
 
 ## [未发布]
 
-### 修复 (Fixes)
-- fix(cli): accept `pg://` short postgres URLs
-- fix(diff): deterministic enum diff ordering
-- refactor(cli): replace init panic with setup error handling
+### 重构 (Refactor)
+- refactor(cli): split diff pipeline into testable stages
+- refactor: inject diff/plan/render via interfaces
+- refactor(render): remove renderer mutable SQL buffer
 
 ### 特性 (Features)
+- feat(cli): add timeout flag and context propagation
 - feat(diff): report warnings for unsupported changes
 - feat(diff): add minimal add/drop constraint pipeline
 
