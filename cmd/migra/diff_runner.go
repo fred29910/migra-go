@@ -52,7 +52,8 @@ func newDefaultDeps() runnerDeps {
 			}
 		},
 		render: func(ops []diff.Operation, format string) (string, error) {
-			return renderOutput(ops, format)
+			renderer := render.NewRenderer()
+			return renderer.RenderOutput(ops, format)
 		},
 		writeOutput: writeOutput,
 	}
@@ -186,19 +187,6 @@ func computeDiff(source, target *model.Schema, cfg diffConfig) ([]diff.Operation
 	}
 
 	return allOps, warnings, nil
-}
-
-// renderOutput renders operations to the specified format
-func renderOutput(ops []diff.Operation, format string) (string, error) {
-	renderer := render.NewRenderer()
-	switch format {
-	case "sql":
-		return renderer.RenderAll(ops), nil
-	case "json":
-		return render.RenderJSON(ops)
-	default:
-		return "", fmt.Errorf("unsupported format: %s (allowed: sql, json)", format)
-	}
 }
 
 // writeOutput writes output text to file or stdout

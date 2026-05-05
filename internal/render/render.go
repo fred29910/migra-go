@@ -19,21 +19,26 @@ var _ SQLEngine = (*Renderer)(nil)
 
 // Renderer converts diff operations into SQL statements
 type Renderer struct {
-	format      string // "sql" or "json"
 	useIfExists bool
 }
 
 // NewRenderer creates a new Renderer
 func NewRenderer() *Renderer {
 	return &Renderer{
-		format:      "sql",
 		useIfExists: true,
 	}
 }
 
-// SetFormat sets the output format
-func (r *Renderer) SetFormat(format string) {
-	r.format = format
+// RenderOutput renders operations to the specified format
+func (r *Renderer) RenderOutput(ops []diff.Operation, format string) (string, error) {
+	switch format {
+	case "sql":
+		return r.RenderAll(ops), nil
+	case "json":
+		return RenderJSON(ops)
+	default:
+		return "", fmt.Errorf("unsupported format: %s (allowed: sql, json)", format)
+	}
 }
 
 // RenderAll converts all operations to SQL
