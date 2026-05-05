@@ -69,6 +69,17 @@ func newFakeDeps() *fakeDeps {
 	return fd
 }
 
+func TestParseDiffConfig_DefaultTimeout(t *testing.T) {
+	cmd := newDiffTestCommand()
+	cfg, err := parseDiffConfig(cmd, []string{"a.sql", "b.sql"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.timeout != 30*time.Second {
+		t.Fatalf("expected 30s, got %s", cfg.timeout)
+	}
+}
+
 func TestRunDiffWithDeps_UsesInjectedEngines(t *testing.T) {
 	fd := newFakeDeps()
 	cfg := diffConfig{source: "a.sql", target: "b.sql", format: "sql", timeout: time.Second}
