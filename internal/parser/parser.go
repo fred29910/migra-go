@@ -132,15 +132,11 @@ func (p *Parser) handleCreateTable(stmt pg_nodes.CreateStmt) error {
 func (p *Parser) handleAlterTable(stmt pg_nodes.AlterTableStmt) error {
 	tableName, schemaName := p.parseRelation(stmt.Relation)
 
-	// Get namespace and table
-	ns, exists := p.schema.Schemas[schemaName]
-	if !exists {
-		return fmt.Errorf("schema '%s' not found", schemaName)
-	}
+	// Get or create namespace and table (handles ALTER TABLE before CREATE TABLE in SQL)
+	ns := p.schema.GetOrCreateNamespace(schemaName)
 
 	table, exists := ns.Tables[tableName]
 	if !exists {
-		// Create table if not exists (for ALTER TABLE before CREATE TABLE in SQL)
 		table = model.NewTable(schemaName, tableName)
 		ns.Tables[tableName] = table
 	}
@@ -206,12 +202,14 @@ func (p *Parser) parseColumnDef(colDef pg_nodes.ColumnDef) *model.Column {
 			switch c.Contype {
 			case pg_nodes.CONSTR_NOTNULL:
 				col.IsNullable = false
-			case pg_nodes.CONSTR_DEFAULT:
-				// Extract default value expression
-				if c.RawExpr != nil {
-					expr := p.parseExpression(c.RawExpr)
+		case pg_nodes.CONSTR_DEFAULT:
+			// Extract default value expression
+			if c.RawExpr != nil {
+				expr, ok := p.parseExpression(c.RawExpr)
+				if ok {
 					col.DefaultExpr = &expr
 				}
+			}
 			}
 		}
 	}
@@ -256,36 +254,39 @@ func (p *Parser) parseTypeName(typeName pg_nodes.TypeName) string {
 	return strings.ToLower(typeStr)
 }
 
+// typeNameMapping maps PostgreSQL internal type names to standard SQL names
+var typeNameMapping = map[string]string{
+	"int4":   "integer",
+	"int8":   "bigint",
+	"float4": "real",
+	"float8": "double precision",
+}
+
 // mapTypeName maps PostgreSQL internal type names to standard SQL names
 func mapTypeName(name string) string {
-	mapping := map[string]string{
-		"int4":   "integer",
-		"int8":   "bigint",
-		"float4": "real",
-		"float8": "double precision",
-	}
-	if mapped, ok := mapping[name]; ok {
+	if mapped, ok := typeNameMapping[name]; ok {
 		return mapped
 	}
 	return name
 }
 
 // parseExpression extracts expression as string (simplified)
-func (p *Parser) parseExpression(expr pg_nodes.Node) string {
+// Returns the expression string and a boolean indicating if it was successfully parsed
+func (p *Parser) parseExpression(expr pg_nodes.Node) (string, bool) {
 	switch e := expr.(type) {
 	case pg_nodes.A_Const:
 		if e.Val != nil {
 			switch v := e.Val.(type) {
 			case pg_nodes.String:
-				return "'" + v.Str + "'"
+				return "'" + v.Str + "'", true
 			case pg_nodes.Integer:
-				return fmt.Sprintf("%d", v.Ival)
+				return fmt.Sprintf("%d", v.Ival), true
 			case pg_nodes.Float:
-				return v.Str
+				return v.Str, true
 			}
 		}
 	}
-	return ""
+	return "", false
 }
 
 // getStatementSnippet extracts SQL snippet around position

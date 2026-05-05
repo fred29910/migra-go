@@ -3,18 +3,29 @@ package introspect
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/fred29910/migra-go/internal/model"
 	"github.com/jackc/pgx/v5"
 )
 
-// loadIndexes loads indexes from pg_indexes
+// loadIndexes loads indexes from pg_index with structured column information
 func loadIndexes(ctx context.Context, conn *pgx.Conn, schemaName string, ns *model.Namespace) error {
 	query := `
-	SELECT indexname, indexdef, tablename, indexname
-	FROM pg_indexes
-	WHERE schemaname = $1`
+	SELECT
+		idx.relname AS index_name,
+		t.relname AS table_name,
+		array_agg(a.attname ORDER BY k.ordinality) AS column_names,
+		i.indisunique AS is_unique,
+		am.amname AS method
+	FROM pg_index i
+	JOIN pg_class idx ON idx.oid = i.indexrelid
+	JOIN pg_class t ON t.oid = i.indrelid
+	JOIN pg_namespace n ON n.oid = idx.relnamespace
+	JOIN pg_am am ON am.oid = idx.relam
+	JOIN LATERAL unnest(i.indkey::int[]) WITH ORDINALITY AS k(attnum, ordinality) ON true
+	JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+	WHERE n.nspname = $1 AND i.indisprimary = false
+	GROUP BY idx.oid, idx.relname, t.relname, i.indisunique, am.amname`
 
 	rows, err := conn.Query(ctx, query, schemaName)
 	if err != nil {
@@ -24,13 +35,14 @@ func loadIndexes(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mod
 
 	var (
 		indexName  string
-		indexDef   string
 		tableName  string
-		indexName2 string // duplicate due to query
+		columnNames []string
+		isUnique   bool
+		method     string
 	)
 
 	for rows.Next() {
-		err := rows.Scan(&indexName, &indexDef, &tableName, &indexName2)
+		err := rows.Scan(&indexName, &tableName, &columnNames, &isUnique, &method)
 		if err != nil {
 			return fmt.Errorf("scan index row: %w", err)
 		}
@@ -40,47 +52,16 @@ func loadIndexes(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mod
 			continue
 		}
 
-		// Parse index definition to extract columns and uniqueness
-		unique := strings.Contains(strings.ToLower(indexDef), "unique")
-		columns := parseIndexColumns(indexDef)
-
 		index := &model.Index{
 			Name:    indexName,
 			Table:   tableName,
-			Columns: columns,
-			Unique:  unique,
-			Method:  "btree", // Default, could parse from definition
+			Columns: columnNames,
+			Unique:  isUnique,
+			Method:  method,
 		}
 
 		table.Indexes[indexName] = index
 	}
 
 	return rows.Err()
-}
-
-// parseIndexColumns extracts column names from index definition
-// Example: "CREATE UNIQUE INDEX idx_name ON table USING btree (col1, col2)"
-func parseIndexColumns(indexDef string) []string {
-	// Find content within parentheses after the table clause
-	start := strings.LastIndex(indexDef, "(")
-	end := strings.LastIndex(indexDef, ")")
-	if start == -1 || end == -1 || start >= end {
-		return []string{}
-	}
-
-	content := indexDef[start+1 : end]
-	// Handle cases like "col1, col2 DESC"
-	parts := strings.Split(content, ",")
-	columns := make([]string, 0, len(parts))
-	for _, p := range parts {
-		col := strings.TrimSpace(p)
-		// Remove modifiers like DESC, ASC, NULLS FIRST, etc.
-		if idx := strings.Index(col, " "); idx != -1 {
-			col = col[:idx]
-		}
-		// Remove quotes
-		col = strings.Trim(col, "\"")
-		columns = append(columns, col)
-	}
-	return columns
 }

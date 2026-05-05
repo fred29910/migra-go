@@ -2,12 +2,13 @@ package model
 
 // Table represents a database table
 type Table struct {
-	Schema      string
-	Name        string
-	Columns     []*Column // Preserve order for column ordering strategies
-	PrimaryKey  *PrimaryKey
-	Constraints map[string]*Constraint
-	Indexes     map[string]*Index
+	Schema       string
+	Name         string
+	Columns      []*Column // Preserve order for column ordering strategies
+	ColumnByName map[string]*Column `json:"-"` // Index for quick lookup by name, excluded from JSON
+	PrimaryKey   *PrimaryKey
+	Constraints  map[string]*Constraint
+	Indexes      map[string]*Index
 }
 
 // PrimaryKey represents a primary key constraint
@@ -36,25 +37,22 @@ type Constraint struct {
 // NewTable creates a new table with initialized maps
 func NewTable(schema, name string) *Table {
 	return &Table{
-		Schema:      schema,
-		Name:        name,
-		Columns:     make([]*Column, 0),
-		Constraints: make(map[string]*Constraint),
-		Indexes:     make(map[string]*Index),
+		Schema:       schema,
+		Name:          name,
+		Columns:       make([]*Column, 0),
+		ColumnByName:  make(map[string]*Column),
+		Constraints:   make(map[string]*Constraint),
+		Indexes:       make(map[string]*Index),
 	}
 }
 
 // GetColumn finds a column by name
 func (t *Table) GetColumn(name string) *Column {
-	for _, col := range t.Columns {
-		if col.Name == name {
-			return col
-		}
-	}
-	return nil
+	return t.ColumnByName[name]
 }
 
-// AddColumn adds a column to the table
+// AddColumn adds a column to the table and maintains the ColumnByName index
 func (t *Table) AddColumn(col *Column) {
 	t.Columns = append(t.Columns, col)
+	t.ColumnByName[col.Name] = col
 }

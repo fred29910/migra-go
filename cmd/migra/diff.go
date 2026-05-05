@@ -9,6 +9,7 @@ import (
 	"github.com/fred29910/migra-go/internal/diff"
 	"github.com/fred29910/migra-go/internal/introspect"
 	"github.com/fred29910/migra-go/internal/model"
+	"github.com/fred29910/migra-go/internal/normalize"
 	"github.com/fred29910/migra-go/internal/parser"
 	"github.com/fred29910/migra-go/internal/plan"
 	"github.com/fred29910/migra-go/internal/render"
@@ -64,9 +65,14 @@ func runDiff(cmd *cobra.Command, args []string) error {
 	}
 
 	// Normalize schemas
-	// TODO: implement normalize.CanonicalizeSchema
-	_ = sourceSchema
-	_ = targetSchema
+	sourceSchema, err = normalize.CanonicalizeSchema(sourceSchema)
+	if err != nil {
+		return fmt.Errorf("failed to normalize source schema: %w", err)
+	}
+	targetSchema, err = normalize.CanonicalizeSchema(targetSchema)
+	if err != nil {
+		return fmt.Errorf("failed to normalize target schema: %w", err)
+	}
 
 	// Diff schemas
 	differ := diff.NewDiffer()
@@ -194,5 +200,5 @@ func isPostgresURL(s string) bool {
 
 // isSQLFile checks if the string is a SQL file
 func isSQLFile(s string) bool {
-	return len(s) >= 4 && s[len(s)-4:] == ".sql"
+	return strings.HasSuffix(strings.ToLower(s), ".sql")
 }

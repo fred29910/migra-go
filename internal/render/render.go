@@ -33,6 +33,7 @@ func (r *Renderer) SetFormat(format string) {
 // RenderAll converts all operations to SQL
 func (r *Renderer) RenderAll(ops []diff.Operation) string {
 	// Sort operations by dependency order (TODO: implement proper sorting)
+	r.sql = r.sql[:0]
 
 	for _, op := range ops {
 		sql := r.Render(op)
@@ -90,7 +91,7 @@ func (r *Renderer) renderAddTable(op *diff.AddTableOp) string {
 	// TODO: Add primary key, constraints
 
 	sql := fmt.Sprintf("-- op: add_table risk:low\nCREATE TABLE %s (\n%s\n);",
-		quoteIdentifier(table.Name),
+		quoteQualifiedIdentifier(table.Schema, table.Name),
 		strings.Join(columns, ",\n"))
 	return sql
 }
@@ -100,13 +101,13 @@ func (r *Renderer) renderDropTable(op *diff.DropTableOp) string {
 	if r.useIfExists {
 		ifExists = "IF EXISTS "
 	}
-	return fmt.Sprintf("-- op: drop_table risk:high\nDROP TABLE %s%s;", ifExists, quoteIdentifier(op.Name))
+	return fmt.Sprintf("-- op: drop_table risk:high\nDROP TABLE %s%s;", ifExists, quoteQualifiedIdentifier(op.Schema, op.Name))
 }
 
 func (r *Renderer) renderAddColumn(op *diff.AddColumnOp) string {
 	col := op.Column
 	sql := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s",
-		quoteIdentifier(op.Table), quoteIdentifier(col.Name), col.DataType)
+		quoteQualifiedIdentifier(op.Schema, op.Table), quoteIdentifier(col.Name), col.DataType)
 
 	if !col.IsNullable {
 		sql += " NOT NULL"
@@ -120,19 +121,19 @@ func (r *Renderer) renderAddColumn(op *diff.AddColumnOp) string {
 
 func (r *Renderer) renderAlterColumnType(op *diff.AlterColumnTypeOp) string {
 	sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s",
-		quoteIdentifier(op.Table), quoteIdentifier(op.Column), op.ToType)
+		quoteQualifiedIdentifier(op.Schema, op.Table), quoteIdentifier(op.Column), op.ToType)
 	return fmt.Sprintf("-- op: alter_column_type risk:high\n%s;", sql)
 }
 
 func (r *Renderer) renderSetNotNull(op *diff.SetNotNullOp) string {
 	sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET NOT NULL",
-		quoteIdentifier(op.Table), quoteIdentifier(op.Column))
+		quoteQualifiedIdentifier(op.Schema, op.Table), quoteIdentifier(op.Column))
 	return fmt.Sprintf("-- op: set_not_null risk:low\n%s;", sql)
 }
 
 func (r *Renderer) renderDropNotNull(op *diff.DropNotNullOp) string {
 	sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL",
-		quoteIdentifier(op.Table), quoteIdentifier(op.Column))
+		quoteQualifiedIdentifier(op.Schema, op.Table), quoteIdentifier(op.Column))
 	return fmt.Sprintf("-- op: drop_not_null risk:low\n%s;", sql)
 }
 
@@ -144,12 +145,12 @@ func (r *Renderer) renderCreateIndex(op *diff.CreateIndexOp) string {
 	}
 	columns := strings.Join(idx.Columns, ", ")
 	return fmt.Sprintf("-- op: add_index risk:low\nCREATE %sINDEX %s ON %s (%s);",
-		unique, quoteIdentifier(idx.Name), quoteIdentifier(idx.Table), columns)
+		unique, quoteQualifiedIdentifier(op.Schema, idx.Name), quoteQualifiedIdentifier(op.Schema, idx.Table), columns)
 }
 
 func (r *Renderer) renderDropIndex(op *diff.DropIndexOp) string {
 	return fmt.Sprintf("-- op: drop_index risk:medium\nDROP INDEX %s%s;",
-		ifExistsPrefix(r.useIfExists), quoteIdentifier(op.Name))
+		ifExistsPrefix(r.useIfExists), quoteQualifiedIdentifier(op.Schema, op.Name))
 }
 
 func (r *Renderer) renderAddEnumType(op *diff.AddEnumTypeOp) string {
@@ -158,13 +159,13 @@ func (r *Renderer) renderAddEnumType(op *diff.AddEnumTypeOp) string {
 		labels[i] = quoteString(label)
 	}
 	sql := fmt.Sprintf("CREATE TYPE %s AS ENUM (%s)",
-		quoteIdentifier(op.Type.Name), strings.Join(labels, ", "))
+		quoteQualifiedIdentifier(op.Schema, op.Type.Name), strings.Join(labels, ", "))
 	return fmt.Sprintf("-- op: add_enum_type risk:low\n%s;", sql)
 }
 
 func (r *Renderer) renderDropEnumType(op *diff.DropEnumTypeOp) string {
 	return fmt.Sprintf("-- op: drop_enum_type risk:high\nDROP TYPE %s%s;",
-		ifExistsPrefix(r.useIfExists), quoteIdentifier(op.Name))
+		ifExistsPrefix(r.useIfExists), quoteQualifiedIdentifier(op.Schema, op.Name))
 }
 
 // String returns the rendered SQL as a string
@@ -180,11 +181,17 @@ func (r *Renderer) String() string {
 
 func quoteIdentifier(id string) string {
 	// Always quote to be safe with reserved words
-	return fmt.Sprintf(`"%s"`, id)
+	// Escape internal double quotes by doubling them (SQL standard)
+	return `"` + strings.ReplaceAll(id, `"`, `""`) + `"`
+}
+
+func quoteQualifiedIdentifier(schema, identifier string) string {
+	return fmt.Sprintf(`%s.%s`, quoteIdentifier(schema), quoteIdentifier(identifier))
 }
 
 func quoteString(s string) string {
-	return fmt.Sprintf("'%s'", s)
+	// Escape internal single quotes by doubling them (SQL standard)
+	return `'` + strings.ReplaceAll(s, `'`, `''`) + `'`
 }
 
 func ifExistsPrefix(use bool) string {

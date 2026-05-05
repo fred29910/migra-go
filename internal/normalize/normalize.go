@@ -42,17 +42,20 @@ func canonicalizeNamespace(ns *model.Namespace) *model.Namespace {
 
 func canonicalizeTable(table *model.Table) *model.Table {
 	result := &model.Table{
-		Schema:      table.Schema,
-		Name:        table.Name,
-		Columns:     make([]*model.Column, len(table.Columns)),
-		PrimaryKey:  table.PrimaryKey,
-		Constraints: make(map[string]*model.Constraint),
-		Indexes:     make(map[string]*model.Index),
+		Schema:       table.Schema,
+		Name:          table.Name,
+		Columns:       make([]*model.Column, len(table.Columns)),
+		ColumnByName:  make(map[string]*model.Column),
+		PrimaryKey:    table.PrimaryKey,
+		Constraints:   make(map[string]*model.Constraint),
+		Indexes:       make(map[string]*model.Index),
 	}
 
 	// Normalize columns
 	for i, col := range table.Columns {
-		result.Columns[i] = canonicalizeColumn(col)
+		normalizedCol := canonicalizeColumn(col)
+		result.Columns[i] = normalizedCol
+		result.ColumnByName[normalizedCol.Name] = normalizedCol
 	}
 
 	// Normalize constraints
@@ -111,22 +114,22 @@ func canonicalizeIndex(idx *model.Index) *model.Index {
 	}
 }
 
+// typeAliases maps type aliases to canonical names
+var typeAliases = map[string]string{
+	"int4":                        "integer",
+	"int8":                        "bigint",
+	"int2":                        "smallint",
+	"bool":                        "boolean",
+	"character varying":           "varchar",
+	"timestamp without time zone": "timestamp",
+	"timestamp with time zone":    "timestamptz",
+}
+
 // normalizeDataType normalizes type aliases to canonical names
 func normalizeDataType(dt string) string {
 	dt = strings.ToLower(strings.TrimSpace(dt))
 
-	// Type aliases mapping
-	aliases := map[string]string{
-		"int4":                        "integer",
-		"int8":                        "bigint",
-		"int2":                        "smallint",
-		"bool":                        "boolean",
-		"character varying":           "varchar",
-		"timestamp without time zone": "timestamp",
-		"timestamp with time zone":    "timestamptz",
-	}
-
-	if canonical, ok := aliases[dt]; ok {
+	if canonical, ok := typeAliases[dt]; ok {
 		return canonical
 	}
 	return dt

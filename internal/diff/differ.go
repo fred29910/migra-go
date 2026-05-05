@@ -1,6 +1,8 @@
 package diff
 
 import (
+	"sort"
+
 	"github.com/fred29910/migra-go/internal/model"
 )
 
@@ -31,8 +33,15 @@ func (d *Differ) Diff(source, target *model.Schema) []Operation {
 
 // diffSchemas compares namespaces in two schemas
 func (d *Differ) diffSchemas(source, target *model.Schema) {
-	// Check all namespaces in target
-	for name, targetNs := range target.Schemas {
+	// Check all namespaces in target (sorted for deterministic output)
+	targetNames := make([]string, 0, len(target.Schemas))
+	for name := range target.Schemas {
+		targetNames = append(targetNames, name)
+	}
+	sort.Strings(targetNames)
+
+	for _, name := range targetNames {
+		targetNs := target.Schemas[name]
 		if sourceNs, exists := source.Schemas[name]; exists {
 			d.diffNamespace(sourceNs, targetNs)
 		} else {
@@ -41,11 +50,17 @@ func (d *Differ) diffSchemas(source, target *model.Schema) {
 		}
 	}
 
-	// Check for namespaces that exist in source but not in target
-	for name, sourceNs := range source.Schemas {
+	// Check for namespaces that exist in source but not in target (sorted for deterministic output)
+	sourceNames := make([]string, 0, len(source.Schemas))
+	for name := range source.Schemas {
+		sourceNames = append(sourceNames, name)
+	}
+	sort.Strings(sourceNames)
+
+	for _, name := range sourceNames {
 		if _, exists := target.Schemas[name]; !exists {
 			// Namespace dropped - MVP: skip or handle explicitly
-			_ = sourceNs
+			_ = source.Schemas[name]
 		}
 	}
 }
