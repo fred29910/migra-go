@@ -67,7 +67,8 @@ func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
 	}
 
 	if len(p.errors) > 0 {
-		return p.schema, fmt.Errorf("parsing completed with %d errors", len(p.errors))
+		first := p.errors[0]
+		return p.schema, fmt.Errorf("parsing completed with %d errors, first: %w", len(p.errors), first)
 	}
 	return p.schema, nil
 }
@@ -301,7 +302,9 @@ func (p *Parser) getStatementSnippet(pos int) string {
 	return p.sql[pos:end]
 }
 
-// Errors returns parsing errors
+// Errors returns parsing errors (defensive copy)
 func (p *Parser) Errors() []error {
-	return p.errors
+	out := make([]error, len(p.errors))
+	copy(out, p.errors)
+	return out
 }
