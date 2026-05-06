@@ -22,8 +22,10 @@ var diffCmd = &cobra.Command{
 Examples:
   migra diff file.sql postgres://localhost/db
   migra diff postgres://localhost/db1 postgres://localhost/db2
-  migra diff file_a.sql file_b.sql`,
-	Args: cobra.ExactArgs(2),
+  migra diff file_a.sql file_b.sql
+  migra diff file.sql  # target from config database.url
+  migra diff          # both from config database.source and database.target`,
+	Args: cobra.RangeArgs(0, 2),
 	RunE: runDiff,
 }
 
@@ -100,7 +102,9 @@ func loadFromSQLFile(path string, strict bool) (*model.Schema, error) {
 
 // isPostgresURL checks if the string is a PostgreSQL connection URL
 func isPostgresURL(s string) bool {
-	return strings.HasPrefix(s, "postgres://") || strings.HasPrefix(s, "pg://")
+	return strings.HasPrefix(s, "postgres://") ||
+		strings.HasPrefix(s, "postgresql://") ||
+		strings.HasPrefix(s, "pg://")
 }
 
 // isSQLFile checks if the string is a SQL file

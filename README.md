@@ -42,30 +42,49 @@ migra diff postgres://localhost/db1 postgres://localhost/db2
 
 # 比较两个 SQL 文件
 migra diff file_a.sql file_b.sql
+
+# 指定 schema 和超时时间
+migra diff --schema public --schema auth --timeout 2m file.sql postgres://localhost/db
 ```
 
 ### 命令行参数
 
-| 参数 | 说明 |
-|------|------|
-| `-s, --schema` | 指定要比较的 Schema 列表（可指定多个） |
-| `-f, --format` | 输出格式：`sql` 或 `json` |
-| `--unsafe-drop` | 允许输出危险的 DROP 操作 |
-| `--strict` | 遇到不支持的语句时直接失败退出 |
-| `-o, --output` | 输出到文件（默认输出到 stdout） |
-| `-c, --config` | 指定配置文件路径 |
-| `-v, --verbose` | 输出详细日志 |
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `-s, --schema` | 指定要比较的 Schema 列表（可指定多个） | `public` |
+| `-f, --format` | 输出格式：`sql` 或 `json` | `sql` |
+| `--unsafe-drop` | 允许输出危险的 DROP 操作 | `false` |
+| `--strict` | 遇到不支持的语句时直接失败退出 | `false` |
+| `--timeout` | Schema 加载超时时间（如 `30s`, `2m`） | `30s` |
+| `-o, --output` | 输出到文件（默认输出到 stdout） | - |
+| `-c, --config` | 指定配置文件路径 | `~/.migra.yaml` 或 `./migra.yaml` |
+| `-v, --verbose` | 输出详细日志 | `false` |
 
 ### 配置文件
 
-支持配置文件 `~/.migra.yaml` 或 `./migra.yaml`，示例：
+支持多层配置，优先级从高到低：命令行参数 > 环境变量 > 配置文件 > 默认值。
+
+**配置文件位置**（自动发现）：
+- `~/.migra.yaml`（用户级）
+- `./migra.yaml`（项目级）
 
 ```bash
 # 复制示例配置
 cp examples/config.yaml ~/.migra.yaml
-# 或使用环境变量
-cp examples/.env.example .env
+# 或
+cp examples/config.yaml ./migra.yaml
 ```
+
+**环境变量**（可选）：
+```bash
+# 复制并编辑环境变量文件
+cp examples/.env.example .env
+# 或直接使用环境变量
+export DATABASE_URL="postgres://user:password@localhost:5432/dbname"
+export MIGRA_SCHEMAS="public"
+```
+
+详细配置说明请参考 [docs/configuration.md](docs/configuration.md)。
 
 ### 数据库连接方式
 

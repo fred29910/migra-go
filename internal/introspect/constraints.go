@@ -13,7 +13,7 @@ func loadConstraints(ctx context.Context, conn *pgx.Conn, schemaName string, ns 
 	query := `
 	SELECT
 		c.conname,
-		c.contype,
+		c.contype::text,
 		t.relname AS table_name,
 		array_agg(a.attname ORDER BY k.ordinality) AS column_names,
 		pg_get_constraintdef(c.oid) AS definition

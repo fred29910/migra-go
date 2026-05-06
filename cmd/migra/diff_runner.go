@@ -10,14 +10,32 @@ import (
 	"github.com/fred29910/migra-go/internal/diff"
 	"github.com/fred29910/migra-go/internal/model"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 const defaultDiffTimeout = 30 * time.Second
 
 // parseDiffConfig parses the diff command flags into a app.Config struct
 func parseDiffConfig(cmd *cobra.Command, args []string) (app.Config, error) {
-	if len(args) != 2 {
-		return app.Config{}, fmt.Errorf("expected 2 arguments (source and target), got %d", len(args))
+	var source, target string
+
+	switch len(args) {
+	case 2:
+		source, target = args[0], args[1]
+	case 1:
+		source = args[0]
+		target = viper.GetString("database.url")
+		if target == "" {
+			return app.Config{}, fmt.Errorf("target not specified: provide 2 arguments, or set database.url in config file")
+		}
+	case 0:
+		source = viper.GetString("database.source")
+		target = viper.GetString("database.target")
+		if source == "" || target == "" {
+			return app.Config{}, fmt.Errorf("source and target not specified: provide arguments, or set database.source and database.target in config file")
+		}
+	default:
+		return app.Config{}, fmt.Errorf("expected 0, 1 or 2 arguments, got %d", len(args))
 	}
 
 	schemas, err := cmd.Flags().GetStringSlice("schema")
@@ -46,8 +64,8 @@ func parseDiffConfig(cmd *cobra.Command, args []string) (app.Config, error) {
 	}
 
 	return app.Config{
-		Source:     args[0],
-		Target:     args[1],
+		Source:     source,
+		Target:     target,
 		Schemas:    schemas,
 		Format:     format,
 		OutputFile: outputFile,
