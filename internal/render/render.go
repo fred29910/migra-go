@@ -174,7 +174,11 @@ func (r *Renderer) renderCreateIndex(op *diff.CreateIndexOp) string {
 	if idx.Unique {
 		unique = "UNIQUE "
 	}
-	columns := strings.Join(idx.Columns, ", ")
+	quotedCols := make([]string, len(idx.Columns))
+	for i, c := range idx.Columns {
+		quotedCols[i] = quoteIdentifier(c)
+	}
+	columns := strings.Join(quotedCols, ", ")
 	return fmt.Sprintf("-- op: add_index risk:low\nCREATE %sINDEX %s ON %s (%s);",
 		unique, quoteQualifiedIdentifier(op.Schema, idx.Name), quoteQualifiedIdentifier(op.Schema, idx.Table), columns)
 }

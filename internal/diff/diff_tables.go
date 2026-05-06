@@ -67,15 +67,26 @@ func (c *diffContext) diffTables(source, target *model.Namespace) {
 
 // diffTableConstraints compares constraints between two tables
 func (c *diffContext) diffTableConstraints(schema string, source, target *model.Table) {
-	for name, constraint := range target.Constraints {
+	addNames := make([]string, 0, len(target.Constraints))
+	for name := range target.Constraints {
 		if _, exists := source.Constraints[name]; !exists {
-			c.addOp(NewAddConstraintOp(schema, target.Name, constraint))
+			addNames = append(addNames, name)
 		}
 	}
+	sort.Strings(addNames)
+	for _, name := range addNames {
+		c.addOp(NewAddConstraintOp(schema, target.Name, target.Constraints[name]))
+	}
+
+	dropNames := make([]string, 0, len(source.Constraints))
 	for name := range source.Constraints {
 		if _, exists := target.Constraints[name]; !exists {
-			c.addOp(NewDropConstraintOp(schema, source.Name, name))
+			dropNames = append(dropNames, name)
 		}
+	}
+	sort.Strings(dropNames)
+	for _, name := range dropNames {
+		c.addOp(NewDropConstraintOp(schema, source.Name, name))
 	}
 }
 
@@ -114,17 +125,25 @@ func (c *diffContext) diffTableColumns(schema string, source, target *model.Tabl
 
 // diffTableIndexes compares indexes between two tables
 func (c *diffContext) diffTableIndexes(schema string, source, target *model.Table) {
-	// Find indexes to add
-	for name, index := range target.Indexes {
+	addIdx := make([]string, 0, len(target.Indexes))
+	for name := range target.Indexes {
 		if _, exists := source.Indexes[name]; !exists {
-			c.addOp(NewCreateIndexOp(schema, index))
+			addIdx = append(addIdx, name)
 		}
 	}
+	sort.Strings(addIdx)
+	for _, name := range addIdx {
+		c.addOp(NewCreateIndexOp(schema, target.Indexes[name]))
+	}
 
-	// Find indexes to drop
+	dropIdx := make([]string, 0, len(source.Indexes))
 	for name := range source.Indexes {
 		if _, exists := target.Indexes[name]; !exists {
-			c.addOp(NewDropIndexOp(schema, name))
+			dropIdx = append(dropIdx, name)
 		}
+	}
+	sort.Strings(dropIdx)
+	for _, name := range dropIdx {
+		c.addOp(NewDropIndexOp(schema, name))
 	}
 }

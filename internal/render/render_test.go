@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/fred29910/migra-go/internal/diff"
+	"github.com/fred29910/migra-go/internal/model"
 )
 
 func TestRenderer_RenderAll_IdempotentAcrossCalls(t *testing.T) {
@@ -27,5 +28,22 @@ func TestRenderOutput_SupportsSQLAndJSON(t *testing.T) {
 	js, err := r.RenderOutput(ops, "json")
 	if err != nil || !strings.Contains(js, `"kind"`) {
 		t.Fatalf("unexpected json render: %v %q", err, js)
+	}
+}
+
+func TestRenderCreateIndex_Quoted(t *testing.T) {
+	r := NewRenderer()
+	op := &diff.CreateIndexOp{
+		Schema: "public",
+		Index: &model.Index{
+			Name:    "idx_user",
+			Table:   "users",
+			Columns: []string{"User Name", "id"},
+		},
+	}
+	sql := r.renderCreateIndex(op)
+	expected := "-- op: add_index risk:low\nCREATE INDEX \"public\".\"idx_user\" ON \"public\".\"users\" (\"User Name\", \"id\");"
+	if sql != expected {
+		t.Errorf("got %q, want %q", sql, expected)
 	}
 }
