@@ -250,7 +250,7 @@ func TestIntegrationParserToDiff(t *testing.T) {
 
 	// Run diff
 	d := diff.NewDiffer()
-	ops := d.Diff(sourceSchema, targetSchema)
+	ops, _ := d.Diff(sourceSchema, targetSchema)
 
 	if len(ops) == 0 {
 		t.Fatal("expected diff operations, got none")
