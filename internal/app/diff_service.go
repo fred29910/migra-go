@@ -88,19 +88,18 @@ func ComputeDiff(source, target *model.Schema, cfg Config) ([]diff.Operation, []
 	operations := differ.Diff(source, target)
 	warnings := differ.Warnings()
 
-	// Report destructive changes
-	destructiveCount := 0
+	// Report destructive changes (Single pass logic)
+	destructiveOps := make([]diff.Operation, 0, len(operations)/4+1)
 	for _, op := range operations {
 		if op.IsDestructive() {
-			destructiveCount++
+			destructiveOps = append(destructiveOps, op)
 		}
 	}
-	if destructiveCount > 0 {
-		warnings = append(warnings, fmt.Sprintf("%d destructive operation(s) detected!", destructiveCount))
-		for _, op := range operations {
-			if op.IsDestructive() {
-				warnings = append(warnings, fmt.Sprintf("  - %s: %s (destructive)", op.Kind(), op.ObjectKey()))
-			}
+	
+	if len(destructiveOps) > 0 {
+		warnings = append(warnings, fmt.Sprintf("%d destructive operation(s) detected!", len(destructiveOps)))
+		for _, op := range destructiveOps {
+			warnings = append(warnings, fmt.Sprintf("  - %s: %s (destructive)", op.Kind(), op.ObjectKey()))
 		}
 		if !cfg.UnsafeDrop {
 			warnings = append(warnings, "Use --unsafe-drop to include destructive DROP operations in output")
@@ -117,7 +116,7 @@ func ComputeDiff(source, target *model.Schema, cfg Config) ([]diff.Operation, []
 		plan.StageDeploy,
 		plan.StagePostDeploy,
 	}
-	var allOps []diff.Operation
+	allOps := make([]diff.Operation, 0, len(operations))
 	for _, stage := range stageOrder {
 		stageOps := stages[stage]
 		if len(stageOps) == 0 {
