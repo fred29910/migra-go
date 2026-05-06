@@ -51,7 +51,7 @@ func loadEnumTypes(ctx context.Context, conn *pgx.Conn, schemaName string, ns *m
 	}
 
 	if err := rows.Err(); err != nil {
-		return err
+		return fmt.Errorf("iterate enum rows: %w", err)
 	}
 
 	// Convert to model.EnumType
