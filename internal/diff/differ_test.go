@@ -12,7 +12,7 @@ func TestDiffer_DiffNoSharedState(t *testing.T) {
 	tgt := model.NewSchema()
 	tgt.GetOrCreateNamespace("public")
 	for i := 0; i < 20; i++ {
-		ops := d.Diff(src, tgt)
+		ops, _ := d.Diff(src, tgt)
 		if len(ops) != 0 {
 			t.Fatalf("expected 0 ops, got %d", len(ops))
 		}

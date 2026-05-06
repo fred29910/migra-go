@@ -24,30 +24,30 @@ type Config struct {
 	Timeout    time.Duration
 }
 
-// Service defines the interface for the diff service
-type Service interface {
+// DiffService defines the interface for the diff service
+type DiffService interface {
 	Run(ctx context.Context, cfg Config) (output string, warnings []string, err error)
 }
 
-// RunnerDeps holds injectable dependencies for DiffService
+// RunnerDeps holds injectable dependencies for diffService
 type RunnerDeps struct {
 	LoadSchema func(ctx context.Context, source string, schemas []string, strict bool) (*model.Schema, error)
 	Compute    func(source, target *model.Schema, cfg Config) ([]diff.Operation, []string, error)
 	Render     func(ops []diff.Operation, format string) (string, error)
 }
 
-// DiffService orchestrates the diff pipeline
-type DiffService struct {
+// diffService orchestrates the diff pipeline
+type diffService struct {
 	deps RunnerDeps
 }
 
 // NewDiffService creates a new diff service
-func NewDiffService(deps RunnerDeps) *DiffService {
-	return &DiffService{deps: deps}
+func NewDiffService(deps RunnerDeps) DiffService {
+	return &diffService{deps: deps}
 }
 
 // Run executes the diff pipeline
-func (s *DiffService) Run(parent context.Context, cfg Config) (string, []string, error) {
+func (s *diffService) Run(parent context.Context, cfg Config) (string, []string, error) {
 	ctx, cancel := context.WithTimeout(parent, cfg.Timeout)
 	defer cancel()
 
@@ -85,8 +85,7 @@ func ComputeDiff(source, target *model.Schema, cfg Config) ([]diff.Operation, []
 
 	// Diff schemas
 	differ := diff.NewDiffer()
-	operations := differ.Diff(source, target)
-	warnings := differ.Warnings()
+	operations, warnings := differ.Diff(source, target)
 
 	// Report destructive changes (Single pass logic)
 	destructiveOps := make([]diff.Operation, 0, len(operations)/4+1)
@@ -95,7 +94,7 @@ func ComputeDiff(source, target *model.Schema, cfg Config) ([]diff.Operation, []
 			destructiveOps = append(destructiveOps, op)
 		}
 	}
-	
+
 	if len(destructiveOps) > 0 {
 		warnings = append(warnings, fmt.Sprintf("%d destructive operation(s) detected!", len(destructiveOps)))
 		for _, op := range destructiveOps {
