@@ -29,7 +29,7 @@ func canonicalizeNamespaceInPlace(ns *model.Namespace) {
 
 func canonicalizeTableInPlace(table *model.Table) {
 	// ColumnByName might change if names are normalized
-	newColumnByName := make(map[string]*model.Column)
+	newColumnByName := make(map[string]*model.Column, len(table.Columns))
 
 	// Normalize columns
 	for _, col := range table.Columns {
@@ -57,8 +57,7 @@ func canonicalizeColumnInPlace(col *model.Column) {
 	col.Name = normalizeIdentifier(col.Name)
 	col.DataType = normalizeDataType(col.DataType)
 	if col.DefaultExpr != nil {
-		normalized := normalizeDefaultExpr(*col.DefaultExpr)
-		col.DefaultExpr = &normalized
+		*col.DefaultExpr = normalizeDefaultExpr(*col.DefaultExpr)
 	}
 }
 
