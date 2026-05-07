@@ -38,5 +38,6 @@ func DefaultRegistry() *HandlerRegistry {
 	r.Register(pg_nodes.CreateStmt{}, &CreateTableHandler{})
 	r.Register(pg_nodes.AlterTableStmt{}, &AlterTableHandler{})
 	r.Register(pg_nodes.CreateEnumStmt{}, &CreateEnumHandler{})
+	r.Register(pg_nodes.IndexStmt{}, &CreateIndexHandler{})
 	return r
 }
