@@ -129,39 +129,12 @@ func (p *Parser) handleCreateTable(stmt pg_nodes.CreateStmt) error {
 
 // handleAlterTable processes ALTER TABLE statements (MVP: AT_AddColumn only)
 func (p *Parser) handleAlterTable(stmt pg_nodes.AlterTableStmt) error {
-	tableName, schemaName := parserutil.ParseRelation(stmt.Relation)
-
-	// Get or create namespace and table (handles ALTER TABLE before CREATE TABLE in SQL)
-	ns := p.schema.GetOrCreateNamespace(schemaName)
-
-	table, exists := ns.Tables[tableName]
-	if !exists {
-		table = model.NewTable(schemaName, tableName)
-		ns.Tables[tableName] = table
+	h := &AlterTableHandler{}
+	mutations, err := h.Handle(stmt)
+	if err != nil {
+		return err
 	}
-
-	// Traverse Cmds (sub-commands)
-	for _, item := range stmt.Cmds.Items {
-		cmd, ok := item.(pg_nodes.AlterTableCmd)
-		if !ok {
-			continue
-		}
-
-		switch cmd.Subtype {
-		case pg_nodes.AT_AddColumn:
-			if cmd.Def != nil {
-				if colDef, ok := cmd.Def.(pg_nodes.ColumnDef); ok {
-					col := parserutil.ParseColumnDef(colDef)
-					if col != nil {
-						table.AddColumn(col)
-					}
-				}
-			}
-			// MVP: Skip other alter commands
-		}
-	}
-
-	return nil
+	return p.applier.Apply(p.schema, mutations)
 }
 
 // parseRelation extracts table name and schema from RangeVar
