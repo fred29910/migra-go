@@ -2,7 +2,7 @@
 
 # Build the project
 build:
-	go build -o migra ./cmd/migra
+	go build --trimpath -ldflags="-s -w" -o migra ./cmd/migra
 
 # Run all tests (db-less unit tests)
 test:
