@@ -75,5 +75,8 @@ func loadConstraints(ctx context.Context, conn *pgx.Conn, schemaName string, ns 
 		table.Constraints[conName] = constraint
 	}
 
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate constraint rows: %w", err)
+	}
+	return nil
 }

@@ -66,5 +66,8 @@ func loadTables(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mode
 		table.AddColumn(col)
 	}
 
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate table rows: %w", err)
+	}
+	return nil
 }
