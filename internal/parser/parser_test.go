@@ -168,7 +168,7 @@ func TestParseErrors(t *testing.T) {
 
 func TestParseSQLReturnsFirstErrorDetail(t *testing.T) {
 	p := NewParser()
-	// 使用解析成功但包含不支持语句的 SQL，触发 visitNode 错误
+	// 使用能触发 visitNode 错误的 SQL，而非 pg_query 语法错误
 	_, err := p.ParseSQL("SELECT * FROM users;")
 	if err == nil {
 		t.Fatal("expected error")
@@ -178,7 +178,7 @@ func TestParseSQLReturnsFirstErrorDetail(t *testing.T) {
 	if !strings.Contains(errMsg, "parsing completed with") {
 		t.Errorf("expected error to contain 'parsing completed with', got: %s", errMsg)
 	}
-	// 验证可以用 errors.As 提取首个错误（通过 Unwrap 检查包装链）
+	// 验证错误包装了首个错误（可通过 Unwrap 提取）
 	unwrapped := errors.Unwrap(err)
 	if unwrapped == nil {
 		t.Errorf("expected error to wrap the first error via Unwrap")
