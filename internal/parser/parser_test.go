@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -162,6 +163,25 @@ func TestParseErrors(t *testing.T) {
 	// Check errors
 	if len(p.Errors()) == 0 {
 		t.Error("expected parsing errors")
+	}
+}
+
+func TestParseSQLReturnsFirstErrorDetail(t *testing.T) {
+	p := NewParser()
+	// 使用解析成功但包含不支持语句的 SQL，触发 visitNode 错误
+	_, err := p.ParseSQL("SELECT * FROM users;")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	// 错误应包含 "parsing completed with" 和首个错误详情
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "parsing completed with") {
+		t.Errorf("expected error to contain 'parsing completed with', got: %s", errMsg)
+	}
+	// 验证可以用 errors.As 提取首个错误（通过 Unwrap 检查包装链）
+	unwrapped := errors.Unwrap(err)
+	if unwrapped == nil {
+		t.Errorf("expected error to wrap the first error via Unwrap")
 	}
 }
 
