@@ -15,7 +15,10 @@ type DBLoader struct{}
 // Match returns true if the source is a database connection string.
 func (l *DBLoader) Match(source string) bool {
 	lowerSource := strings.ToLower(source)
-	return strings.HasPrefix(lowerSource, "postgres://") || strings.HasPrefix(lowerSource, "mysql://")
+	return strings.HasPrefix(lowerSource, "postgres://") ||
+		strings.HasPrefix(lowerSource, "postgresql://") ||
+		strings.HasPrefix(lowerSource, "pg://") ||
+		strings.HasPrefix(lowerSource, "mysql://")
 }
 
 // Load loads schema from a database connection string.

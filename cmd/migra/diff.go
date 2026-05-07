@@ -74,7 +74,7 @@ func loadSchemaWithContext(ctx context.Context, sourceStr string, schemas []stri
 	}
 	// Log parsing errors if any
 	for _, e := range errs {
-		fmt.Fprintf(os.Stderr, "Warning: %v\n", e)
+		fmt.Fprintf(os.Stderr, "Warning [%s]: %v\n", sourceStr, e)
 	}
 	return schema, nil
 }
