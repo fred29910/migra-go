@@ -35,7 +35,16 @@ func (m CreateTableMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Name, model.KindTable)
 }
 func (m CreateTableMutation) Apply(schema *model.Schema) error {
-	return fmt.Errorf("CreateTableMutation.Apply not implemented yet")
+	ns := schema.GetOrCreateNamespace(m.Schema)
+	if _, exists := ns.Tables[m.Name]; exists {
+		return fmt.Errorf("table %s.%s already exists", m.Schema, m.Name)
+	}
+	table := model.NewTable(m.Schema, m.Name)
+	for i := range m.Columns {
+		table.AddColumn(&m.Columns[i])
+	}
+	ns.Tables[m.Name] = table
+	return nil
 }
 
 // AddColumnMutation describes adding a column to an existing table.
