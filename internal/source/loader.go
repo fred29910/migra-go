@@ -6,6 +6,7 @@ import (
 	"github.com/fred29910/migra-go/internal/model"
 )
 
+// LoadOptions contains extensible options for schema loading.
 type LoadOptions struct{}
 
 // Loader defines the interface for loading schema sources.
