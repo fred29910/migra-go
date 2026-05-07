@@ -11,7 +11,9 @@ func TestDBLoader_Match(t *testing.T) {
 		expected bool
 	}{
 		{"postgres://user:pass@localhost/db", true},
+		{"POSTGRES://user:pass@localhost/db", true},
 		{"mysql://user:pass@localhost/db", true},
+		{"MYSQL://user:pass@localhost/db", true},
 		{"file:///path/to/file.sql", false},
 		{"/path/to/file.sql", false},
 	}
@@ -30,7 +32,9 @@ func TestSQLFileLoader_Match(t *testing.T) {
 		expected bool
 	}{
 		{"file:///path/to/file.sql", true},
+		{"FILE:///path/to/file.sql", true},
 		{"/path/to/file.sql", true},
+		{"/path/to/file.SQL", true},
 		{"postgres://user:pass@localhost/db", false},
 	}
 	for _, tt := range tests {

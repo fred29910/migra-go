@@ -7,10 +7,12 @@ import (
 	"github.com/fred29910/migra-go/internal/model"
 )
 
+// SQLFileLoader implements Loader for SQL file sources.
 type SQLFileLoader struct{}
 
 func (l *SQLFileLoader) Match(source string) bool {
-	return strings.HasPrefix(source, "file://") || strings.HasSuffix(source, ".sql")
+	lowerSource := strings.ToLower(source)
+	return strings.HasPrefix(lowerSource, "file://") || strings.HasSuffix(lowerSource, ".sql")
 }
 
 func (l *SQLFileLoader) Load(ctx context.Context, source string, opt LoadOptions) (*model.Schema, []error, error) {

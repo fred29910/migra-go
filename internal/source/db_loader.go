@@ -7,10 +7,12 @@ import (
 	"github.com/fred29910/migra-go/internal/model"
 )
 
+// DBLoader implements Loader for database connections.
 type DBLoader struct{}
 
 func (l *DBLoader) Match(source string) bool {
-	return strings.HasPrefix(source, "postgres://") || strings.HasPrefix(source, "mysql://")
+	lowerSource := strings.ToLower(source)
+	return strings.HasPrefix(lowerSource, "postgres://") || strings.HasPrefix(lowerSource, "mysql://")
 }
 
 func (l *DBLoader) Load(ctx context.Context, source string, opt LoadOptions) (*model.Schema, []error, error) {
