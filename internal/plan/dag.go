@@ -75,54 +75,16 @@ func BuildDAG(ops []diff.Operation) *DAG {
 
 // addDependencies adds dependencies for a node based on operation type
 func (d *DAG) addDependencies(node *Node) {
-	switch op := node.Op.(type) {
-	case *diff.AddColumnOp:
-		// AddColumn depends on its table being created first
-		tableKey := model.NewObjectKey(op.Schema, op.Table, model.KindTable)
-		if tableNode := d.findNodeByOpKind(tableKey, diff.KindAddTable); tableNode != nil {
-			d.AddDependency(node, tableNode)
+	for _, depKey := range node.Op.DependsOn() {
+		if depNode := d.findNodeByObjectKey(depKey); depNode != nil {
+			d.AddDependency(node, depNode)
 		}
-
-	case *diff.CreateIndexOp:
-		// CreateIndex depends on its table being created
-		tableKey := model.NewObjectKey(op.Schema, op.Index.Table, model.KindTable)
-		if tableNode := d.findNodeByOpKind(tableKey, diff.KindAddTable); tableNode != nil {
-			d.AddDependency(node, tableNode)
-		}
-
-	case *diff.AlterColumnTypeOp:
-		// AlterColumnType depends on the table existing
-		tableKey := model.NewObjectKey(op.Schema, op.Table, model.KindTable)
-		if tableNode := d.findNodeByOpKind(tableKey, diff.KindAddTable); tableNode != nil {
-			d.AddDependency(node, tableNode)
-		}
-
-	case *diff.SetNotNullOp:
-		tableKey := model.NewObjectKey(op.Schema, op.Table, model.KindTable)
-		if tableNode := d.findNodeByOpKind(tableKey, diff.KindAddTable); tableNode != nil {
-			d.AddDependency(node, tableNode)
-		}
-
-	case *diff.DropNotNullOp:
-		tableKey := model.NewObjectKey(op.Schema, op.Table, model.KindTable)
-		if tableNode := d.findNodeByOpKind(tableKey, diff.KindAddTable); tableNode != nil {
-			d.AddDependency(node, tableNode)
-		}
-
-	case *diff.AddEnumTypeOp:
-		// Enum types typically don't have dependencies on other operations
-		// But columns that use this type depend on the enum type
-
-	case *diff.DropEnumTypeOp:
-		// DropEnumType depends on no columns using it
-		// TODO: implement reverse dependency check
 	}
 }
 
-func (d *DAG) findNodeByOpKind(key model.ObjectKey, kind diff.Kind) *Node {
-	nodes := d.byObject[key]
-	for _, node := range nodes {
-		if node.Op.Kind() == kind {
+func (d *DAG) findNodeByObjectKey(key model.ObjectKey) *Node {
+	for _, node := range d.nodes {
+		if node.Op.ObjectKey() == key {
 			return node
 		}
 	}
