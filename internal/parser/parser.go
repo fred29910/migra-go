@@ -34,16 +34,18 @@ func (e *ParseError) Error() string {
 
 // Parser parses SQL statements using pg_query_go and builds a Schema model
 type Parser struct {
-	schema *model.Schema
-	errors []error
-	sql    string // Original SQL for extracting statement snippets
+	schema  *model.Schema
+	errors  []error
+	sql     string // Original SQL for extracting statement snippets
+	applier *MutationApplier
 }
 
 // NewParser creates a new SQL parser
 func NewParser() *Parser {
 	return &Parser{
-		schema: model.NewSchema(),
-		errors: make([]error, 0),
+		schema:  model.NewSchema(),
+		errors:  make([]error, 0),
+		applier: &MutationApplier{},
 	}
 }
 
@@ -106,28 +108,23 @@ func (p *Parser) visitNode(stmt pg_nodes.Node) error {
 
 // handleCreateTable processes CREATE TABLE statements (MVP: ColumnDef only)
 func (p *Parser) handleCreateTable(stmt pg_nodes.CreateStmt) error {
-	// Extract table name and schema
 	tableName, schemaName := parserutil.ParseRelation(stmt.Relation)
 
-	// Create table
-	table := model.NewTable(schemaName, tableName)
-
-	// Traverse TableElts for column definitions
+	var columns []model.Column
 	for _, item := range stmt.TableElts.Items {
 		switch elt := item.(type) {
 		case pg_nodes.ColumnDef:
-			col := parserutil.ParseColumnDef(elt)
-			if col != nil {
-				table.AddColumn(col)
-			}
+			columns = append(columns, *parserutil.ParseColumnDef(elt))
 			// MVP: Skip constraints for now
 		}
 	}
 
-	// Store to schema
-	ns := p.schema.GetOrCreateNamespace(schemaName)
-	ns.Tables[tableName] = table
-	return nil
+	mut := CreateTableMutation{
+		Schema:  schemaName,
+		Name:    tableName,
+		Columns: columns,
+	}
+	return p.applier.Apply(p.schema, []SchemaMutation{mut})
 }
 
 // handleAlterTable processes ALTER TABLE statements (MVP: AT_AddColumn only)
