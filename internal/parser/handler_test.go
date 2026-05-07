@@ -36,3 +36,36 @@ func TestCreateTableHandler(t *testing.T) {
 	assert.False(t, mut.Columns[0].IsNullable)
 	assert.Equal(t, "name", mut.Columns[1].Name)
 }
+
+func TestAlterTableHandler_AddColumn(t *testing.T) {
+	node := mustParseFirstStmt(t, "ALTER TABLE users ADD COLUMN age integer")
+	h := &AlterTableHandler{}
+
+	mutations, err := h.Handle(node)
+	require.NoError(t, err)
+	require.Len(t, mutations, 1)
+
+	mut, ok := mutations[0].(AddColumnMutation)
+	require.True(t, ok)
+	assert.Equal(t, "users", mut.Table)
+	assert.Equal(t, "public", mut.Schema)
+	assert.Equal(t, "age", mut.Column.Name)
+	assert.Equal(t, "integer", mut.Column.DataType)
+}
+
+func TestAlterTableHandler_MultipleAddColumns(t *testing.T) {
+	node := mustParseFirstStmt(t, "ALTER TABLE users ADD COLUMN age integer, ADD COLUMN email varchar(100)")
+	h := &AlterTableHandler{}
+
+	mutations, err := h.Handle(node)
+	require.NoError(t, err)
+	require.Len(t, mutations, 2)
+
+	mut0, ok := mutations[0].(AddColumnMutation)
+	require.True(t, ok)
+	assert.Equal(t, "age", mut0.Column.Name)
+
+	mut1, ok := mutations[1].(AddColumnMutation)
+	require.True(t, ok)
+	assert.Equal(t, "email", mut1.Column.Name)
+}
