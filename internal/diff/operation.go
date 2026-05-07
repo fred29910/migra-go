@@ -25,6 +25,7 @@ const (
 type Operation interface {
 	Kind() Kind
 	ObjectKey() model.ObjectKey
+	DependsOn() []model.ObjectKey
 	IsDestructive() bool
 }
 
@@ -40,6 +41,10 @@ func (op *baseOperation) Kind() Kind {
 
 func (op *baseOperation) ObjectKey() model.ObjectKey {
 	return op.objectKey
+}
+
+func (op *baseOperation) DependsOn() []model.ObjectKey {
+	return nil
 }
 
 // AddTableOp represents adding a new table
@@ -108,6 +113,12 @@ func (op *AddColumnOp) IsDestructive() bool {
 	return false
 }
 
+func (op *AddColumnOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
+	}
+}
+
 // AlterColumnTypeOp represents changing a column's data type
 type AlterColumnTypeOp struct {
 	baseOperation
@@ -136,6 +147,12 @@ func (op *AlterColumnTypeOp) IsDestructive() bool {
 	return true
 }
 
+func (op *AlterColumnTypeOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
+	}
+}
+
 // SetNotNullOp represents setting a column to NOT NULL
 type SetNotNullOp struct {
 	baseOperation
@@ -158,6 +175,12 @@ func NewSetNotNullOp(schema, table, column string) *SetNotNullOp {
 
 func (op *SetNotNullOp) IsDestructive() bool {
 	return false
+}
+
+func (op *SetNotNullOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
+	}
 }
 
 // DropNotNullOp represents dropping NOT NULL constraint
@@ -184,6 +207,12 @@ func (op *DropNotNullOp) IsDestructive() bool {
 	return false
 }
 
+func (op *DropNotNullOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
+	}
+}
+
 // CreateIndexOp represents creating a new index
 type CreateIndexOp struct {
 	baseOperation
@@ -204,6 +233,12 @@ func NewCreateIndexOp(schema string, index *model.Index) *CreateIndexOp {
 
 func (op *CreateIndexOp) IsDestructive() bool {
 	return false
+}
+
+func (op *CreateIndexOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Index.Table, model.KindTable),
+	}
 }
 
 // DropIndexOp represents dropping an index
@@ -290,6 +325,12 @@ func NewAddConstraintOp(schema, table string, c *model.Constraint) *AddConstrain
 
 func (op *AddConstraintOp) IsDestructive() bool {
 	return false
+}
+
+func (op *AddConstraintOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
+	}
 }
 
 type DropConstraintOp struct {
