@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/fred29910/migra-go/internal/model"
+	"github.com/fred29910/migra-go/internal/parser/parserutil"
 	pg "github.com/lfittl/pg_query_go"
 	pg_nodes "github.com/lfittl/pg_query_go/nodes"
 )
@@ -106,7 +107,7 @@ func (p *Parser) visitNode(stmt pg_nodes.Node) error {
 // handleCreateTable processes CREATE TABLE statements (MVP: ColumnDef only)
 func (p *Parser) handleCreateTable(stmt pg_nodes.CreateStmt) error {
 	// Extract table name and schema
-	tableName, schemaName := p.parseRelation(stmt.Relation)
+	tableName, schemaName := parserutil.ParseRelation(stmt.Relation)
 
 	// Create table
 	table := model.NewTable(schemaName, tableName)
@@ -115,7 +116,7 @@ func (p *Parser) handleCreateTable(stmt pg_nodes.CreateStmt) error {
 	for _, item := range stmt.TableElts.Items {
 		switch elt := item.(type) {
 		case pg_nodes.ColumnDef:
-			col := p.parseColumnDef(elt)
+			col := parserutil.ParseColumnDef(elt)
 			if col != nil {
 				table.AddColumn(col)
 			}
@@ -131,7 +132,7 @@ func (p *Parser) handleCreateTable(stmt pg_nodes.CreateStmt) error {
 
 // handleAlterTable processes ALTER TABLE statements (MVP: AT_AddColumn only)
 func (p *Parser) handleAlterTable(stmt pg_nodes.AlterTableStmt) error {
-	tableName, schemaName := p.parseRelation(stmt.Relation)
+	tableName, schemaName := parserutil.ParseRelation(stmt.Relation)
 
 	// Get or create namespace and table (handles ALTER TABLE before CREATE TABLE in SQL)
 	ns := p.schema.GetOrCreateNamespace(schemaName)
@@ -153,7 +154,7 @@ func (p *Parser) handleAlterTable(stmt pg_nodes.AlterTableStmt) error {
 		case pg_nodes.AT_AddColumn:
 			if cmd.Def != nil {
 				if colDef, ok := cmd.Def.(pg_nodes.ColumnDef); ok {
-					col := p.parseColumnDef(colDef)
+					col := parserutil.ParseColumnDef(colDef)
 					if col != nil {
 						table.AddColumn(col)
 					}
@@ -193,7 +194,7 @@ func (p *Parser) parseColumnDef(colDef pg_nodes.ColumnDef) *model.Column {
 
 	// Extract data type
 	if colDef.TypeName != nil {
-		col.DataType = p.parseTypeName(*colDef.TypeName)
+		col.DataType = parserutil.ParseTypeName(*colDef.TypeName)
 	}
 
 	// Check constraints (NOT NULL, DEFAULT, etc.)
@@ -206,7 +207,7 @@ func (p *Parser) parseColumnDef(colDef pg_nodes.ColumnDef) *model.Column {
 			case pg_nodes.CONSTR_DEFAULT:
 				// Extract default value expression
 				if c.RawExpr != nil {
-					expr, ok := p.parseExpression(c.RawExpr)
+					expr, ok := parserutil.ParseExpression(c.RawExpr)
 					if ok {
 						col.DefaultExpr = &expr
 					}
@@ -233,7 +234,7 @@ func (p *Parser) parseTypeName(typeName pg_nodes.TypeName) string {
 	typeStr := strings.Join(parts, ".")
 
 	// Map PostgreSQL internal type names to standard names
-	typeStr = mapTypeName(typeStr)
+	typeStr = parserutil.MapTypeName(typeStr)
 
 	// Add type modifiers (e.g., varchar(50))
 	if len(typeName.Typmods.Items) > 0 {
