@@ -1,21 +1,13 @@
 package parser
 
-// MVP 范围声明：
-// 本 parser 仅支持以下功能的解析（基于计划 2026-05-04-parser-enhancement-design.md）：
-//   - CREATE TABLE（仅提取 ColumnDef，跳过约束）
-//   - ALTER TABLE ADD COLUMN（仅处理 AT_AddColumn）
-// 不支持的功能（返回 ParseError）：
-//   - CREATE INDEX / CREATE UNIQUE INDEX
-//   - CREATE TYPE ... AS ENUM
-//   - ALTER TABLE 的其他子命令（DROP COLUMN、ALTER COLUMN TYPE 等）
-//   - 约束（PRIMARY KEY、FOREIGN KEY、CHECK 等）
+// Parser 使用 HandlerRegistry 将 AST 节点路由到对应 Handler，
+// Handler 返回 SchemaMutation 列表，由 MutationApplier 统一应用到 model.Schema。
+// 新增 DDL 类型只需：实现 Handler + Mutation 类型 + 注册到 DefaultRegistry。
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/fred29910/migra-go/internal/model"
-	"github.com/fred29910/migra-go/internal/parser/parserutil"
 	pg "github.com/lfittl/pg_query_go"
 	pg_nodes "github.com/lfittl/pg_query_go/nodes"
 )
@@ -128,130 +120,6 @@ func (p *Parser) visitNode(stmt pg_nodes.Node) error {
 		}
 	}
 	return nil
-}
-
-// parseRelation extracts table name and schema from RangeVar
-func (p *Parser) parseRelation(relation *pg_nodes.RangeVar) (tableName, schemaName string) {
-	if relation == nil {
-		return "", "public"
-	}
-	if relation.Relname != nil {
-		tableName = *relation.Relname
-	}
-	if relation.Schemaname != nil {
-		schemaName = *relation.Schemaname
-	} else {
-		schemaName = "public"
-	}
-	return
-}
-
-// parseColumnDef extracts column definition from AST node
-func (p *Parser) parseColumnDef(colDef pg_nodes.ColumnDef) *model.Column {
-	col := &model.Column{
-		IsNullable: true,
-	}
-	if colDef.Colname != nil {
-		col.Name = *colDef.Colname
-	}
-
-	// Extract data type
-	if colDef.TypeName != nil {
-		col.DataType = parserutil.ParseTypeName(*colDef.TypeName)
-	}
-
-	// Check constraints (NOT NULL, DEFAULT, etc.)
-	for _, item := range colDef.Constraints.Items {
-		switch c := item.(type) {
-		case pg_nodes.Constraint:
-			switch c.Contype {
-			case pg_nodes.CONSTR_NOTNULL:
-				col.IsNullable = false
-			case pg_nodes.CONSTR_DEFAULT:
-				// Extract default value expression
-				if c.RawExpr != nil {
-					expr, ok := parserutil.ParseExpression(c.RawExpr)
-					if ok {
-						col.DefaultExpr = &expr
-					}
-				}
-			}
-		}
-	}
-
-	return col
-}
-
-// parseTypeName extracts type name from TypeName node
-func (p *Parser) parseTypeName(typeName pg_nodes.TypeName) string {
-	parts := make([]string, 0)
-	for _, item := range typeName.Names.Items {
-		if s, ok := item.(pg_nodes.String); ok {
-			// Skip pg_catalog schema prefix
-			if s.Str != "pg_catalog" {
-				parts = append(parts, s.Str)
-			}
-		}
-	}
-
-	typeStr := strings.Join(parts, ".")
-
-	// Map PostgreSQL internal type names to standard names
-	typeStr = parserutil.MapTypeName(typeStr)
-
-	// Add type modifiers (e.g., varchar(50))
-	if len(typeName.Typmods.Items) > 0 {
-		mods := make([]string, 0)
-		for _, item := range typeName.Typmods.Items {
-			if a, ok := item.(pg_nodes.A_Const); ok {
-				if a.Val != nil {
-					if i, ok := a.Val.(pg_nodes.Integer); ok {
-						mods = append(mods, fmt.Sprintf("%d", i.Ival))
-					}
-				}
-			}
-		}
-		if len(mods) > 0 {
-			typeStr += "(" + strings.Join(mods, ",") + ")"
-		}
-	}
-
-	return strings.ToLower(typeStr)
-}
-
-// typeNameMapping maps PostgreSQL internal type names to standard SQL names
-var typeNameMapping = map[string]string{
-	"int4":   "integer",
-	"int8":   "bigint",
-	"float4": "real",
-	"float8": "double precision",
-}
-
-// mapTypeName maps PostgreSQL internal type names to standard SQL names
-func mapTypeName(name string) string {
-	if mapped, ok := typeNameMapping[name]; ok {
-		return mapped
-	}
-	return name
-}
-
-// parseExpression extracts expression as string (simplified)
-// Returns the expression string and a boolean indicating if it was successfully parsed
-func (p *Parser) parseExpression(expr pg_nodes.Node) (string, bool) {
-	switch e := expr.(type) {
-	case pg_nodes.A_Const:
-		if e.Val != nil {
-			switch v := e.Val.(type) {
-			case pg_nodes.String:
-				return "'" + v.Str + "'", true
-			case pg_nodes.Integer:
-				return fmt.Sprintf("%d", v.Ival), true
-			case pg_nodes.Float:
-				return v.Str, true
-			}
-		}
-	}
-	return "", false
 }
 
 // getStatementSnippet extracts SQL snippet around position
