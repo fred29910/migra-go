@@ -7,7 +7,12 @@ import (
 )
 
 // LoadOptions contains extensible options for schema loading.
-type LoadOptions struct{}
+type LoadOptions struct {
+	// Schemas to load (for database sources)
+	Schemas []string
+	// Strict mode (fail on parsing errors)
+	Strict bool
+}
 
 // Loader defines the interface for loading schema sources.
 type Loader interface {

@@ -2,8 +2,10 @@ package source
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
+	"github.com/fred29910/migra-go/internal/introspect"
 	"github.com/fred29910/migra-go/internal/model"
 )
 
@@ -19,6 +21,12 @@ func (l *DBLoader) Match(source string) bool {
 // Load loads schema from a database connection string.
 // Returns the loaded schema, any parsing errors, and any fatal error.
 func (l *DBLoader) Load(ctx context.Context, source string, opt LoadOptions) (*model.Schema, []error, error) {
-	// TODO: 从 cmd/migra/diff.go 的 loadFromDB 迁移逻辑
-	return nil, nil, nil
+	introspectOpt := introspect.LoadOptions{
+		Schemas: opt.Schemas,
+	}
+	schema, err := introspect.LoadFromDB(ctx, source, introspectOpt)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to load schema from database: %w", err)
+	}
+	return schema, nil, nil
 }

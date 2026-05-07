@@ -1,20 +1,31 @@
 package main
 
 import (
+	"context"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/fred29910/migra-go/internal/source"
 	"github.com/spf13/cobra"
 )
 
-func TestIsPostgresURL_AcceptsPgScheme(t *testing.T) {
-	cases := []string{"pg://db", "pg://a", "postgres://localhost/db"}
+func TestDBLoader_Match(t *testing.T) {
+	loader := &source.DBLoader{}
+	cases := []struct {
+		source string
+		want   bool
+	}{
+		{"postgres://localhost/db", true},
+		{"mysql://localhost/db", true},
+		{"pg://db", false},
+		{"file.sql", false},
+	}
 	for _, c := range cases {
-		if !isPostgresURL(c) {
-			t.Fatalf("expected postgres url: %s", c)
+		if got := loader.Match(c.source); got != c.want {
+			t.Fatalf("DBLoader.Match(%s) = %v, want %v", c.source, got, c.want)
 		}
 	}
 }
@@ -31,7 +42,7 @@ func TestLoadFromSQLFile_NonStrictReturnsSchemaAndLogsWarnings(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stderr = w
 
-	schema, err := loadFromSQLFile(path, false)
+	schema, err := loadSchemaWithContext(context.Background(), path, nil, false)
 
 	_ = w.Close()
 	os.Stderr = oldStderr
