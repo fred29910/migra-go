@@ -59,7 +59,16 @@ func (m AddColumnMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column.Name, model.KindColumn)
 }
 func (m AddColumnMutation) Apply(schema *model.Schema) error {
-	return fmt.Errorf("AddColumnMutation.Apply not implemented yet")
+	ns := schema.GetOrCreateNamespace(m.Schema)
+	table, exists := ns.Tables[m.Table]
+	if !exists {
+		// ALTER TABLE may appear before CREATE TABLE in SQL;
+		// create an empty placeholder table.
+		table = model.NewTable(m.Schema, m.Table)
+		ns.Tables[m.Table] = table
+	}
+	table.AddColumn(&m.Column)
+	return nil
 }
 
 // CreateEnumTypeMutation describes creating an enum type.

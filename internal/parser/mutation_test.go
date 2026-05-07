@@ -41,3 +41,28 @@ func TestCreateTableMutation_Apply_Duplicate(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "already exists")
 }
+
+func TestAddColumnMutation_Apply_ToExistingTable(t *testing.T) {
+	schema := model.NewSchema()
+	mutTable := CreateTableMutation{Schema: "public", Name: "users", Columns: []model.Column{{Name: "id"}}}
+	require.NoError(t, mutTable.Apply(schema))
+
+	mutCol := AddColumnMutation{Schema: "public", Table: "users", Column: model.Column{Name: "age", DataType: "integer"}}
+	err := mutCol.Apply(schema)
+	require.NoError(t, err)
+
+	ns := schema.GetNamespace("public")
+	require.Len(t, ns.Tables["users"].Columns, 2)
+	assert.Equal(t, "age", ns.Tables["users"].Columns[1].Name)
+}
+
+func TestAddColumnMutation_Apply_CreatesPlaceholderTable(t *testing.T) {
+	schema := model.NewSchema()
+	mutCol := AddColumnMutation{Schema: "public", Table: "users", Column: model.Column{Name: "age", DataType: "integer"}}
+	err := mutCol.Apply(schema)
+	require.NoError(t, err)
+
+	ns := schema.GetNamespace("public")
+	require.NotNil(t, ns.Tables["users"])
+	assert.Len(t, ns.Tables["users"].Columns, 1)
+}
