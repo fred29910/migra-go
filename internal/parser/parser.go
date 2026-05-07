@@ -34,18 +34,30 @@ func (e *ParseError) Error() string {
 
 // Parser parses SQL statements using pg_query_go and builds a Schema model
 type Parser struct {
-	schema  *model.Schema
-	errors  []error
-	sql     string // Original SQL for extracting statement snippets
-	applier *MutationApplier
+	schema   *model.Schema
+	errors   []error
+	sql      string // Original SQL for extracting statement snippets
+	applier  *MutationApplier
+	registry *HandlerRegistry
 }
 
-// NewParser creates a new SQL parser
+// NewParser creates a new SQL parser with default handler registry.
 func NewParser() *Parser {
 	return &Parser{
-		schema:  model.NewSchema(),
-		errors:  make([]error, 0),
-		applier: &MutationApplier{},
+		schema:   model.NewSchema(),
+		errors:   make([]error, 0),
+		applier:  &MutationApplier{},
+		registry: DefaultRegistry(),
+	}
+}
+
+// NewParserWith creates a Parser with custom dependencies. Primarily for testing.
+func NewParserWith(registry *HandlerRegistry, applier *MutationApplier) *Parser {
+	return &Parser{
+		schema:   model.NewSchema(),
+		errors:   make([]error, 0),
+		applier:  applier,
+		registry: registry,
 	}
 }
 
@@ -76,65 +88,46 @@ func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
 	return p.schema, nil
 }
 
-// visitNode dispatches node to specific handlers using value type assertions
+// visitNode dispatches node to the registered handler via HandlerRegistry.
 func (p *Parser) visitNode(stmt pg_nodes.Node) error {
 	// Statements from pg_query.Parse() are wrapped in RawStmt
 	rawStmt, ok := stmt.(pg_nodes.RawStmt)
 	if !ok {
 		return &ParseError{
-			Message:   fmt.Sprintf("expected RawStmt, got: %T", stmt),
-			Position:  -1,
-			Statement: "",
+			Message:  fmt.Sprintf("expected RawStmt, got: %T", stmt),
+			Position: -1,
 		}
 	}
 
-	// Get actual statement from RawStmt.Stmt
 	actualStmt := rawStmt.Stmt
 	pos := rawStmt.StmtLocation
 
-	switch n := actualStmt.(type) {
-	case pg_nodes.CreateStmt:
-		return p.handleCreateTable(n)
-	case pg_nodes.AlterTableStmt:
-		return p.handleAlterTable(n)
-	default:
+	handler, found := p.registry.Dispatch(actualStmt)
+	if !found {
 		return &ParseError{
 			Message:   fmt.Sprintf("unsupported statement type: %T", actualStmt),
 			Position:  pos,
 			Statement: p.getStatementSnippet(pos),
 		}
 	}
-}
 
-// handleCreateTable processes CREATE TABLE statements (MVP: ColumnDef only)
-func (p *Parser) handleCreateTable(stmt pg_nodes.CreateStmt) error {
-	tableName, schemaName := parserutil.ParseRelation(stmt.Relation)
-
-	var columns []model.Column
-	for _, item := range stmt.TableElts.Items {
-		switch elt := item.(type) {
-		case pg_nodes.ColumnDef:
-			columns = append(columns, *parserutil.ParseColumnDef(elt))
-			// MVP: Skip constraints for now
+	mutations, err := handler.Handle(actualStmt)
+	if err != nil {
+		return &ParseError{
+			Message:   err.Error(),
+			Position:  pos,
+			Statement: p.getStatementSnippet(pos),
 		}
 	}
 
-	mut := CreateTableMutation{
-		Schema:  schemaName,
-		Name:    tableName,
-		Columns: columns,
+	if err := p.applier.Apply(p.schema, mutations); err != nil {
+		return &ParseError{
+			Message:   err.Error(),
+			Position:  pos,
+			Statement: p.getStatementSnippet(pos),
+		}
 	}
-	return p.applier.Apply(p.schema, []SchemaMutation{mut})
-}
-
-// handleAlterTable processes ALTER TABLE statements (MVP: AT_AddColumn only)
-func (p *Parser) handleAlterTable(stmt pg_nodes.AlterTableStmt) error {
-	h := &AlterTableHandler{}
-	mutations, err := h.Handle(stmt)
-	if err != nil {
-		return err
-	}
-	return p.applier.Apply(p.schema, mutations)
+	return nil
 }
 
 // parseRelation extracts table name and schema from RangeVar
