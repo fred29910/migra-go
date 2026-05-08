@@ -95,7 +95,17 @@ func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
 }
 
 // visitNode dispatches node to the registered handler via HandlerRegistry.
-func (p *Parser) visitNode(stmt pg_nodes.Node) error {
+func (p *Parser) visitNode(stmt pg_nodes.Node) (err error) {
+	// Panic recovery to prevent entire process from crashing
+	defer func() {
+		if r := recover(); r != nil {
+			err = &ParseError{
+				Message:  fmt.Sprintf("recovered from panic: %v", r),
+				Position: -1,
+			}
+		}
+	}()
+
 	// Statements from pg_query.Parse() are wrapped in RawStmt
 	rawStmt, ok := stmt.(pg_nodes.RawStmt)
 	if !ok {

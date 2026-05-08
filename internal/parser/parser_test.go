@@ -7,6 +7,7 @@ import (
 
 	"github.com/fred29910/migra-go/internal/diff"
 	"github.com/fred29910/migra-go/internal/render"
+	pg_nodes "github.com/lfittl/pg_query_go/nodes"
 )
 
 // TestParseCreateTable tests parsing CREATE TABLE statements
@@ -304,4 +305,28 @@ func TestParserInitializationRobustness(t *testing.T) {
 			t.Fatalf("expected naked Parser literal to be functional via ParseSQL lazy init, got err: %v", err)
 		}
 	})
+}
+
+type panickingHandler struct{}
+func (h *panickingHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error) {
+	panic("intentional panic for testing recover")
+}
+
+func TestParser_RecoverFromPanic(t *testing.T) {
+	registry := NewHandlerRegistry()
+	// Map CreateStmt to our panicking handler
+	registry.Register(pg_nodes.CreateStmt{}, &panickingHandler{})
+	
+	p := NewParserWith(registry, nil)
+	_, err := p.ParseSQL("CREATE TABLE t1 (id int);")
+	
+	if err == nil {
+		t.Fatal("expected error from recovered panic, got nil")
+	}
+	if !strings.Contains(err.Error(), "recovered from panic") {
+		t.Errorf("expected error to mention panic recovery, got: %s", err.Error())
+	}
+	if !strings.Contains(err.Error(), "intentional panic for testing recover") {
+		t.Errorf("expected error to contain panic message, got: %s", err.Error())
+	}
 }
