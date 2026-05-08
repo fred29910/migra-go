@@ -2,13 +2,14 @@ package model
 
 // Table represents a database table
 type Table struct {
-	Schema       string
-	Name         string
-	Columns      []*Column          // Preserve order for column ordering strategies
-	ColumnByName map[string]*Column `json:"-"` // Index for quick lookup by name, excluded from JSON
-	PrimaryKey   *PrimaryKey
-	Constraints  map[string]*Constraint
-	Indexes      map[string]*Index
+	Schema        string
+	Name          string
+	Columns       []*Column          // Preserve order for column ordering strategies
+	ColumnByName  map[string]*Column `json:"-"` // Index for quick lookup by name, excluded from JSON
+	PrimaryKey    *PrimaryKey
+	Constraints   map[string]*Constraint
+	Indexes       map[string]*Index
+	IsPlaceholder bool `json:"-"` // Internal state for parser-time placeholder tables
 }
 
 // PrimaryKey represents a primary key constraint
@@ -37,12 +38,13 @@ type Constraint struct {
 // NewTable creates a new table with initialized maps
 func NewTable(schema, name string) *Table {
 	return &Table{
-		Schema:       schema,
-		Name:         name,
-		Columns:      make([]*Column, 0),
-		ColumnByName: make(map[string]*Column),
-		Constraints:  make(map[string]*Constraint),
-		Indexes:      make(map[string]*Index),
+		Schema:        schema,
+		Name:          name,
+		Columns:       make([]*Column, 0),
+		ColumnByName:  make(map[string]*Column),
+		Constraints:   make(map[string]*Constraint),
+		Indexes:       make(map[string]*Index),
+		IsPlaceholder: false,
 	}
 }
 

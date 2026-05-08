@@ -64,3 +64,29 @@ func TestSchemaSerialization(t *testing.T) {
 		t.Errorf("expected column name 'id', got '%s'", deserializedTable.Columns[0].Name)
 	}
 }
+
+func TestTablePlaceholderSerialization(t *testing.T) {
+	table := NewTable("public", "test")
+	table.IsPlaceholder = true
+
+	data, err := json.Marshal(table)
+	if err != nil {
+		t.Fatalf("failed to marshal table: %v", err)
+	}
+
+	jsonStr := string(data)
+	if contains(jsonStr, "IsPlaceholder") || contains(jsonStr, "is_placeholder") {
+		t.Errorf("JSON should not contain IsPlaceholder field, got: %s", jsonStr)
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || func() bool {
+		for i := 0; i <= len(s)-len(substr); i++ {
+			if s[i:i+len(substr)] == substr {
+				return true
+			}
+		}
+		return false
+	}())
+}
