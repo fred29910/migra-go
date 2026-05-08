@@ -19,7 +19,7 @@ func (h *CreateTableHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error
 		switch elt := item.(type) {
 		case pg_nodes.ColumnDef:
 			columns = append(columns, *parserutil.ParseColumnDef(elt))
-		// MVP: skip constraints
+			// MVP: skip constraints
 		}
 	}
 
