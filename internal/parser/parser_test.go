@@ -287,3 +287,21 @@ func TestIntegrationParserToDiff(t *testing.T) {
 		t.Error("expected ALTER TABLE statement in rendered SQL")
 	}
 }
+
+func TestParserInitializationRobustness(t *testing.T) {
+	t.Run("NewParserWith nil dependencies", func(t *testing.T) {
+		p := NewParserWith(nil, nil)
+		_, err := p.ParseSQL("CREATE TABLE t1 (id int);")
+		if err != nil {
+			t.Fatalf("expected NewParserWith(nil, nil) to be functional, got err: %v", err)
+		}
+	})
+
+	t.Run("Parser struct literal lazy initialization", func(t *testing.T) {
+		p := &Parser{} // Naked literal
+		_, err := p.ParseSQL("CREATE TABLE t1 (id int);")
+		if err != nil {
+			t.Fatalf("expected naked Parser literal to be functional via ParseSQL lazy init, got err: %v", err)
+		}
+	})
+}

@@ -45,6 +45,12 @@ func NewParser() *Parser {
 
 // NewParserWith creates a Parser with custom dependencies. Primarily for testing.
 func NewParserWith(registry *HandlerRegistry, applier *MutationApplier) *Parser {
+	if registry == nil {
+		registry = DefaultRegistry()
+	}
+	if applier == nil {
+		applier = &MutationApplier{}
+	}
 	return &Parser{
 		schema:   model.NewSchema(),
 		errors:   make([]error, 0),
@@ -55,6 +61,14 @@ func NewParserWith(registry *HandlerRegistry, applier *MutationApplier) *Parser 
 
 // ParseSQL parses SQL string and returns the schema
 func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
+	// Ensure dependencies are initialized even if created via struct literal
+	if p.registry == nil {
+		p.registry = DefaultRegistry()
+	}
+	if p.applier == nil {
+		p.applier = &MutationApplier{}
+	}
+
 	// Reset parser state for each ParseSQL call
 	p.schema = model.NewSchema()
 	p.errors = p.errors[:0]
