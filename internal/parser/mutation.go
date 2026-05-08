@@ -36,10 +36,31 @@ func (m CreateTableMutation) Target() model.ObjectKey {
 }
 func (m CreateTableMutation) Apply(schema *model.Schema) error {
 	ns := schema.GetOrCreateNamespace(m.Schema)
-	if _, exists := ns.Tables[m.Name]; exists {
-		return fmt.Errorf("table %s.%s already exists", m.Schema, m.Name)
+	table, exists := ns.Tables[m.Name]
+	if exists {
+		if !table.IsPlaceholder {
+			return fmt.Errorf("table %s.%s already exists", m.Schema, m.Name)
+		}
+		// Merge with placeholder table
+		for _, col := range m.Columns {
+			existingCol := table.GetColumn(col.Name)
+			if existingCol != nil {
+				// Consistency check: type must match if column was already added by ALTER
+				if existingCol.DataType != col.DataType {
+					return fmt.Errorf("column %s.%s type mismatch: exists as %s, trying to create as %s",
+						m.Name, col.Name, existingCol.DataType, col.DataType)
+				}
+				// If matches, we skip adding it to avoid duplicates
+				continue
+			}
+			// Append new column from CREATE TABLE
+			table.AddColumn(&col)
+		}
+		table.IsPlaceholder = false
+		return nil
 	}
-	table := model.NewTable(m.Schema, m.Name)
+
+	table = model.NewTable(m.Schema, m.Name)
 	for i := range m.Columns {
 		table.AddColumn(&m.Columns[i])
 	}
@@ -65,6 +86,7 @@ func (m AddColumnMutation) Apply(schema *model.Schema) error {
 		// ALTER TABLE may appear before CREATE TABLE in SQL;
 		// create an empty placeholder table.
 		table = model.NewTable(m.Schema, m.Table)
+		table.IsPlaceholder = true
 		ns.Tables[m.Table] = table
 	}
 	table.AddColumn(&m.Column)
