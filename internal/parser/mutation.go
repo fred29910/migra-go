@@ -105,5 +105,5 @@ func (m CreateEnumTypeMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Name, model.KindType)
 }
 func (m CreateEnumTypeMutation) Apply(schema *model.Schema) error {
-	return fmt.Errorf("CreateEnumTypeMutation.Apply not implemented yet")
+	return fmt.Errorf("CREATE TYPE ENUM is not yet supported (MVP scope only includes CREATE TABLE and ALTER TABLE ADD COLUMN)")
 }

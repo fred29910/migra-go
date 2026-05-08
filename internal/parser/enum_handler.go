@@ -16,5 +16,5 @@ func (h *CreateEnumHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error)
 	if !ok {
 		return nil, fmt.Errorf("CreateEnumHandler: expected pg_nodes.CreateEnumStmt, got %T", node)
 	}
-	return nil, fmt.Errorf("CREATE TYPE ENUM parsing not yet fully implemented")
+	return nil, fmt.Errorf("CREATE TYPE ENUM is not yet supported (MVP scope only includes CREATE TABLE and ALTER TABLE ADD COLUMN)")
 }

@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/fred29910/migra-go/internal/parser/parserutil"
 	pg_nodes "github.com/lfittl/pg_query_go/nodes"
@@ -38,7 +39,7 @@ func (h *AlterTableHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error)
 			}
 		// MVP: Skip other alter subcommands
 		default:
-			// Collect warnings or skip silently
+			fmt.Fprintf(os.Stderr, "warning: unsupported ALTER TABLE subcommand: %v\n", cmd.Subtype)
 		}
 	}
 

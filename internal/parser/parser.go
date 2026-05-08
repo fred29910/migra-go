@@ -16,7 +16,6 @@ import (
 type ParseError struct {
 	Message   string
 	Position  int
-	StmtLen   int
 	Statement string
 }
 

@@ -15,7 +15,11 @@ type MutationApplier struct {
 // Apply applies mutations to the given schema in order.
 // Returns nil if all mutations succeeded, or an aggregate error.
 func (a *MutationApplier) Apply(schema *model.Schema, mutations []SchemaMutation) error {
-	a.errors = a.errors[:0]
+	if a.errors == nil {
+		a.errors = make([]error, 0)
+	} else {
+		a.errors = a.errors[:0]
+	}
 	for _, mut := range mutations {
 		if err := mut.Apply(schema); err != nil {
 			a.errors = append(a.errors, &MutationError{Mutation: mut, Cause: err})

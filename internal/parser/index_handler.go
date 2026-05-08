@@ -16,5 +16,5 @@ func (h *CreateIndexHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error
 	if !ok {
 		return nil, fmt.Errorf("CreateIndexHandler: expected pg_nodes.IndexStmt, got %T", node)
 	}
-	return nil, fmt.Errorf("CREATE INDEX parsing not yet fully implemented")
+	return nil, fmt.Errorf("CREATE INDEX is not yet supported (MVP scope only includes CREATE TABLE and ALTER TABLE ADD COLUMN)")
 }
