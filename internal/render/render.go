@@ -174,13 +174,25 @@ func (r *Renderer) renderCreateIndex(op *diff.CreateIndexOp) string {
 	if idx.Unique {
 		unique = "UNIQUE "
 	}
-	quotedCols := make([]string, len(idx.Columns))
-	for i, c := range idx.Columns {
-		quotedCols[i] = quoteIdentifier(c)
+	// Build column list from Elements, fallback to Columns for backward compatibility
+	quotedItems := make([]string, 0, len(idx.Elements))
+	if len(idx.Elements) > 0 {
+		for _, elem := range idx.Elements {
+			if elem.Name != "" {
+				quotedItems = append(quotedItems, quoteIdentifier(elem.Name))
+			} else if elem.Expr != "" {
+				quotedItems = append(quotedItems, "("+elem.Expr+")")
+			}
+		}
+	} else if len(idx.Columns) > 0 {
+		// Backward compatibility
+		for _, c := range idx.Columns {
+			quotedItems = append(quotedItems, quoteIdentifier(c))
+		}
 	}
-	columns := strings.Join(quotedCols, ", ")
+	items := strings.Join(quotedItems, ", ")
 	return fmt.Sprintf("-- op: add_index risk:low\nCREATE %sINDEX %s ON %s (%s);",
-		unique, quoteQualifiedIdentifier(op.Schema, idx.Name), quoteQualifiedIdentifier(op.Schema, idx.Table), columns)
+		unique, quoteQualifiedIdentifier(op.Schema, idx.Name), quoteQualifiedIdentifier(op.Schema, idx.Table), items)
 }
 
 func (r *Renderer) renderDropIndex(op *diff.DropIndexOp) string {
