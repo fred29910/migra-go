@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"fmt"
+
 	"github.com/fred29910/migra-go/internal/model"
 	"github.com/fred29910/migra-go/internal/parser/parserutil"
 	pg_nodes "github.com/lfittl/pg_query_go/nodes"
@@ -11,7 +13,10 @@ type CreateTableHandler struct{}
 
 // Handle converts a pg_query CreateStmt into schema mutations.
 func (h *CreateTableHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error) {
-	stmt := node.(pg_nodes.CreateStmt)
+	stmt, ok := node.(pg_nodes.CreateStmt)
+	if !ok {
+		return nil, fmt.Errorf("CreateTableHandler: expected pg_nodes.CreateStmt, got %T", node)
+	}
 	tableName, schemaName := parserutil.ParseRelation(stmt.Relation)
 
 	var columns []model.Column

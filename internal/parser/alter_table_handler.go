@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"fmt"
+
 	"github.com/fred29910/migra-go/internal/parser/parserutil"
 	pg_nodes "github.com/lfittl/pg_query_go/nodes"
 )
@@ -10,7 +12,10 @@ type AlterTableHandler struct{}
 
 // Handle converts a pg_query AlterTableStmt into schema mutations.
 func (h *AlterTableHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error) {
-	stmt := node.(pg_nodes.AlterTableStmt)
+	stmt, ok := node.(pg_nodes.AlterTableStmt)
+	if !ok {
+		return nil, fmt.Errorf("AlterTableHandler: expected pg_nodes.AlterTableStmt, got %T", node)
+	}
 	tableName, schemaName := parserutil.ParseRelation(stmt.Relation)
 
 	var mutations []SchemaMutation

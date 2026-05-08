@@ -12,6 +12,9 @@ type CreateIndexHandler struct{}
 // Handle converts a pg_query IndexStmt into schema mutations.
 // Currently returns an error as index parsing is not yet fully implemented.
 func (h *CreateIndexHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error) {
-	_ = node.(pg_nodes.IndexStmt)
+	_, ok := node.(pg_nodes.IndexStmt)
+	if !ok {
+		return nil, fmt.Errorf("CreateIndexHandler: expected pg_nodes.IndexStmt, got %T", node)
+	}
 	return nil, fmt.Errorf("CREATE INDEX parsing not yet fully implemented")
 }

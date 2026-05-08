@@ -69,3 +69,22 @@ func TestAlterTableHandler_MultipleAddColumns(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "email", mut1.Column.Name)
 }
+
+func TestHandlers_TypeSafety(t *testing.T) {
+	// Create a node that is NOT what the handlers expect
+	node := pg_nodes.VacuumStmt{} 
+	
+	t.Run("CreateTableHandler", func(t *testing.T) {
+		h := &CreateTableHandler{}
+		_, err := h.Handle(node)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected pg_nodes.CreateStmt")
+	})
+
+	t.Run("AlterTableHandler", func(t *testing.T) {
+		h := &AlterTableHandler{}
+		_, err := h.Handle(node)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected pg_nodes.AlterTableStmt")
+	})
+}
