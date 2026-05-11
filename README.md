@@ -10,11 +10,15 @@
 ## 功能特性
 
 - 🔍 **双向 Diff**：比较 SQL 文件、PostgreSQL 实例或两者之间的差异。
-- 🏗️ **结构化模型**：使用中间 SchemaModel 表示数据库结构。
+- 🏗️ **结构化模型**：使用中间 SchemaModel 表示数据库结构，支持表、列、主键、索引、枚举类型和约束。
 - 📋 **SQL 生成**：输出可执行的迁移 SQL，支持枚举类型、索引、数据列和约束的精确变更。
-- 🛡️ **安全保护**：标记破坏性操作，默认抛出告警提示，可选跳过危险变更。
+- 🛡️ **安全保护**：标记破坏性操作（DROP），默认抛出告警提示，可选跳过危险变更（`--unsafe-drop`）。
 - 🎯 **语义归一化**：减少因同义表达导致的误报。
 - 🚀 **高性能**：基于 Kahn 算法实现的 DAG（有向无环图）拓扑排序，保证生成脚本的执行顺序确定且高效。
+- ⚙️ **三阶段执行计划**：自动将操作分为 pre-deploy（创建）、deploy（修改）、post-deploy（删除）三个阶段。
+- 🔧 **可扩展解析器**：基于 HandlerRegistry + 访问者模式的 OCP 设计，新增 DDL 类型只需实现 Handler + Mutation 并注册。
+- 📊 **多格式输出**：支持 SQL 和 JSON 两种输出格式。
+- ⏱️ **超时控制**：支持 `--timeout` 参数控制 Schema 加载超时时间。
 
 ## 快速开始
 
@@ -45,6 +49,12 @@ migra diff file_a.sql file_b.sql
 
 # 指定 schema 和超时时间
 migra diff --schema public --schema auth --timeout 2m file.sql postgres://localhost/db
+
+# 输出 JSON 格式
+migra diff --format json file_a.sql file_b.sql
+
+# 启用危险 DROP 操作输出
+migra diff --unsafe-drop file_a.sql file_b.sql
 ```
 
 ### 命令行参数
@@ -119,18 +129,64 @@ migra diff file.sql "postgres://myuser@localhost/mydb"
 
 详见 [examples/](examples/) 目录和 [PostgreSQL 官方文档](https://www.postgresql.org/docs/current/libpq-envars.html)。
 
-## 项目结构
+## 架构概览
+
+### 数据流
+
+```
+┌─────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│  SQL / DB   │────▶│   Parser     │────▶│   Diff       │────▶│   Renderer   │
+│  (Source &  │     │  (AST →      │     │  (Schema A   │     │  (Operations │
+│   Target)   │     │   SchemaModel)│     │   vs B →     │     │   → SQL/JSON)│
+└─────────────┘     └──────────────┘     │   DiffOps)   │     └──────────────┘
+                                         └──────┬───────┘
+                                                │
+                                         ┌──────▼───────┐
+                                         │   Planner    │
+                                         │ (DAG 拓扑排序│
+                                         │  三阶段执行)  │
+                                         └──────────────┘
+```
+
+### 项目结构
 
 ```
 .
 ├── cmd/migra/          # CLI 入口（Cobra + Viper）
+│   ├── main.go         # 根命令与配置初始化
+│   ├── diff.go         # diff 子命令与参数解析
+│   ├── diff_runner.go  # 差异计算流水线编排
+│   └── diff_test.go    # CLI 层测试
 ├── internal/
+│   ├── app/            # 应用层服务（依赖注入编排）
+│   │   └── diff_service.go
 │   ├── model/          # 中间数据模型（Schema、Table、Column 等）
-│   ├── parser/         # SQL 解析（基于 pg_query_go）
+│   │   ├── schema.go
+│   │   ├── table.go
+│   │   ├── column.go
+│   │   ├── index_elem.go
+│   │   └── object_key.go
+│   ├── parser/         # SQL 解析（基于 pg_query_go，OCP 架构）
+│   │   ├── parser.go           # 主解析器 + 异常恢复
+│   │   ├── registry.go         # Handler 注册表（reflect.Type 路由）
+│   │   ├── applier.go          # Mutation 应用器
+│   │   ├── mutation.go         # SchemaMutation 接口与核心类型
+│   │   ├── create_table_handler.go
+│   │   ├── alter_table_handler.go
+│   │   ├── index_handler.go    # 完整索引支持（IndexElem）
+│   │   ├── enum_handler.go
+│   │   └── parserutil/         # 辅助函数包
 │   ├── introspect/     # 数据库内省（读取 pg_catalog）
 │   ├── normalize/      # 语义归一化
-│   ├── diff/           # 差异比较引擎（包含操作收集与警告反馈）
+│   ├── diff/           # 差异比较引擎
+│   │   ├── differ.go          # Differ 核心逻辑
+│   │   ├── operation.go       # Operation 类型定义
+│   │   ├── diff_tables.go     # 表级差异
+│   │   ├── diff_columns.go    # 列级差异
+│   │   └── diff_index.go      # 索引差异
 │   ├── plan/           # 执行计划与拓扑排序（DAG）
+│   │   ├── plan.go            # 三阶段执行计划
+│   │   └── dag.go             # DAG 构建与排序
 │   ├── render/         # SQL / JSON 渲染器
 │   └── testutil/       # 测试工具集
 ├── scripts/            # 辅助构建脚本
@@ -167,7 +223,7 @@ make ci       # 本地运行完整 CI 检查流程
 
 ### 技术栈
 
-- **语言**：Go 1.24+
+- **语言**：Go 1.26+
 - **CLI 框架**：[Cobra](https://github.com/spf13/cobra) + [Viper](https://github.com/spf13/viper)
 - **数据库驱动**：[pgx v5](https://github.com/jackc/pgx)
 - **SQL 解析**：[pg_query_go](https://github.com/lfittl/pg_query_go)
