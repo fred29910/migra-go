@@ -146,4 +146,55 @@ func (c *diffContext) diffTableIndexes(schema string, source, target *model.Tabl
 	for _, name := range dropIdx {
 		c.addOp(NewDropIndexOp(schema, name))
 	}
+
+	// Compare indexes that exist in both source and target for content changes
+	bothIdx := make([]string, 0, len(target.Indexes))
+	for name := range target.Indexes {
+		if _, exists := source.Indexes[name]; exists {
+			bothIdx = append(bothIdx, name)
+		}
+	}
+	sort.Strings(bothIdx)
+	for _, name := range bothIdx {
+		srcIdx := source.Indexes[name]
+		tgtIdx := target.Indexes[name]
+		if !sameIndexContent(srcIdx, tgtIdx) {
+			c.addOp(NewDropIndexOp(schema, name))
+			c.addOp(NewCreateIndexOp(schema, tgtIdx))
+		}
+	}
+}
+
+// sameIndexContent checks if two indexes have the same content
+func sameIndexContent(a, b *model.Index) bool {
+	if a.Unique != b.Unique {
+		return false
+	}
+	if a.Method != b.Method {
+		return false
+	}
+	if a.WhereClause != b.WhereClause {
+		return false
+	}
+	if len(a.Elements) != len(b.Elements) {
+		return false
+	}
+	for i := range a.Elements {
+		if a.Elements[i].Name != b.Elements[i].Name {
+			return false
+		}
+		if a.Elements[i].Expr != b.Elements[i].Expr {
+			return false
+		}
+		if a.Elements[i].Opclass != b.Elements[i].Opclass {
+			return false
+		}
+		if a.Elements[i].Ordering != b.Elements[i].Ordering {
+			return false
+		}
+		if a.Elements[i].NullsOrdering != b.Elements[i].NullsOrdering {
+			return false
+		}
+	}
+	return true
 }
