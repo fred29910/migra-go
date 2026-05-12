@@ -69,3 +69,14 @@ func (t *Table) AddColumn(col *Column) {
 	t.Columns = append(t.Columns, col)
 	t.ColumnByName[col.Name] = col
 }
+
+// RemoveColumn removes a column by name from the table
+func (t *Table) RemoveColumn(name string) {
+	delete(t.ColumnByName, name)
+	for i, col := range t.Columns {
+		if col.Name == name {
+			t.Columns = append(t.Columns[:i], t.Columns[i+1:]...)
+			return
+		}
+	}
+}

@@ -10,10 +10,16 @@ import (
 type MutationKind string
 
 const (
-	MutKindCreateTable    MutationKind = "create_table"
-	MutKindAddColumn      MutationKind = "add_column"
-	MutKindCreateEnumType MutationKind = "create_enum_type"
-	MutKindCreateIndex    MutationKind = "create_index"
+	MutKindCreateTable     MutationKind = "create_table"
+	MutKindAddColumn       MutationKind = "add_column"
+	MutKindCreateEnumType  MutationKind = "create_enum_type"
+	MutKindCreateIndex     MutationKind = "create_index"
+	MutKindDropColumn      MutationKind = "drop_column"
+	MutKindAlterColumnType MutationKind = "alter_column_type"
+	MutKindSetNotNull      MutationKind = "set_not_null"
+	MutKindDropNotNull     MutationKind = "drop_not_null"
+	MutKindSetDefault      MutationKind = "set_default"
+	MutKindDropDefault     MutationKind = "drop_default"
 )
 
 // SchemaMutation is a self-describing and self-applying schema change.
@@ -127,5 +133,174 @@ func (m CreateEnumTypeMutation) Apply(schema *model.Schema) error {
 		return fmt.Errorf("type %s.%s already exists", m.Schema, m.Name)
 	}
 	ns.Types[m.Name] = &model.EnumType{Name: m.Name, Labels: m.Labels}
+	return nil
+}
+
+// DropColumnMutation describes dropping a column from a table.
+type DropColumnMutation struct {
+	Schema string
+	Table  string
+	Column string
+}
+
+func (m DropColumnMutation) Kind() MutationKind { return MutKindDropColumn }
+func (m DropColumnMutation) Target() model.ObjectKey {
+	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
+}
+func (m DropColumnMutation) Apply(schema *model.Schema) error {
+	ns := schema.GetNamespace(m.Schema)
+	if ns == nil {
+		return fmt.Errorf("schema %s not found", m.Schema)
+	}
+	table, exists := ns.Tables[m.Table]
+	if !exists {
+		return fmt.Errorf("table %s.%s not found", m.Schema, m.Table)
+	}
+	if _, exists := table.ColumnByName[m.Column]; !exists {
+		return fmt.Errorf("column %s.%s.%s not found", m.Schema, m.Table, m.Column)
+	}
+	table.RemoveColumn(m.Column)
+	return nil
+}
+
+// AlterColumnTypeMutation describes changing a column's data type.
+type AlterColumnTypeMutation struct {
+	Schema string
+	Table  string
+	Column string
+	ToType string
+}
+
+func (m AlterColumnTypeMutation) Kind() MutationKind { return MutKindAlterColumnType }
+func (m AlterColumnTypeMutation) Target() model.ObjectKey {
+	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
+}
+func (m AlterColumnTypeMutation) Apply(schema *model.Schema) error {
+	ns := schema.GetNamespace(m.Schema)
+	if ns == nil {
+		return fmt.Errorf("schema %s not found", m.Schema)
+	}
+	table, exists := ns.Tables[m.Table]
+	if !exists {
+		return fmt.Errorf("table %s.%s not found", m.Schema, m.Table)
+	}
+	col := table.ColumnByName[m.Column]
+	if col == nil {
+		return fmt.Errorf("column %s.%s.%s not found", m.Schema, m.Table, m.Column)
+	}
+	col.DataType = m.ToType
+	return nil
+}
+
+// SetNotNullMutation describes setting a column to NOT NULL.
+type SetNotNullMutation struct {
+	Schema string
+	Table  string
+	Column string
+}
+
+func (m SetNotNullMutation) Kind() MutationKind { return MutKindSetNotNull }
+func (m SetNotNullMutation) Target() model.ObjectKey {
+	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
+}
+func (m SetNotNullMutation) Apply(schema *model.Schema) error {
+	ns := schema.GetNamespace(m.Schema)
+	if ns == nil {
+		return fmt.Errorf("schema %s not found", m.Schema)
+	}
+	table, exists := ns.Tables[m.Table]
+	if !exists {
+		return fmt.Errorf("table %s.%s not found", m.Schema, m.Table)
+	}
+	col := table.ColumnByName[m.Column]
+	if col == nil {
+		return fmt.Errorf("column %s.%s.%s not found", m.Schema, m.Table, m.Column)
+	}
+	col.IsNullable = false
+	return nil
+}
+
+// DropNotNullMutation describes dropping NOT NULL from a column.
+type DropNotNullMutation struct {
+	Schema string
+	Table  string
+	Column string
+}
+
+func (m DropNotNullMutation) Kind() MutationKind { return MutKindDropNotNull }
+func (m DropNotNullMutation) Target() model.ObjectKey {
+	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
+}
+func (m DropNotNullMutation) Apply(schema *model.Schema) error {
+	ns := schema.GetNamespace(m.Schema)
+	if ns == nil {
+		return fmt.Errorf("schema %s not found", m.Schema)
+	}
+	table, exists := ns.Tables[m.Table]
+	if !exists {
+		return fmt.Errorf("table %s.%s not found", m.Schema, m.Table)
+	}
+	col := table.ColumnByName[m.Column]
+	if col == nil {
+		return fmt.Errorf("column %s.%s.%s not found", m.Schema, m.Table, m.Column)
+	}
+	col.IsNullable = true
+	return nil
+}
+
+// SetDefaultMutation describes setting a default expression on a column.
+type SetDefaultMutation struct {
+	Schema      string
+	Table       string
+	Column      string
+	DefaultExpr string
+}
+
+func (m SetDefaultMutation) Kind() MutationKind { return MutKindSetDefault }
+func (m SetDefaultMutation) Target() model.ObjectKey {
+	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
+}
+func (m SetDefaultMutation) Apply(schema *model.Schema) error {
+	ns := schema.GetNamespace(m.Schema)
+	if ns == nil {
+		return fmt.Errorf("schema %s not found", m.Schema)
+	}
+	table, exists := ns.Tables[m.Table]
+	if !exists {
+		return fmt.Errorf("table %s.%s not found", m.Schema, m.Table)
+	}
+	col := table.ColumnByName[m.Column]
+	if col == nil {
+		return fmt.Errorf("column %s.%s.%s not found", m.Schema, m.Table, m.Column)
+	}
+	col.DefaultExpr = &m.DefaultExpr
+	return nil
+}
+
+// DropDefaultMutation describes dropping a default expression from a column.
+type DropDefaultMutation struct {
+	Schema string
+	Table  string
+	Column string
+}
+
+func (m DropDefaultMutation) Kind() MutationKind { return MutKindDropDefault }
+func (m DropDefaultMutation) Target() model.ObjectKey {
+	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
+}
+func (m DropDefaultMutation) Apply(schema *model.Schema) error {
+	ns := schema.GetNamespace(m.Schema)
+	if ns == nil {
+		return fmt.Errorf("schema %s not found", m.Schema)
+	}
+	table, exists := ns.Tables[m.Table]
+	if !exists {
+		return fmt.Errorf("table %s.%s not found", m.Schema, m.Table)
+	}
+	col := table.ColumnByName[m.Column]
+	if col == nil {
+		return fmt.Errorf("column %s.%s.%s not found", m.Schema, m.Table, m.Column)
+	}
+	col.DefaultExpr = nil
 	return nil
 }

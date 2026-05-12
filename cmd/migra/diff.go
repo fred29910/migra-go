@@ -9,6 +9,7 @@ import (
 	"github.com/fred29910/migra-go/internal/model"
 	"github.com/fred29910/migra-go/internal/source"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // sourceRegistry is the global registry of schema loaders
@@ -38,13 +39,20 @@ Examples:
 func init() {
 	rootCmd.AddCommand(diffCmd)
 
-	// Diff-specific flags
-	diffCmd.Flags().StringSliceP("schema", "s", []string{"public"}, "schemas to compare (can be multiple)")
-	diffCmd.Flags().StringP("format", "f", "sql", "output format: sql or json")
-	diffCmd.Flags().Bool("unsafe-drop", false, "allow destructive drop operations")
-	diffCmd.Flags().Bool("strict", false, "fail on unsupported statements")
-	diffCmd.Flags().StringP("output", "o", "", "output file (default: stdout)")
+	// Diff-specific flags（默认值从 viper 读取）
+	diffCmd.Flags().StringSliceP("schema", "s", viper.GetStringSlice("diff.schemas"), "schemas to compare (can be multiple)")
+	diffCmd.Flags().StringP("format", "f", viper.GetString("diff.format"), "output format: sql or json")
+	diffCmd.Flags().Bool("unsafe-drop", viper.GetBool("diff.unsafe_drop"), "allow destructive drop operations")
+	diffCmd.Flags().Bool("strict", viper.GetBool("diff.strict"), "fail on unsupported statements")
+	diffCmd.Flags().StringP("output", "o", viper.GetString("output.file"), "output file (default: stdout)")
 	diffCmd.Flags().Duration("timeout", defaultDiffTimeout, "timeout for schema loading (e.g. 30s, 2m)")
+
+	// 绑定到 viper
+	viper.BindPFlag("diff.schemas", diffCmd.Flags().Lookup("schema"))
+	viper.BindPFlag("diff.format", diffCmd.Flags().Lookup("format"))
+	viper.BindPFlag("diff.unsafe_drop", diffCmd.Flags().Lookup("unsafe-drop"))
+	viper.BindPFlag("diff.strict", diffCmd.Flags().Lookup("strict"))
+	viper.BindPFlag("output.file", diffCmd.Flags().Lookup("output"))
 }
 
 func runDiff(cmd *cobra.Command, args []string) error {

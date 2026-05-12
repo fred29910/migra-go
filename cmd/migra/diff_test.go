@@ -21,7 +21,7 @@ func TestDBLoader_Match(t *testing.T) {
 		{"postgres://localhost/db", true},
 		{"postgresql://localhost/db", true},
 		{"pg://db", true},
-		{"mysql://localhost/db", true},
+		{"mysql://localhost/db", false},
 		{"file.sql", false},
 	}
 	for _, c := range cases {

@@ -12,8 +12,10 @@ func TestDBLoader_Match(t *testing.T) {
 	}{
 		{"postgres://user:pass@localhost/db", true},
 		{"POSTGRES://user:pass@localhost/db", true},
-		{"mysql://user:pass@localhost/db", true},
-		{"MYSQL://user:pass@localhost/db", true},
+		{"postgresql://user:pass@localhost/db", true},
+		{"pg://user:pass@localhost/db", true},
+		{"mysql://user:pass@localhost/db", false},
+		{"MYSQL://user:pass@localhost/db", false},
 		{"file:///path/to/file.sql", false},
 		{"/path/to/file.sql", false},
 	}

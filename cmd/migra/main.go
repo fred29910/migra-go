@@ -33,6 +33,10 @@ func setupFlags(cmd *cobra.Command) error {
 }
 
 func initConfig() {
+	// 设置环境变量前缀为 MIGRA_
+	viper.SetEnvPrefix("MIGRA")
+	viper.AutomaticEnv()
+
 	if cfgFile := viper.GetString("config"); cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
@@ -45,8 +49,6 @@ func initConfig() {
 		viper.AddConfigPath(".")
 		viper.SetConfigName("migra")
 	}
-
-	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err == nil {
 		if viper.GetBool("verbose") {

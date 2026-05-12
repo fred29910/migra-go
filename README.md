@@ -102,12 +102,11 @@ cp examples/config.yaml ./migra.yaml
 ```
 
 **环境变量**（可选）：
+使用 `MIGRA_` 前缀的环境变量（通过 viper.SetEnvPrefix 自动绑定）：
 ```bash
-# 复制并编辑环境变量文件
-cp examples/.env.example .env
-# 或直接使用环境变量
-export DATABASE_URL="postgres://user:password@localhost:5432/dbname"
-export MIGRA_SCHEMAS="public"
+export MIGRA_DATABASE_URL="postgres://user:password@localhost:5432/dbname"
+export MIGRA_DIFF_SCHEMAS="public,auth"
+export MIGRA_DIFF_FORMAT="sql"
 ```
 
 详细配置说明请参考 [docs/configuration.md](docs/configuration.md)。
