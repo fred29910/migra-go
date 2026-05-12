@@ -17,6 +17,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func isDestructiveOperation(isDestructive, unsafeDrop bool) bool {
+	return isDestructive && !unsafeDrop
+}
+
 var nonTransactionalDDL = map[string]bool{
 	"CREATE INDEX CONCURRENTLY":   true,
 	"DROP INDEX CONCURRENTLY":     true,
@@ -168,6 +172,12 @@ func executeWithConfirmation(ctx context.Context, cfg pushConfig, sourceSchema *
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
+	txActive := true
+	defer func() {
+		if txActive {
+			_ = tx.Rollback(ctx)
+		}
+	}()
 
 	go func() {
 		<-sigChan
@@ -188,16 +198,18 @@ next:
 		if isNonTransactionalSQL(sql) {
 			fmt.Printf("\nNon-transactional DDL detected at SQL #%d:\n  %s\nThis operation cannot be executed within a transaction.\nPlease execute it separately outside this tool.\n", i+1, sql)
 			_ = tx.Rollback(ctx)
+			txActive = false
 			return fmt.Errorf("non-transactional DDL at SQL #%d", i+1)
 		}
 
 		for {
-			if cfg.Execute && autoMode {
+			if autoMode {
 				_, err := tx.Exec(ctx, sql)
 				if err != nil {
 					fmt.Printf("Error executing SQL #%d: %v\n", i+1, err)
 					fmt.Println("Rolling back transaction...")
 					_ = tx.Rollback(ctx)
+					txActive = false
 					return fmt.Errorf("execution failed at SQL #%d, transaction rolled back", i+1)
 				}
 				fmt.Printf("SQL #%d executed\n", i+1)
@@ -221,7 +233,7 @@ next:
 
 			switch input {
 			case "y":
-				if isDestructive && !cfg.UnsafeDrop && !autoMode {
+				if isDestructiveOperation(isDestructive, cfg.UnsafeDrop) && !autoMode {
 					fmt.Println("Destructive operation requires --unsafe-drop or explicit confirmation")
 					continue
 				}
@@ -230,6 +242,7 @@ next:
 					fmt.Printf("Error executing SQL #%d: %v\n", i+1, err)
 					fmt.Println("Rolling back transaction...")
 					_ = tx.Rollback(ctx)
+					txActive = false
 					return fmt.Errorf("execution failed at SQL #%d, transaction rolled back", i+1)
 				}
 				fmt.Printf("SQL #%d executed\n", i+1)
@@ -237,9 +250,10 @@ next:
 			case "n":
 				fmt.Println("Cancelled")
 				_ = tx.Rollback(ctx)
+				txActive = false
 				return nil
 			case "a":
-				if isDestructive && !cfg.UnsafeDrop {
+				if isDestructiveOperation(isDestructive, cfg.UnsafeDrop) {
 					fmt.Printf("Destructive operation detected in auto-mode, reverting to interactive mode.\nSQL #%d: %s\n\n", i+1, sql)
 					autoMode = false
 					continue
@@ -258,6 +272,7 @@ next:
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
+	txActive = false
 	fmt.Println("\nAll SQL executed successfully, transaction committed")
 
 	if !cfg.NoVerify {

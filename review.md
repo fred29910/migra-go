@@ -1,112 +1,105 @@
-# DDL 缺口补齐设计 — 评审报告
+# 代码评审报告
 
-**文档**: `docs/superpowers/specs/2026-05-12-example-ddl-gap-closure-design.md`  
-**评审日期**: 2026-05-12  
-**项目**: migra-go
 
----
+## 整体评价
 
-## 总体评价
-
-设计定位清晰合理，采用"示例闭环优先"的务实范围控制，无范围蔓延。与代码库现状高度吻合。
+最近5个commit实现了一个完整的 `push` 命令，用于将schema变更应用到目标数据库。整体实现思路清晰，交互逻辑考虑周全。
 
 ---
 
-## 一、设计与现状吻合度（优秀）
+## Commit 1: `a97f56f` - feat(cli): add push subcommand definition
 
-| 设计项 | 当前现状 | 评价 |
-|--------|---------|------|
-| `CreateEnumHandler` 修复 | `CreateEnumTypeMutation` struct 已存在但 `Apply()` 返回错误 | **精准对齐**，设计复用现有 struct |
-| `CreateTableHandler` 解析 PK/FK/默认值 | 当前 handler 跳过约束 | **精准对齐** |
-| `renderAddTable` 输出 PK 和约束 | 当前有 `// TODO: Add primary key, constraints` | **精准对齐** |
-| `SetDefaultOp` / `DropDefaultOp` | `diffColumn` 中默认值变更仅 warn | **精准对齐** |
-| `DropColumnOp` | `diffTableColumns` 中列删除仅 warn | **精准对齐** |
+**优点：**
+- 命令定义清晰，参数说明完整，Examples 示例很有帮助
 
----
+**建议修改：**
 
-## 二、关键风险
+- 第26行：`dry-run` 默认为 `true`，但同时第27行又有 `--execute` 参数。这种"双重模式"容易让用户困惑——为什么要有两个相互排斥的选项？
 
-### 风险 1：约束定义（Definition）字符串稳定性
-
-设计将约束 `Definition` 定义为"可直接拼入 SQL 的片段"（如 `PRIMARY KEY ("id")`），但 `pg_query_go` 的 deparse 输出格式可能因版本变化。
-
-**建议**: 约束定义输出放在 render 层重新组装，而非依赖 AST 的 deparse 字符串。在 parser 层只提取语义（columns, ref_table, ref_columns），由 render 层拼 SQL。
-
-### 风险 2：`AddEnumLabelOp` 的 `DependsOn` 细化
-
-设计说"enum label 依赖 enum type"，但 enum type 的 `ObjectKey` 与 table 不同。`AddEnumTypeOp` 当前无 `DependsOn`，新增的 `AddEnumLabelOp` 若依赖 type 而 type 在本轮才创建，需确保 planner 排序正确。
-
-### 风险 3：ALTER ADD COLUMN 与 CREATE TABLE 的列默认值处理一致性
-
-`CreateTableMutation.Apply()` 当前只写 `Columns`，不写 `DefaultExpr`（因为 parser 没提取）。需要确保两处 handler 同时推进。
-
-### 风险 4：验收命令中的 `rtk` 前缀
-
-验收命令使用 `rtk`（Rust Token Killer），但 `Makefile` 中不含此前缀。需确认 `rtk` 是全局可用命令。
+  建议：考虑简化为单一模式，例如 `--dry-run` (默认true)，用 `--execute` 覆盖默认值。
 
 ---
 
-## 三、设计建议
+## Commit 2: `6b211c9` - feat: implement push command execution logic
 
-### 建议 1：约束定义拼装替代方案
+**优点：**
+- 信号处理优雅，能在收到 interrupt 时 rollback（第172-177行）
+- 非交互式模式的 autoMode 设计合理
+- 验证逻辑完整（第263-280行）
 
-当前方案：
-```
-Constraint.Definition = "PRIMARY KEY (\"id\")"  // 来自 AST deparse
+**必须修复：**
+
+- 第167-170行：事务 begin 后没有 defer 释放 tx，如果后续代码提前 return，tx 可能泄漏
+
+```go
+tx, err := conn.Begin(ctx)
+if err != nil {
+    return fmt.Errorf("failed to begin transaction: %w", err)
+}
+// 建议添加 defer 释放，即使在 rollback 场景下
+defer func() {
+    if tx != nil {
+        _ = tx.Rollback(ctx)
+    }
+}()
 ```
 
-建议方案：
-```
-Constraint.Definition = ""  // parser 不写，render 时按约束类型 + Columns + RefTable 拼装
-```
+- 第188-192行：检测到非事务DDL时rollback后直接return，但此时 conn 可能还处于不稳定状态，建议在 return 前先确保连接关闭。
 
-优点：不受 `pg_query_go` 序列化格式影响，golden 测试稳定。
+**建议修改：**
 
-### 建议 2：`DropColumnOp` 的破坏性风险量化
+- 第20-25行：`nonTransactionalDDL` 使用map但只做 Contains 检查，效率不高。可以考虑用更高效的数据结构。
 
-设计标记 `DropColumnOp` 为 `risk:high`，但未讨论 CASCADE 策略。建议：
-- 默认输出 `DROP COLUMN ...`（非 CASCADE）
-- 在文档中注明 `--unsafe-drop` 不自动加 CASCADE
+- 第94-96行：source 只接受文件或数据库连接，但检查逻辑只验证 target。建议统一验证 source 参数。
 
-### 建议 3：enum 非尾部追加的 warning 格式
+**仅供参考：**
 
-设计保守合理。建议 warning 格式包含具体 label 信息：
-```
-enum "public"."user_role": label "guest" removed or reordered, skipping (manual migration required)
-```
+- 第140-143行：每次循环都调用 `op.IsDestructive()`，可以考虑缓存结果。
 
 ---
 
-## 四、TDD 要求
+## Commit 3: `3bf4497` - feat: add non-transactional DDL detection and auto-mode DROP safety
 
-设计明确提出"先写失败测试，再实现"，符合 TDD 原则。建议执行顺序：
+**优点：**
+- 非事务DDL检测逻辑合理，避免了用户踩坑
 
-1. Parser 测试（红）→ 实现（绿）
-2. Diff 测试（红）→ 实现（绿）
-3. Render 测试（红）→ 实现（绿）
-4. CLI 端到端测试 → 验收
+**建议修改：**
 
----
+- 第224行和242行有重复的破坏性操作检查逻辑：
 
-## 五、验收条件清晰度
+  ```go
+  if isDestructive && !cfg.UnsafeDrop && !autoMode { ... }
+  if isDestructive && !cfg.UnsafeDrop { ... }
+  ```
 
-4 条验收命令明确可执行，验收标准具体：
-
-- `CREATE TABLE "public"."comments"` 出现在输出 ✅
-- `ALTER TABLE "public"."users" ADD COLUMN "age" integer` ✅
-- `ALTER TYPE "public"."user_role" ADD VALUE 'guest'` ✅
-- stderr 不含 `CREATE TYPE ENUM is not yet supported` ✅
-
-无遗漏。
+  建议提取为独立函数 `shouldRequireConfirmation(op)`，提高可维护性。
 
 ---
 
-## 六、结论
+## Commit 4: `60abc41` - test(push): add push command tests
 
-**设计质量：良+（B+）**
+**优点：**
+- 测试覆盖了核心函数，测试用例命名清晰
 
-- 范围控制得当，无范围蔓延 ✅
-- 与现有代码结构高度吻合 ✅
-- 设计文档详细程度充足 ✅
-- 验收标准明确 ✅
-- **主要建议**：约束 Definition 的拼装策略需重新考量（风险 1）
+**建议修改：**
+
+- `TestParsePushConfig` 测试用例较少，只验证了正确场景，没有覆盖：
+  - 缺少参数的情况
+  - 无效的 connection string
+  - 无效的 schema 参数
+
+  建议补充边界条件的测试用例。
+
+---
+
+## Commit 5: `4eacd5e` - docs: add push command design spec and implementation plan
+
+**优点：**
+- 文档详细，包含设计规范和实现计划
+
+**仅供参考：**
+
+- 文档较长（854行），建议拆分为多个文件，按内容类型组织。
+
+---
+

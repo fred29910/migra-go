@@ -8,6 +8,47 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestIsDestructiveOperation(t *testing.T) {
+	tests := []struct {
+		name          string
+		isDestructive bool
+		unsafeDrop    bool
+		want          bool
+	}{
+		{
+			name:          "destructive without unsafe drop",
+			isDestructive: true,
+			unsafeDrop:    false,
+			want:          true,
+		},
+		{
+			name:          "destructive with unsafe drop",
+			isDestructive: true,
+			unsafeDrop:    true,
+			want:          false,
+		},
+		{
+			name:          "non-destructive without unsafe drop",
+			isDestructive: false,
+			unsafeDrop:    false,
+			want:          false,
+		},
+		{
+			name:          "non-destructive with unsafe drop",
+			isDestructive: false,
+			unsafeDrop:    true,
+			want:          false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isDestructiveOperation(tt.isDestructive, tt.unsafeDrop)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestIsNonTransactionalSQL(t *testing.T) {
 	tests := []struct {
 		name string
@@ -78,6 +119,11 @@ func TestParsePushConfig(t *testing.T) {
 		{
 			name:    "valid two args pg prefix",
 			args:    []string{"file.sql", "pg://localhost/db"},
+			wantErr: false,
+		},
+		{
+			name:    "valid two args postgresql prefix",
+			args:    []string{"file.sql", "postgresql://localhost/db"},
 			wantErr: false,
 		},
 	}
