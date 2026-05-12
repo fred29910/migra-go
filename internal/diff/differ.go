@@ -58,8 +58,6 @@ func (c *diffContext) diffSchemas(source, target *model.Schema) {
 
 	for _, name := range sourceNames {
 		if _, exists := target.Schemas[name]; !exists {
-			// Namespace dropped - MVP: skip or handle explicitly
-			_ = source.Schemas[name]
 			c.warnf("namespace drop is not implemented yet (ignored): %s", name)
 		}
 	}
