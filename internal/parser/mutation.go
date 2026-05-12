@@ -25,15 +25,30 @@ type SchemaMutation interface {
 
 // CreateTableMutation describes creating a new table.
 type CreateTableMutation struct {
-	Schema  string
-	Name    string
-	Columns []model.Column
+	Schema      string
+	Name        string
+	Columns     []model.Column
+	PrimaryKey  *model.PrimaryKey
+	Constraints []model.Constraint
 }
 
 func (m CreateTableMutation) Kind() MutationKind { return MutKindCreateTable }
 func (m CreateTableMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Name, model.KindTable)
 }
+func applyTableMetadata(table *model.Table, primaryKey *model.PrimaryKey, constraints []model.Constraint) {
+	if primaryKey != nil {
+		table.PrimaryKey = primaryKey
+	}
+	for i := range constraints {
+		c := constraints[i]
+		if c.Table == "" {
+			c.Table = table.Name
+		}
+		table.Constraints[c.Name] = &c
+	}
+}
+
 func (m CreateTableMutation) Apply(schema *model.Schema) error {
 	ns := schema.GetOrCreateNamespace(m.Schema)
 	table, exists := ns.Tables[m.Name]
@@ -57,6 +72,7 @@ func (m CreateTableMutation) Apply(schema *model.Schema) error {
 			table.AddColumn(&col)
 		}
 		table.IsPlaceholder = false
+		applyTableMetadata(table, m.PrimaryKey, m.Constraints)
 		return nil
 	}
 
@@ -65,6 +81,7 @@ func (m CreateTableMutation) Apply(schema *model.Schema) error {
 		table.AddColumn(&m.Columns[i])
 	}
 	ns.Tables[m.Name] = table
+	applyTableMetadata(table, m.PrimaryKey, m.Constraints)
 	return nil
 }
 

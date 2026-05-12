@@ -33,12 +33,17 @@ type Index struct {
 	IfNotExists   bool         // IF NOT EXISTS
 }
 
-// Constraint represents a table constraint (check, unique, etc.)
+// Constraint represents a table constraint (check, unique, foreign key, etc.)
 type Constraint struct {
 	Name       string
 	Type       string
 	Definition string
 	Table      string
+	Columns    []string
+	RefSchema  string
+	RefTable   string
+	RefColumns []string
+	Expression string
 }
 
 // NewTable creates a new table with initialized maps

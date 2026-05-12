@@ -98,6 +98,48 @@ func TestMutationOrder_AlterBeforeCreate(t *testing.T) {
 	assert.Equal(t, "id", table.Columns[1].Name, "New column from CREATE should be appended")
 }
 
+func TestCreateTableMutation_Apply_PrimaryKeyAndConstraints(t *testing.T) {
+	m := CreateTableMutation{
+		Schema: "public",
+		Name:   "comments",
+		Columns: []model.Column{
+			{Name: "id", DataType: "serial", IsNullable: false},
+			{Name: "post_id", DataType: "integer", IsNullable: false},
+		},
+		PrimaryKey: &model.PrimaryKey{Name: "comments_pkey", Columns: []string{"id"}},
+		Constraints: []model.Constraint{
+			{
+				Name:       "comments_post_id_fkey",
+				Type:       "foreign_key",
+				Table:      "comments",
+				Columns:    []string{"post_id"},
+				RefSchema:  "public",
+				RefTable:   "posts",
+				RefColumns: []string{"id"},
+			},
+		},
+	}
+
+	schema := model.NewSchema()
+	err := m.Apply(schema)
+	require.NoError(t, err)
+
+	ns := schema.GetNamespace("public")
+	require.NotNil(t, ns)
+	table := ns.Tables["comments"]
+	require.NotNil(t, table)
+
+	require.NotNil(t, table.PrimaryKey)
+	assert.Equal(t, "comments_pkey", table.PrimaryKey.Name)
+	assert.Equal(t, []string{"id"}, table.PrimaryKey.Columns)
+
+	fk := table.Constraints["comments_post_id_fkey"]
+	require.NotNil(t, fk)
+	assert.Equal(t, "public", fk.RefSchema)
+	assert.Equal(t, "posts", fk.RefTable)
+	assert.Equal(t, []string{"id"}, fk.RefColumns)
+}
+
 func TestMutationOrder_TypeConflict(t *testing.T) {
 	schema := model.NewSchema()
 	
