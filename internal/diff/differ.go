@@ -119,6 +119,13 @@ func (c *diffContext) diffTypes(source, target *model.Namespace) {
 		}
 	}
 
+	// Find types that exist in both
+	for _, name := range targetTypeNames {
+		if sourceType, exists := source.Types[name]; exists {
+			c.diffEnumType(target.Name, name, sourceType, target.Types[name])
+		}
+	}
+
 	// Find types to drop
 	sourceTypeNames := make([]string, 0, len(source.Types))
 	for name := range source.Types {
@@ -137,4 +144,38 @@ func (c *diffContext) diffTypes(source, target *model.Namespace) {
 			})
 		}
 	}
+}
+
+func (c *diffContext) diffEnumType(schema, name string, sourceType, targetType *model.EnumType) {
+	if isEnumAppend(sourceType.Labels, targetType.Labels) {
+		for _, label := range targetType.Labels[len(sourceType.Labels):] {
+			c.addOp(NewAddEnumLabelOp(schema, name, label))
+		}
+	} else if !sameStringSlice(sourceType.Labels, targetType.Labels) {
+		c.warnf("enum %s.%s change is not append-only and is not implemented", schema, name)
+	}
+}
+
+func isEnumAppend(sourceLabels, targetLabels []string) bool {
+	if len(targetLabels) <= len(sourceLabels) {
+		return false
+	}
+	for i, label := range sourceLabels {
+		if targetLabels[i] != label {
+			return false
+		}
+	}
+	return true
+}
+
+func sameStringSlice(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

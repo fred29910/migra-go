@@ -109,9 +109,7 @@ func (c *diffContext) diffTableColumns(schema string, source, target *model.Tabl
 	// Find columns to drop (in source but not in target)
 	for name := range source.ColumnByName {
 		if _, exists := target.ColumnByName[name]; !exists {
-			// MVP: skip column drops for safety
-			_ = name
-			c.warnf("column drop is not implemented yet (ignored): %s.%s.%s", schema, source.Name, name)
+			c.addOp(NewDropColumnOp(schema, source.Name, name))
 		}
 	}
 
