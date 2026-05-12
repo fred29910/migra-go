@@ -60,15 +60,71 @@ migra diff --unsafe-drop file_a.sql file_b.sql
 # 将 schema 变更应用到目标数据库（交互式确认）
 migra push file.sql postgres://localhost/db
 
-# 使用--unsafe-drop跳过危险操作确认
+# 比较两个数据库，将差异应用到目标库
+migra push postgres://localhost/db1 postgres://localhost/db2
+
+# 预览模式（默认）：显示 diff SQL 但不执行
+migra push --dry-run file.sql postgres://localhost/db
+
+# 指定多个 schema 进行推送
+migra push --schema public --schema auth file.sql postgres://localhost/db
+
+# 跳过危险操作确认（自动允许 DROP）
 migra push --unsafe-drop file.sql postgres://localhost/db
 
-# 跳过交互确认直接执行（不推荐）
+# 跳过交互确认直接执行（不推荐，生产环境慎用）
 migra push --execute file.sql postgres://localhost/db
 
 # 跳过执行后校验
 migra push --no-verify file.sql postgres://localhost/db
+
+# 设置超时时间
+migra push --timeout 2m file.sql postgres://localhost/db
 ```
+
+### push 交互流程
+
+`migra push` 默认以 dry-run 模式运行，仅预览 SQL 变更。添加 `--execute` 后进入交互执行模式：
+
+```
+$ migra push --execute file.sql postgres://localhost/db
+
+=== Diff Preview ===
+1:
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    ...
+);
+
+2:
+CREATE INDEX idx_users_username ON users(username);
+
+Execute SQL #1? (y=yes, n=no, a=apply all, s=skip): y
+SQL #1 executed
+Execute SQL #2? (y=yes, n=no, a=apply all, s=skip): a
+SQL #2 executed
+
+All SQL executed successfully, transaction committed
+
+=== Post-execution validation ===
+Validation passed: target schema matches expected state
+```
+
+交互选项说明：
+
+| 按键 | 说明 |
+|------|------|
+| `y` | 执行当前 SQL |
+| `n` | 取消并回滚事务 |
+| `a` | 自动执行剩余所有 SQL（遇到危险操作会再次询问） |
+| `s` | 跳过当前 SQL，继续下一条 |
+
+安全机制：
+- **事务保护**：所有 SQL 在事务中执行，任意一条失败自动回滚
+- **危险操作检测**：DROP 类操作需额外确认，除非使用 `--unsafe-drop`
+- **非事务性 DDL 拦截**：`CREATE INDEX CONCURRENTLY` 等操作会被拦截并提示单独执行
+- **执行后校验**：提交后自动重新 diff，确认目标库与预期一致
+- **信号处理**：Ctrl+C 触发事务回滚，安全退出
 
 ### 命令行参数
 

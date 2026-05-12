@@ -237,7 +237,7 @@ next:
 				fmt.Println("Rolling back transaction...")
 				_ = tx.Rollback(ctx)
 				txActive = false
-				return fmt.Errorf("execution failed at SQL #%d, transaction rolled back", i+1)
+				return fmt.Errorf("execution failed at SQL #%d, transaction rolled back: %w", i+1, err)
 			}
 			continue next
 		}
@@ -261,7 +261,7 @@ next:
 				fmt.Println("Rolling back transaction...")
 				_ = tx.Rollback(ctx)
 				txActive = false
-				return fmt.Errorf("execution failed at SQL #%d, transaction rolled back", i+1)
+				return fmt.Errorf("execution failed at SQL #%d, transaction rolled back: %w", i+1, err)
 			}
 			continue next
 		case "n":

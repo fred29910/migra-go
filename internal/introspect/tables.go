@@ -61,7 +61,8 @@ func loadTables(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mode
 			IsNullable: isNullable == "YES",
 		}
 		if colDefault.Valid {
-			col.DefaultExpr = &colDefault.String
+			defaultStr := colDefault.String
+			col.DefaultExpr = &defaultStr
 		}
 		table.AddColumn(col)
 	}
