@@ -79,10 +79,45 @@ func TestParseCreateIndex(t *testing.T) {
 	t.Skip("CREATE INDEX not in MVP scope (only CREATE TABLE and ALTER TABLE ADD COLUMN are supported)")
 }
 
-// TestParseCreateEnumType tests parsing CREATE TYPE ... AS ENUM statements
-// MVP 范围不包含 CREATE TYPE，此测试跳过
 func TestParseCreateEnumType(t *testing.T) {
-	t.Skip("CREATE TYPE not in MVP scope (only CREATE TABLE and ALTER TABLE ADD COLUMN are supported)")
+	p := NewParser()
+	schema, err := p.ParseSQL(`CREATE TYPE user_role AS ENUM ('admin', 'user');`)
+	if err != nil {
+		t.Fatalf("ParseSQL failed: %v", err)
+	}
+	enumType := schema.Schemas["public"].Types["user_role"]
+	if enumType == nil {
+		t.Fatal("expected enum type")
+	}
+	if strings.Join(enumType.Labels, ",") != "admin,user" {
+		t.Fatalf("unexpected enum labels: %#v", enumType.Labels)
+	}
+}
+
+func TestParseCreateTablePrimaryKeyAndForeignKey(t *testing.T) {
+	p := NewParser()
+	schema, err := p.ParseSQL(`
+		CREATE TABLE posts (id integer PRIMARY KEY);
+		CREATE TABLE comments (
+			id integer PRIMARY KEY,
+			post_id integer NOT NULL,
+			FOREIGN KEY (post_id) REFERENCES posts(id)
+		);
+	`)
+	if err != nil {
+		t.Fatalf("ParseSQL failed: %v", err)
+	}
+	comments := schema.Schemas["public"].Tables["comments"]
+	if comments.PrimaryKey == nil || strings.Join(comments.PrimaryKey.Columns, ",") != "id" {
+		t.Fatalf("expected comments primary key, got %#v", comments.PrimaryKey)
+	}
+	fk := comments.Constraints["comments_post_id_fkey"]
+	if fk == nil {
+		t.Fatal("expected generated foreign key constraint")
+	}
+	if fk.Type != "foreign_key" || fk.RefSchema != "public" || fk.RefTable != "posts" || strings.Join(fk.RefColumns, ",") != "id" {
+		t.Fatalf("unexpected foreign key: %#v", fk)
+	}
 }
 
 // TestParseAlterTableAddColumn tests parsing ALTER TABLE ADD COLUMN

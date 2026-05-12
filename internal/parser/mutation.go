@@ -122,5 +122,10 @@ func (m CreateEnumTypeMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Name, model.KindType)
 }
 func (m CreateEnumTypeMutation) Apply(schema *model.Schema) error {
-	return fmt.Errorf("CREATE TYPE ENUM is not yet supported (MVP scope only includes CREATE TABLE and ALTER TABLE ADD COLUMN)")
+	ns := schema.GetOrCreateNamespace(m.Schema)
+	if _, exists := ns.Types[m.Name]; exists {
+		return fmt.Errorf("type %s.%s already exists", m.Schema, m.Name)
+	}
+	ns.Types[m.Name] = &model.EnumType{Name: m.Name, Labels: m.Labels}
+	return nil
 }
