@@ -8,6 +8,7 @@ import (
 
 	"github.com/fred29910/migra-go/internal/diff"
 	"github.com/fred29910/migra-go/internal/model"
+	"github.com/stretchr/testify/require"
 )
 
 // fakeDeps is a test double for runnerDeps with call tracking
@@ -54,4 +55,47 @@ func TestDiffService_Run(t *testing.T) {
 		t.Fatal("expected compute to be called")
 	}
 	_ = warns
+}
+
+func TestNormalizeSchemas(t *testing.T) {
+	source := model.NewSchema()
+	source.GetOrCreateNamespace("public").Tables["users"] = &model.Table{
+		Name: "users",
+	}
+
+	target := model.NewSchema()
+	target.GetOrCreateNamespace("public")
+
+	err := NormalizeSchemas(source, target)
+	require.NoError(t, err)
+}
+
+func TestFilterDestructiveOps(t *testing.T) {
+	ops := []diff.Operation{
+		diff.NewAddTableOp("public", "new_table", &model.Table{Name: "new_table"}),
+		diff.NewDropTableOp("public", "old_table"),
+		diff.NewAddColumnOp("public", "users", &model.Column{Name: "id", DataType: "integer"}),
+		diff.NewDropColumnOp("public", "users", "old_column"),
+	}
+
+	filtered, warnings := FilterDestructiveOps(ops, false)
+	require.Len(t, filtered, 2)
+	require.Len(t, warnings, 4)
+
+	filteredAll, warningsAll := FilterDestructiveOps(ops, true)
+	require.Len(t, filteredAll, 4)
+	require.Len(t, warningsAll, 0)
+}
+
+func TestBuildExecutionPlan(t *testing.T) {
+	ops := []diff.Operation{
+		diff.NewAddTableOp("public", "users", &model.Table{Name: "users"}),
+		diff.NewAddColumnOp("public", "users", &model.Column{Name: "id", DataType: "integer"}),
+	}
+
+	result, err := BuildExecutionPlan(ops, true)
+	require.NoError(t, err)
+	require.Len(t, result, 2)
+
+	require.Equal(t, diff.KindAddTable, result[0].Kind())
 }
