@@ -81,14 +81,24 @@ func TestIsNonTransactionalSQL(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "create index using concurrently",
-			sql:  "CREATE INDEX USING CONCURRENTLY",
-			want: true,
-		},
-		{
 			name: "case insensitive",
 			sql:  "create index concurrently idx on t(c)",
 			want: true,
+		},
+		{
+			name: "comment before does not match",
+			sql:  "-- This will CREATE INDEX CONCURRENTLY later\nALTER TABLE t ADD COLUMN c int",
+			want: false,
+		},
+		{
+			name: "in-line comment does not match",
+			sql:  "ALTER TABLE t ADD COLUMN c int; -- runs CREATE INDEX CONCURRENTLY",
+			want: false,
+		},
+		{
+			name: "no false positive on similar words",
+			sql:  "CREATE INDEX idx ON t (concurrently_col)",
+			want: false,
 		},
 		{
 			name: "empty string",
@@ -100,6 +110,42 @@ func TestIsNonTransactionalSQL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := isNonTransactionalSQL(tt.sql)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestStripSQLComments(t *testing.T) {
+	tests := []struct {
+		name string
+		sql  string
+		want string
+	}{
+		{
+			name: "no comments",
+			sql:  "CREATE INDEX CONCURRENTLY idx ON t(c);",
+			want: "CREATE INDEX CONCURRENTLY idx ON t(c);",
+		},
+		{
+			name: "inline comment removed",
+			sql:  "ALTER TABLE t ADD COLUMN c int; -- some comment",
+			want: "ALTER TABLE t ADD COLUMN c int; ",
+		},
+		{
+			name: "full line comment removed",
+			sql:  "-- comment\nSELECT 1",
+			want: "\nSELECT 1",
+		},
+		{
+			name: "multiple comments",
+			sql:  "CREATE INDEX CONCURRENTLY idx ON t(c); -- first\nALTER TABLE t DROP COLUMN c; -- second",
+			want: "CREATE INDEX CONCURRENTLY idx ON t(c); \nALTER TABLE t DROP COLUMN c; ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stripSQLComments(tt.sql)
 			assert.Equal(t, tt.want, got)
 		})
 	}
