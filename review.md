@@ -1,69 +1,112 @@
-  1. 性能优化
+# DDL 缺口补齐设计 — 评审报告
 
-  1. Renderer 有状态累积，重复调用会不断增长 r.sql。
-     问题位置：internal/render/render.go:34
-     建议：RenderAll 开始时重置切片，避免长生命周期对象内存持续占用。
+**文档**: `docs/superpowers/specs/2026-05-12-example-ddl-gap-closure-design.md`  
+**评审日期**: 2026-05-12  
+**项目**: migra-go
 
-  // before
-  for _, op := range ops { ... r.sql = append(r.sql, sql) }
+---
 
-  // after
-  r.sql = r.sql[:0]
-  for _, op := range ops { ... }
+## 总体评价
 
-  2. 热路径重复创建 map，产生不必要分配。
-     问题位置：internal/parser/parser.go:260, internal/normalize/normalize.go:119
-     建议：将类型别名表提升为包级只读变量。
-  3. Diff 对列每次构建临时 map，表大时有额外开销。
-     问题位置：internal/diff/diff_tables.go:43
-     建议：Table 增加 ColumnByName map[string]*Column（保留 Columns 顺序），构建时维护索引。
+设计定位清晰合理，采用"示例闭环优先"的务实范围控制，无范围蔓延。与代码库现状高度吻合。
 
-  2. 代码质量与可维护性
+---
 
-  1. “声明支持 normalize”但主流程未调用，导致误报 diff。
-     问题位置：cmd/migra/diff.go:66
-     建议：真正接入 normalize.CanonicalizeSchema，并在失败时返回错误。
-  2. 关键逻辑存在注释与实现不一致。
-     问题位置：internal/parser/parser.go:143
-     说明：注释写“ALTER TABLE 前置时创建表”，但 schema 不存在时直接报错。
-     建议：统一语义（要么明确 fail-fast，要么自动 GetOrCreateNamespace）。
-  3. 多处字符串解析脆弱，遇表达式/函数索引会误解析。
-     问题位置：internal/introspect/indexes.go:63, internal/introspect/constraints.go:81
-     建议：尽量从 pg_catalog 获取结构化字段，少做 strings.Split 式 SQL 文本解析。
+## 一、设计与现状吻合度（优秀）
 
-  3. Idiomatic Go
+| 设计项 | 当前现状 | 评价 |
+|--------|---------|------|
+| `CreateEnumHandler` 修复 | `CreateEnumTypeMutation` struct 已存在但 `Apply()` 返回错误 | **精准对齐**，设计复用现有 struct |
+| `CreateTableHandler` 解析 PK/FK/默认值 | 当前 handler 跳过约束 | **精准对齐** |
+| `renderAddTable` 输出 PK 和约束 | 当前有 `// TODO: Add primary key, constraints` | **精准对齐** |
+| `SetDefaultOp` / `DropDefaultOp` | `diffColumn` 中默认值变更仅 warn | **精准对齐** |
+| `DropColumnOp` | `diffTableColumns` 中列删除仅 warn | **精准对齐** |
 
-  1. 忽略错误返回，不符合 Go 错误处理习惯。
-     问题位置：cmd/migra/main.go:25
-     建议：检查 viper.BindPFlag 返回值并在启动时报错/panic。
-  2. parseExpression 返回空串也被当作有效默认值指针，语义不清。
-     问题位置：internal/parser/parser.go:273
-     建议：改为 (string, bool)，仅 ok=true 时写入 DefaultExpr。
-  3. isSQLFile 用手工下标判断后缀，可读性差。
-     问题位置：cmd/migra/diff.go:196
-     建议：strings.HasSuffix(strings.ToLower(s), ".sql")。
+---
 
-  4. 架构与结构
+## 二、关键风险
 
-  1. 渲染层未 schema-qualified，和“支持多 schema”目标冲突。
-     问题位置：internal/render/render.go:92, internal/render/render.go:108
-     建议：统一 schema.table 输出。
+### 风险 1：约束定义（Definition）字符串稳定性
 
-  // before
-  ALTER TABLE "users" ADD COLUMN ...
+设计将约束 `Definition` 定义为"可直接拼入 SQL 的片段"（如 `PRIMARY KEY ("id")`），但 `pg_query_go` 的 deparse 输出格式可能因版本变化。
 
-  // after
-  ALTER TABLE "public"."users" ADD COLUMN ...
+**建议**: 约束定义输出放在 render 层重新组装，而非依赖 AST 的 deparse 字符串。在 parser 层只提取语义（columns, ref_table, ref_columns），由 render 层拼 SQL。
 
-  2. SQL 引号处理不安全（标识符双引号、字符串单引号都未 escape）。
-     问题位置：internal/render/render.go:181, internal/render/render.go:186
-     建议：实现安全转义：
+### 风险 2：`AddEnumLabelOp` 的 `DependsOn` 细化
 
-  func quoteIdentifier(id string) string { return `"` + strings.ReplaceAll(id, `"`, `""`) + `"` }
-  func quoteString(s string) string { return `'` + strings.ReplaceAll(s, `'`, `''`) + `'` }
+设计说"enum label 依赖 enum type"，但 enum type 的 `ObjectKey` 与 table 不同。`AddEnumTypeOp` 当前无 `DependsOn`，新增的 `AddEnumLabelOp` 若依赖 type 而 type 在本轮才创建，需确保 planner 排序正确。
 
-  3. 输出顺序依赖 map 遍历，结果非确定性（CI/回归比对不稳定）。
-     问题位置：internal/diff/differ.go:35, internal/diff/diff_tables.go:18
-     建议：先收集 key 后排序，再遍历。
-  4. Differ/Parser/Renderer 都是可变状态对象，不利于并发复用与测试隔离。
-     建议：逐步改为“函数式无状态 API”（输入->输出），或明确声明“不可并发复用”。
+### 风险 3：ALTER ADD COLUMN 与 CREATE TABLE 的列默认值处理一致性
+
+`CreateTableMutation.Apply()` 当前只写 `Columns`，不写 `DefaultExpr`（因为 parser 没提取）。需要确保两处 handler 同时推进。
+
+### 风险 4：验收命令中的 `rtk` 前缀
+
+验收命令使用 `rtk`（Rust Token Killer），但 `Makefile` 中不含此前缀。需确认 `rtk` 是全局可用命令。
+
+---
+
+## 三、设计建议
+
+### 建议 1：约束定义拼装替代方案
+
+当前方案：
+```
+Constraint.Definition = "PRIMARY KEY (\"id\")"  // 来自 AST deparse
+```
+
+建议方案：
+```
+Constraint.Definition = ""  // parser 不写，render 时按约束类型 + Columns + RefTable 拼装
+```
+
+优点：不受 `pg_query_go` 序列化格式影响，golden 测试稳定。
+
+### 建议 2：`DropColumnOp` 的破坏性风险量化
+
+设计标记 `DropColumnOp` 为 `risk:high`，但未讨论 CASCADE 策略。建议：
+- 默认输出 `DROP COLUMN ...`（非 CASCADE）
+- 在文档中注明 `--unsafe-drop` 不自动加 CASCADE
+
+### 建议 3：enum 非尾部追加的 warning 格式
+
+设计保守合理。建议 warning 格式包含具体 label 信息：
+```
+enum "public"."user_role": label "guest" removed or reordered, skipping (manual migration required)
+```
+
+---
+
+## 四、TDD 要求
+
+设计明确提出"先写失败测试，再实现"，符合 TDD 原则。建议执行顺序：
+
+1. Parser 测试（红）→ 实现（绿）
+2. Diff 测试（红）→ 实现（绿）
+3. Render 测试（红）→ 实现（绿）
+4. CLI 端到端测试 → 验收
+
+---
+
+## 五、验收条件清晰度
+
+4 条验收命令明确可执行，验收标准具体：
+
+- `CREATE TABLE "public"."comments"` 出现在输出 ✅
+- `ALTER TABLE "public"."users" ADD COLUMN "age" integer` ✅
+- `ALTER TYPE "public"."user_role" ADD VALUE 'guest'` ✅
+- stderr 不含 `CREATE TYPE ENUM is not yet supported` ✅
+
+无遗漏。
+
+---
+
+## 六、结论
+
+**设计质量：良+（B+）**
+
+- 范围控制得当，无范围蔓延 ✅
+- 与现有代码结构高度吻合 ✅
+- 设计文档详细程度充足 ✅
+- 验收标准明确 ✅
+- **主要建议**：约束 Definition 的拼装策略需重新考量（风险 1）
