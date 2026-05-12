@@ -96,6 +96,35 @@ func ParseExpression(expr pg_nodes.Node) (string, bool) {
 				return v.Str, true
 			}
 		}
+	case pg_nodes.FuncCall:
+		parts := make([]string, 0, len(e.Funcname.Items))
+		for _, item := range e.Funcname.Items {
+			if s, ok := item.(pg_nodes.String); ok {
+				parts = append(parts, s.Str)
+			}
+		}
+		argStrs := make([]string, 0, len(e.Args.Items))
+		for _, item := range e.Args.Items {
+			if s, ok := ParseExpression(item); ok {
+				argStrs = append(argStrs, s)
+			}
+		}
+		return strings.Join(parts, ".") + "(" + strings.Join(argStrs, ", ") + ")", true
+	}
+	if d, ok := expr.(interface{ Deparse() string }); ok {
+		var out string
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					out = ""
+				}
+			}()
+			out = d.Deparse()
+		}()
+		out = strings.TrimSpace(out)
+		if out != "" {
+			return out, true
+		}
 	}
 	return "", false
 }

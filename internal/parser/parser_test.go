@@ -307,6 +307,30 @@ func TestParserInitializationRobustness(t *testing.T) {
 	})
 }
 
+func TestParseDefaultFunctionExpressionConsistentForCreateAndAlter(t *testing.T) {
+	p := NewParser()
+	schema, err := p.ParseSQL(`
+		CREATE TABLE events (
+			id integer,
+			created_at timestamp DEFAULT now()
+		);
+		ALTER TABLE events ADD COLUMN updated_at timestamp DEFAULT now();
+	`)
+	if err != nil {
+		t.Fatalf("ParseSQL failed: %v", err)
+	}
+
+	table := schema.Schemas["public"].Tables["events"]
+	created := table.ColumnByName["created_at"]
+	updated := table.ColumnByName["updated_at"]
+	if created.DefaultExpr == nil || *created.DefaultExpr != "now()" {
+		t.Fatalf("expected created_at default now(), got %#v", created.DefaultExpr)
+	}
+	if updated.DefaultExpr == nil || *updated.DefaultExpr != "now()" {
+		t.Fatalf("expected updated_at default now(), got %#v", updated.DefaultExpr)
+	}
+}
+
 type panickingHandler struct{}
 func (h *panickingHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error) {
 	panic("intentional panic for testing recover")
