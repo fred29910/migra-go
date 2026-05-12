@@ -41,17 +41,23 @@ func (h *CreateTableHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error
 		switch elt := item.(type) {
 		case pg_nodes.ColumnDef:
 			col := parserutil.ParseColumnDef(elt)
-			columns = append(columns, *col)
 			for _, conItem := range elt.Constraints.Items {
 				if c, ok := conItem.(pg_nodes.Constraint); ok {
 					if c.Contype == pg_nodes.CONSTR_PRIMARY {
+						col.IsNullable = false
 						primaryKey = &model.PrimaryKey{
 							Name:    defaultConstraintName(tableName, model.Constraint{Name: "", Type: "primary_key"}),
 							Columns: []string{col.Name},
 						}
+						constraints = append(constraints, model.Constraint{
+							Name:    primaryKey.Name,
+							Type:    "primary_key",
+							Columns: []string{col.Name},
+						})
 					}
 				}
 			}
+			columns = append(columns, *col)
 		case pg_nodes.Constraint:
 			switch elt.Contype {
 			case pg_nodes.CONSTR_PRIMARY:
@@ -65,6 +71,11 @@ func (h *CreateTableHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error
 					Name:    defaultConstraintName(tableName, model.Constraint{Name: "", Type: "primary_key"}),
 					Columns: cols,
 				}
+				constraints = append(constraints, model.Constraint{
+					Name:    primaryKey.Name,
+					Type:    "primary_key",
+					Columns: cols,
+				})
 			case pg_nodes.CONSTR_FOREIGN:
 				var fkCols []string
 				for _, attr := range elt.FkAttrs.Items {

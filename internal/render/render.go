@@ -85,10 +85,14 @@ func (r *Renderer) Render(op diff.Operation) string {
 	case *diff.DropIndexOp:
 		return r.renderDropIndex(v)
 	case *diff.AddConstraintOp:
+		definition := renderConstraintDefinition(v.Constraint)
+		if definition == "" {
+			return ""
+		}
 		return fmt.Sprintf("-- op: add_constraint risk:medium\nALTER TABLE %s ADD CONSTRAINT %s %s;",
 			quoteQualifiedIdentifier(v.Schema, v.Table),
 			quoteIdentifier(v.Constraint.Name),
-			v.Constraint.Definition,
+			definition,
 		)
 	case *diff.DropConstraintOp:
 		return fmt.Sprintf("-- op: drop_constraint risk:medium\nALTER TABLE %s DROP CONSTRAINT %s%s;",
@@ -147,7 +151,9 @@ func (r *Renderer) renderAddTable(op *diff.AddTableOp) string {
 			Type:    "primary_key",
 			Columns: table.PrimaryKey.Columns,
 		}
-		lines = append(lines, "    "+renderConstraint(pk))
+		if rendered := renderConstraint(pk); rendered != "" {
+			lines = append(lines, "    "+rendered)
+		}
 	}
 
 	if len(table.Constraints) > 0 {
@@ -161,7 +167,9 @@ func (r *Renderer) renderAddTable(op *diff.AddTableOp) string {
 			if table.PrimaryKey != nil && c.Name == table.PrimaryKey.Name {
 				continue
 			}
-			lines = append(lines, "    "+renderConstraint(c))
+			if rendered := renderConstraint(c); rendered != "" {
+				lines = append(lines, "    "+rendered)
+			}
 		}
 	}
 
@@ -273,24 +281,34 @@ func renderConstraint(c *model.Constraint) string {
 	if c == nil {
 		return ""
 	}
+	definition := renderConstraintDefinition(c)
+	if definition == "" {
+		return ""
+	}
+	return fmt.Sprintf("CONSTRAINT %s %s", quoteIdentifier(c.Name), definition)
+}
+
+func renderConstraintDefinition(c *model.Constraint) string {
+	if c == nil {
+		return ""
+	}
 	switch c.Type {
 	case "primary_key":
-		return fmt.Sprintf("CONSTRAINT %s PRIMARY KEY (%s)", quoteIdentifier(c.Name), quoteIdentifierList(c.Columns))
+		return fmt.Sprintf("PRIMARY KEY (%s)", quoteIdentifierList(c.Columns))
 	case "foreign_key":
-		return fmt.Sprintf("CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s (%s)",
-			quoteIdentifier(c.Name),
+		return fmt.Sprintf("FOREIGN KEY (%s) REFERENCES %s (%s)",
 			quoteIdentifierList(c.Columns),
 			quoteQualifiedIdentifier(c.RefSchema, c.RefTable),
 			quoteIdentifierList(c.RefColumns),
 		)
 	case "check":
 		if c.Expression != "" {
-			return fmt.Sprintf("CONSTRAINT %s CHECK (%s)", quoteIdentifier(c.Name), c.Expression)
+			return fmt.Sprintf("CHECK (%s)", c.Expression)
 		}
 		return ""
 	}
 	if c.Definition != "" {
-		return fmt.Sprintf("CONSTRAINT %s %s", quoteIdentifier(c.Name), c.Definition)
+		return c.Definition
 	}
 	return ""
 }

@@ -63,6 +63,9 @@ func TestNewOperationsMetadata(t *testing.T) {
 	if enumOp.Kind() != KindAddEnumLabel || enumOp.IsDestructive() {
 		t.Fatalf("unexpected enum label op metadata")
 	}
+	if enumOp.ObjectKey() == enumOp.DependsOn()[0] {
+		t.Fatalf("enum label object key should be distinct from enum type dependency")
+	}
 	if len(enumOp.DependsOn()) != 1 || enumOp.DependsOn()[0].Kind != model.KindType {
 		t.Fatalf("expected enum type dependency, got %#v", enumOp.DependsOn())
 	}

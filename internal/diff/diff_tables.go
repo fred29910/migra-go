@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"reflect"
 	"sort"
 
 	"github.com/fred29910/migra-go/internal/model"
@@ -78,6 +79,18 @@ func (c *diffContext) diffTableConstraints(schema string, source, target *model.
 		c.addOp(NewAddConstraintOp(schema, target.Name, target.Constraints[name]))
 	}
 
+	changeNames := make([]string, 0, len(target.Constraints))
+	for name, targetConstraint := range target.Constraints {
+		if sourceConstraint, exists := source.Constraints[name]; exists && !sameConstraintContent(sourceConstraint, targetConstraint) {
+			changeNames = append(changeNames, name)
+		}
+	}
+	sort.Strings(changeNames)
+	for _, name := range changeNames {
+		c.addOp(NewDropConstraintOp(schema, source.Name, name))
+		c.addOp(NewAddConstraintOp(schema, target.Name, target.Constraints[name]))
+	}
+
 	dropNames := make([]string, 0, len(source.Constraints))
 	for name := range source.Constraints {
 		if _, exists := target.Constraints[name]; !exists {
@@ -88,6 +101,19 @@ func (c *diffContext) diffTableConstraints(schema string, source, target *model.
 	for _, name := range dropNames {
 		c.addOp(NewDropConstraintOp(schema, source.Name, name))
 	}
+}
+
+func sameConstraintContent(a, b *model.Constraint) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.Type == b.Type &&
+		a.Definition == b.Definition &&
+		reflect.DeepEqual(a.Columns, b.Columns) &&
+		a.RefSchema == b.RefSchema &&
+		a.RefTable == b.RefTable &&
+		reflect.DeepEqual(a.RefColumns, b.RefColumns) &&
+		a.Expression == b.Expression
 }
 
 // diffTableColumns compares columns between two tables

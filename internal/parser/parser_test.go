@@ -111,6 +111,12 @@ func TestParseCreateTablePrimaryKeyAndForeignKey(t *testing.T) {
 	if comments.PrimaryKey == nil || strings.Join(comments.PrimaryKey.Columns, ",") != "id" {
 		t.Fatalf("expected comments primary key, got %#v", comments.PrimaryKey)
 	}
+	if comments.ColumnByName["id"].IsNullable {
+		t.Fatal("column-level primary key should make id NOT NULL")
+	}
+	if comments.Constraints["comments_pkey"] == nil {
+		t.Fatal("expected primary key to also be stored as a table constraint")
+	}
 	fk := comments.Constraints["comments_post_id_fkey"]
 	if fk == nil {
 		t.Fatal("expected generated foreign key constraint")
@@ -367,6 +373,7 @@ func TestParseDefaultFunctionExpressionConsistentForCreateAndAlter(t *testing.T)
 }
 
 type panickingHandler struct{}
+
 func (h *panickingHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error) {
 	panic("intentional panic for testing recover")
 }
@@ -375,10 +382,10 @@ func TestParser_RecoverFromPanic(t *testing.T) {
 	registry := NewHandlerRegistry()
 	// Map CreateStmt to our panicking handler
 	registry.Register(pg_nodes.CreateStmt{}, &panickingHandler{})
-	
+
 	p := NewParserWith(registry, nil)
 	_, err := p.ParseSQL("CREATE TABLE t1 (id int);")
-	
+
 	if err == nil {
 		t.Fatal("expected error from recovered panic, got nil")
 	}

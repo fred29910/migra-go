@@ -63,15 +63,37 @@ func TestRenderAddTable_WithDefaultsAndConstraints(t *testing.T) {
 func TestRenderNewOperations(t *testing.T) {
 	r := NewRenderer()
 	cases := map[string]diff.Operation{
-		`ALTER TYPE "public"."user_role" ADD VALUE 'guest';`: diff.NewAddEnumLabelOp("public", "user_role", "guest"),
+		`ALTER TYPE "public"."user_role" ADD VALUE 'guest';`:                        diff.NewAddEnumLabelOp("public", "user_role", "guest"),
 		`ALTER TABLE "public"."users" ALTER COLUMN "created_at" SET DEFAULT now();`: diff.NewSetDefaultOp("public", "users", "created_at", "now()"),
-		`ALTER TABLE "public"."users" ALTER COLUMN "created_at" DROP DEFAULT;`: diff.NewDropDefaultOp("public", "users", "created_at"),
-		`ALTER TABLE "public"."users" DROP COLUMN IF EXISTS "old_col";`: diff.NewDropColumnOp("public", "users", "old_col"),
+		`ALTER TABLE "public"."users" ALTER COLUMN "created_at" DROP DEFAULT;`:      diff.NewDropDefaultOp("public", "users", "created_at"),
+		`ALTER TABLE "public"."users" DROP COLUMN IF EXISTS "old_col";`:             diff.NewDropColumnOp("public", "users", "old_col"),
 	}
 	for want, op := range cases {
 		if got := r.Render(op); !strings.Contains(got, want) {
 			t.Errorf("expected %q in %q", want, got)
 		}
+	}
+}
+
+func TestRenderAddConstraint_UsesStructuredConstraint(t *testing.T) {
+	r := NewRenderer()
+	op := diff.NewAddConstraintOp("public", "comments", &model.Constraint{
+		Name:       "comments_post_id_fkey",
+		Type:       "foreign_key",
+		Table:      "comments",
+		Columns:    []string{"post_id"},
+		RefSchema:  "public",
+		RefTable:   "posts",
+		RefColumns: []string{"id"},
+	})
+
+	got := r.Render(op)
+	want := `ALTER TABLE "public"."comments" ADD CONSTRAINT "comments_post_id_fkey" FOREIGN KEY ("post_id") REFERENCES "public"."posts" ("id");`
+	if !strings.Contains(got, want) {
+		t.Fatalf("expected %q in %q", want, got)
+	}
+	if strings.Contains(got, `ADD CONSTRAINT "comments_post_id_fkey" ;`) {
+		t.Fatalf("structured constraint rendered as empty definition: %q", got)
 	}
 }
 

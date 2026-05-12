@@ -48,3 +48,47 @@ func TestDiffer_EnumLabelAppendDefaultChangeAndDropColumn(t *testing.T) {
 		t.Fatalf("missing expected operations, got %#v", kinds)
 	}
 }
+
+func TestDiffer_DetectsSameNameConstraintContentChange(t *testing.T) {
+	source := model.NewSchema()
+	sourceNs := source.GetOrCreateNamespace("public")
+	sourceTable := model.NewTable("public", "comments")
+	sourceTable.Constraints["comments_post_id_fkey"] = &model.Constraint{
+		Name:       "comments_post_id_fkey",
+		Type:       "foreign_key",
+		Table:      "comments",
+		Columns:    []string{"post_id"},
+		RefSchema:  "public",
+		RefTable:   "posts",
+		RefColumns: []string{"id"},
+	}
+	sourceNs.Tables["comments"] = sourceTable
+
+	target := model.NewSchema()
+	targetNs := target.GetOrCreateNamespace("public")
+	targetTable := model.NewTable("public", "comments")
+	targetTable.Constraints["comments_post_id_fkey"] = &model.Constraint{
+		Name:       "comments_post_id_fkey",
+		Type:       "foreign_key",
+		Table:      "comments",
+		Columns:    []string{"post_id"},
+		RefSchema:  "public",
+		RefTable:   "articles",
+		RefColumns: []string{"id"},
+	}
+	targetNs.Tables["comments"] = targetTable
+
+	ops, _ := NewDiffer().Diff(source, target)
+	var hasDrop, hasAdd bool
+	for _, op := range ops {
+		switch op.Kind() {
+		case KindDropConstraint:
+			hasDrop = true
+		case KindAddConstraint:
+			hasAdd = true
+		}
+	}
+	if !hasDrop || !hasAdd {
+		t.Fatalf("expected drop+add for same-name constraint change, got %#v", ops)
+	}
+}

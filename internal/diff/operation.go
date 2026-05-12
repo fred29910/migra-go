@@ -352,7 +352,7 @@ func NewAddEnumLabelOp(schema, typeName, label string) *AddEnumLabelOp {
 	return &AddEnumLabelOp{
 		baseOperation: baseOperation{
 			kind:      KindAddEnumLabel,
-			objectKey: model.NewObjectKey(schema, typeName, model.KindType),
+			objectKey: model.NewObjectKey(schema, typeName+"."+label, model.KindType),
 		},
 		Schema: schema,
 		Type:   typeName,
@@ -373,10 +373,10 @@ func (op *AddEnumLabelOp) DependsOn() []model.ObjectKey {
 // SetDefaultOp represents setting a default expression on a column
 type SetDefaultOp struct {
 	baseOperation
-	Schema       string
-	Table        string
-	Column       string
-	DefaultExpr  string
+	Schema      string
+	Table       string
+	Column      string
+	DefaultExpr string
 }
 
 func NewSetDefaultOp(schema, table, column, defaultExpr string) *SetDefaultOp {
