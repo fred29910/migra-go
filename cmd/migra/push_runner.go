@@ -17,6 +17,23 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var nonTransactionalDDL = map[string]bool{
+	"CREATE INDEX CONCURRENTLY":   true,
+	"DROP INDEX CONCURRENTLY":     true,
+	"REINDEX INDEX CONCURRENTLY":  true,
+	"CREATE INDEX USING CONCURRENTLY": true,
+}
+
+func isNonTransactionalSQL(sql string) bool {
+	upperSQL := strings.ToUpper(sql)
+	for pattern := range nonTransactionalDDL {
+		if strings.Contains(upperSQL, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
 type pushConfig struct {
 	Source     string
 	Target     string
@@ -168,6 +185,12 @@ next:
 
 		isDestructive := op.IsDestructive()
 
+		if isNonTransactionalSQL(sql) {
+			fmt.Printf("\nNon-transactional DDL detected at SQL #%d:\n  %s\nThis operation cannot be executed within a transaction.\nPlease execute it separately outside this tool.\n", i+1, sql)
+			_ = tx.Rollback(ctx)
+			return fmt.Errorf("non-transactional DDL at SQL #%d", i+1)
+		}
+
 		for {
 			if cfg.Execute && autoMode {
 				_, err := tx.Exec(ctx, sql)
@@ -216,6 +239,11 @@ next:
 				_ = tx.Rollback(ctx)
 				return nil
 			case "a":
+				if isDestructive && !cfg.UnsafeDrop {
+					fmt.Printf("Destructive operation detected in auto-mode, reverting to interactive mode.\nSQL #%d: %s\n\n", i+1, sql)
+					autoMode = false
+					continue
+				}
 				autoMode = true
 				continue next
 			case "s":
