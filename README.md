@@ -11,7 +11,8 @@
 
 - 🔍 **双向 Diff**：比较 SQL 文件、PostgreSQL 实例或两者之间的差异。
 - 🏗️ **结构化模型**：使用中间 SchemaModel 表示数据库结构，支持表、列、主键、索引、枚举类型和约束。
-- 📋 **SQL 生成**：输出可执行的迁移 SQL，支持枚举类型、索引、数据列和约束的精确变更。
+- 📋 **SQL 生成与执行**：输出可执行的迁移 SQL，并支持 `push` 命令将变更直接应用到目标数据库。
+- 🛡️ **交互式安全执行**：`push` 命令提供逐条确认、危险操作中断、事务保护与自动回滚。
 - 🛡️ **安全保护**：标记破坏性操作（DROP），默认抛出告警提示，可选跳过危险变更（`--unsafe-drop`）。
 - 🎯 **语义归一化**：减少因同义表达导致的误报。
 - 🚀 **高性能**：基于 Kahn 算法实现的 DAG（有向无环图）拓扑排序，保证生成脚本的执行顺序确定且高效。
@@ -55,20 +56,35 @@ migra diff --format json file_a.sql file_b.sql
 
 # 启用危险 DROP 操作输出
 migra diff --unsafe-drop file_a.sql file_b.sql
+
+# 将 schema 变更应用到目标数据库（交互式确认）
+migra push file.sql postgres://localhost/db
+
+# 使用--unsafe-drop跳过危险操作确认
+migra push --unsafe-drop file.sql postgres://localhost/db
+
+# 跳过交互确认直接执行（不推荐）
+migra push --execute file.sql postgres://localhost/db
+
+# 跳过执行后校验
+migra push --no-verify file.sql postgres://localhost/db
 ```
 
 ### 命令行参数
 
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `-s, --schema` | 指定要比较的 Schema 列表（可指定多个） | `public` |
-| `-f, --format` | 输出格式：`sql` 或 `json` | `sql` |
-| `--unsafe-drop` | 允许输出危险的 DROP 操作 | `false` |
-| `--strict` | 遇到不支持的语句时直接失败退出 | `false` |
-| `--timeout` | Schema 加载超时时间（如 `30s`, `2m`） | `30s` |
-| `-o, --output` | 输出到文件（默认输出到 stdout） | - |
-| `-c, --config` | 指定配置文件路径 | `~/.migra.yaml` 或 `./migra.yaml` |
-| `-v, --verbose` | 输出详细日志 | `false` |
+| 参数 | 命令 | 说明 | 默认值 |
+|------|------|------|--------|
+| `-s, --schema` | diff, push | 指定要比较的 Schema 列表（可指定多个） | `public` |
+| `-f, --format` | diff | 输出格式：`sql` 或 `json` | `sql` |
+| `--unsafe-drop` | diff, push | 允许输出/执行危险的 DROP 操作 | `false` |
+| `--strict` | diff | 遇到不支持的语句时直接失败退出 | `false` |
+| `--timeout` | diff, push | Schema 加载超时时间（如 `30s`, `2m`） | `30s` |
+| `-o, --output` | diff | 输出到文件（默认输出到 stdout） | - |
+| `--dry-run` | push | 显示 SQL 预览但不执行 | `true` |
+| `--execute` | push | 跳过交互确认直接执行（不推荐） | `false` |
+| `--no-verify` | push | 跳过执行后校验 | `false` |
+| `-c, --config` | 全局 | 指定配置文件路径 | `~/.migra.yaml` 或 `./migra.yaml` |
+| `-v, --verbose` | 全局 | 输出详细日志 | `false` |
 
 ### 配置文件
 
@@ -138,13 +154,13 @@ migra diff file.sql "postgres://myuser@localhost/mydb"
 │  SQL / DB   │────▶│   Parser     │────▶│   Diff       │────▶│   Renderer   │
 │  (Source &  │     │  (AST →      │     │  (Schema A   │     │  (Operations │
 │   Target)   │     │   SchemaModel)│     │   vs B →     │     │   → SQL/JSON)│
-└─────────────┘     └──────────────┘     │   DiffOps)   │     └──────────────┘
-                                         └──────┬───────┘
-                                                │
-                                         ┌──────▼───────┐
-                                         │   Planner    │
-                                         │ (DAG 拓扑排序│
-                                         │  三阶段执行)  │
+└─────────────┘     └──────────────┘     │   DiffOps)   │     └──────┬───────┘
+                                         └──────┬───────┘            │
+                                                │           ┌────────▼────────┐
+                                         ┌──────▼───────┐   │    Push        │
+                                         │   Planner    │──▶│ (交互确认执行  │
+                                         │ (DAG 拓扑排序│   │  事务+回滚)    │
+                                         │  三阶段执行)  │   └─────────────────┘
                                          └──────────────┘
 ```
 
@@ -156,7 +172,10 @@ migra diff file.sql "postgres://myuser@localhost/mydb"
 │   ├── main.go         # 根命令与配置初始化
 │   ├── diff.go         # diff 子命令与参数解析
 │   ├── diff_runner.go  # 差异计算流水线编排
-│   └── diff_test.go    # CLI 层测试
+│   ├── diff_test.go    # CLI 层测试
+│   ├── push.go         # push 子命令定义与参数解析
+│   ├── push_runner.go  # push 执行逻辑（交互确认、事务、回滚）
+│   └── push_test.go    # push 命令测试
 ├── internal/
 │   ├── app/            # 应用层服务（依赖注入编排）
 │   │   └── diff_service.go
