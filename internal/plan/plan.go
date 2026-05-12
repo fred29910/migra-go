@@ -72,7 +72,7 @@ func (p *Planner) assignStage(op diff.Operation) Stage {
 		return StageDeploy
 
 	// Post-deploy: drop objects (dangerous)
-	case diff.KindDropTable, diff.KindDropIndex, diff.KindDropConstraint, diff.KindDropEnumType:
+	case diff.KindDropTable, diff.KindDropColumn, diff.KindDropIndex, diff.KindDropConstraint, diff.KindDropEnumType:
 		if p.unsafeDrops {
 			return StagePostDeploy
 		}
