@@ -165,10 +165,11 @@ func (m DropColumnMutation) Apply(schema *model.Schema) error {
 
 // AlterColumnTypeMutation describes changing a column's data type.
 type AlterColumnTypeMutation struct {
-	Schema string
-	Table  string
-	Column string
-	ToType string
+	Schema   string
+	Table    string
+	Column   string
+	FromType string
+	ToType   string
 }
 
 func (m AlterColumnTypeMutation) Kind() MutationKind { return MutKindAlterColumnType }
@@ -187,6 +188,10 @@ func (m AlterColumnTypeMutation) Apply(schema *model.Schema) error {
 	col := table.ColumnByName[m.Column]
 	if col == nil {
 		return fmt.Errorf("column %s.%s.%s not found", m.Schema, m.Table, m.Column)
+	}
+	if m.FromType != "" && col.DataType != m.FromType {
+		return fmt.Errorf("column %s.%s.%s type mismatch: current %s, expected %s",
+			m.Schema, m.Table, m.Column, col.DataType, m.FromType)
 	}
 	col.DataType = m.ToType
 	return nil

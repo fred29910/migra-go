@@ -24,7 +24,12 @@ func (l *DBLoader) Match(source string) bool {
 // Load loads schema from a database connection string.
 // Returns the loaded schema, any parsing errors, and any fatal error.
 func (l *DBLoader) Load(ctx context.Context, source string, opt LoadOptions) (*model.Schema, []error, error) {
-	conn, err := pgx.Connect(ctx, source)
+	connConfig, err := pgx.ParseConfig(source)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse connection string: %w", err)
+	}
+
+	conn, err := pgx.ConnectConfig(ctx, connConfig)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
