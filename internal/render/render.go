@@ -130,6 +130,12 @@ func (r *Renderer) Render(op diff.Operation) string {
 	}
 }
 
+// RenderSingle renders a single operation to SQL string
+// Used by push command for interactive confirmation
+func (r *Renderer) RenderSingle(op diff.Operation) string {
+	return r.Render(op)
+}
+
 func (r *Renderer) renderAddTable(op *diff.AddTableOp) string {
 	table := op.Table
 	lines := make([]string, 0)
