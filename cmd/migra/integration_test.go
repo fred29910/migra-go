@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/fred29910/migra-go/internal/app"
 	"github.com/fred29910/migra-go/internal/diff"
 	"github.com/fred29910/migra-go/internal/model"
 	"github.com/fred29910/migra-go/internal/plan"
@@ -177,6 +179,37 @@ func TestIntegrationDAGSort(t *testing.T) {
 	}
 
 	t.Log("DAG sort order correct")
+}
+
+// TestExampleSQLFilesDiffIncludesEnumAndConstraints tests end-to-end diff of example SQL files
+func TestExampleSQLFilesDiffIncludesEnumAndConstraints(t *testing.T) {
+	out, warns, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+		Source:     "../../testdata/example_source.sql",
+		Target:     "../../testdata/example_target.sql",
+		Schemas:    []string{"public"},
+		Format:     "sql",
+		Timeout:    defaultDiffTimeout,
+		UnsafeDrop: false,
+	})
+	if err != nil {
+		t.Fatalf("diff service failed: %v", err)
+	}
+
+	for _, want := range []string{
+		`CREATE TABLE "public"."comments"`,
+		`ALTER TABLE "public"."users" ADD COLUMN "age" integer`,
+		`ALTER TYPE "public"."user_role" ADD VALUE 'guest'`,
+		`CONSTRAINT "comments_pkey" PRIMARY KEY ("id")`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got:\n%s", want, out)
+		}
+	}
+	for _, warning := range warns {
+		if strings.Contains(warning, "CREATE TYPE ENUM is not yet supported") {
+			t.Fatalf("unexpected enum unsupported warning: %s", warning)
+		}
+	}
 }
 
 // TestFullPipeline tests the full pipeline with plan stage grouping
