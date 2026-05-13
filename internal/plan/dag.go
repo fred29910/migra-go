@@ -82,13 +82,21 @@ func (d *DAG) addDependencies(node *Node) {
 	}
 }
 
+// findNodeByObjectKey finds the best matching node for an object key.
+// When multiple nodes share the same key (e.g., DropConstraint + AddConstraint
+// for the same constraint), DropConstraint is preferred so that
+// AddConstraint.DependsOn resolves to the DropConstraint node, not itself.
 func (d *DAG) findNodeByObjectKey(key model.ObjectKey) *Node {
-	for _, node := range d.nodes {
-		if node.Op.ObjectKey() == key {
-			return node
+	matches := d.byObject[key]
+	if len(matches) == 0 {
+		return nil
+	}
+	for _, n := range matches {
+		if n.Op.Kind() == diff.KindDropConstraint {
+			return n
 		}
 	}
-	return nil
+	return matches[0]
 }
 
 // GetExecutionOrder returns operations in topological order

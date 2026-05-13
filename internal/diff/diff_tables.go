@@ -82,6 +82,12 @@ func (c *diffContext) diffTableConstraints(schema string, source, target *model.
 	changeNames := make([]string, 0, len(target.Constraints))
 	for name, targetConstraint := range target.Constraints {
 		if sourceConstraint, exists := source.Constraints[name]; exists && !sameConstraintContent(sourceConstraint, targetConstraint) {
+			// Skip if the constraint is semantically identical (same type and columns).
+			// This prevents unnecessary DROP+ADD cycles when the only difference
+			// is in derived fields like Definition (from pg_get_constraintdef).
+			if sameConstraintSemantics(sourceConstraint, targetConstraint) {
+				continue
+			}
 			changeNames = append(changeNames, name)
 		}
 	}
@@ -116,6 +122,36 @@ func sameConstraintContent(a, b *model.Constraint) bool {
 		a.RefTable == b.RefTable &&
 		reflect.DeepEqual(a.RefColumns, b.RefColumns) &&
 		a.Expression == b.Expression
+}
+
+// sameConstraintSemantics checks if two constraints have the same semantic meaning
+// (same type and affected columns), ignoring derived/implementation details.
+// This is used as a safety net to avoid unnecessary DROP+ADD cycles when
+// sameConstraintContent returns false due to Definition or other derived fields.
+func sameConstraintSemantics(a, b *model.Constraint) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	if a.Type != b.Type {
+		return false
+	}
+	if !reflect.DeepEqual(a.Columns, b.Columns) {
+		return false
+	}
+	// For foreign keys, also check reference target
+	if a.Type == "foreign_key" {
+		if a.RefSchema != b.RefSchema || a.RefTable != b.RefTable {
+			return false
+		}
+		if !reflect.DeepEqual(a.RefColumns, b.RefColumns) {
+			return false
+		}
+	}
+	// For check constraints, also check expression
+	if a.Type == "check" && a.Expression != b.Expression {
+		return false
+	}
+	return true
 }
 
 // diffTableColumns compares columns between two tables
