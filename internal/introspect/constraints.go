@@ -54,6 +54,7 @@ func loadConstraints(ctx context.Context, conn *pgx.Conn, schemaName string, ns 
 			Name:       conName,
 			Table:      tableName,
 			Definition: definition,
+			Columns:    columnNames,
 		}
 
 		switch conType {

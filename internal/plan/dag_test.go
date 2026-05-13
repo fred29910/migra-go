@@ -89,3 +89,31 @@ func TestDAGGetExecutionOrder_StableForLinearChain(t *testing.T) {
 		t.Fatalf("unexpected order: got=%v want=%v", got, want)
 	}
 }
+
+func TestTopoSortDropConstraintBeforeAddConstraint(t *testing.T) {
+	// Simulate the scenario: changeNames generates DROP + ADD for the same constraint.
+	// ADD CONSTRAINT should depend on DROP CONSTRAINT, so DROP runs first.
+	ops := []diff.Operation{
+		diff.NewDropConstraintOp("public", "posts", "posts_pkey"),
+		diff.NewAddConstraintOp("public", "posts", &model.Constraint{
+			Name:    "posts_pkey",
+			Type:    "primary_key",
+			Columns: []string{"id"},
+		}),
+	}
+
+	sorted, err := TopoSort(ops)
+	if err != nil {
+		t.Fatalf("TopoSort failed: %v", err)
+	}
+	if len(sorted) != 2 {
+		t.Fatalf("expected 2 operations, got %d", len(sorted))
+	}
+	// DROP must come before ADD
+	if sorted[0].Kind() != diff.KindDropConstraint {
+		t.Fatalf("expected first op to be drop_constraint, got %s", sorted[0].Kind())
+	}
+	if sorted[1].Kind() != diff.KindAddConstraint {
+		t.Fatalf("expected second op to be add_constraint, got %s", sorted[1].Kind())
+	}
+}
