@@ -70,6 +70,16 @@ func (op *AddTableOp) IsDestructive() bool {
 	return false
 }
 
+func (op *AddTableOp) DependsOn() []model.ObjectKey {
+	var deps []model.ObjectKey
+	for _, constraint := range op.Table.Constraints {
+		if constraint.Type == "foreign_key" && constraint.RefTable != "" {
+			deps = append(deps, model.NewObjectKey(constraint.RefSchema, constraint.RefTable, model.KindTable))
+		}
+	}
+	return deps
+}
+
 // DropTableOp represents dropping a table
 type DropTableOp struct {
 	baseOperation
