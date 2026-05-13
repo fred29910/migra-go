@@ -107,8 +107,10 @@ func sameConstraintContent(a, b *model.Constraint) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
+	// Note: Definition is excluded from comparison because it's a derived field
+	// from pg_get_constraintdef (DB introspect only), not set by SQL file parser.
+	// Content equality is determined by structured fields: Type, Columns, Refs, Expression.
 	return a.Type == b.Type &&
-		a.Definition == b.Definition &&
 		reflect.DeepEqual(a.Columns, b.Columns) &&
 		a.RefSchema == b.RefSchema &&
 		a.RefTable == b.RefTable &&

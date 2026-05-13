@@ -1,7 +1,7 @@
 ---
 description: 总指挥 agent，全权限开发，严格遵循 superpowers-zh 工作纪律：先头脑风暴→计划→TDD→审查→验收
 mode: primary
-model: openrouter/openrouter/owl-alpha
+model: opencode/ring-2.6-1t-free
 temperature: 0.3
 color: "#7F77DD"
 permission:

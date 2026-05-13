@@ -130,10 +130,13 @@ func ParseExpression(expr pg_nodes.Node) (string, bool) {
 }
 
 var typeNameMapping = map[string]string{
-	"int4":   "integer",
-	"int8":   "bigint",
-	"float4": "real",
-	"float8": "double precision",
+	"int4":      "integer",
+	"int8":      "bigint",
+	"float4":    "real",
+	"float8":    "double precision",
+	"serial":    "integer",
+	"bigserial": "bigint",
+	"smallserial": "smallint",
 }
 
 // MapTypeName maps PostgreSQL internal type names to standard SQL names.

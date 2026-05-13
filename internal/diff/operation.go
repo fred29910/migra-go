@@ -465,6 +465,8 @@ func (op *AddConstraintOp) IsDestructive() bool {
 func (op *AddConstraintOp) DependsOn() []model.ObjectKey {
 	return []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
+		// Ensure ADD CONSTRAINT runs after DROP CONSTRAINT for the same constraint
+		model.NewObjectKey(op.Schema, op.Table+"."+op.Constraint.Name, model.KindConstraint),
 	}
 }
 
