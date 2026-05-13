@@ -152,7 +152,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 		Timeout:    cfg.Timeout,
 	}
 
-	ops, warnings, err := app.ComputeDiff(sourceSchema, targetSchema, appCfg)
+	ops, warnings, err := app.ComputeDiff(targetSchema, sourceSchema, appCfg)
 	if err != nil {
 		return err
 	}
@@ -298,7 +298,7 @@ next:
 			fmt.Printf("Warning: failed to load target schema for verification: %v\n", err)
 		} else {
 			differ := diff.NewDiffer()
-			remainOps, _ := differ.Diff(sourceSchema, newTargetSchema)
+			remainOps, _ := differ.Diff(newTargetSchema, sourceSchema)
 			if len(remainOps) > 0 {
 				fmt.Printf("Warning: %d operations still pending after migration:\n", len(remainOps))
 				for _, op := range remainOps {

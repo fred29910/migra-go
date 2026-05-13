@@ -8,7 +8,7 @@ import (
 var pushCmd = &cobra.Command{
 	Use:   "push [source] [target]",
 	Short: "Apply schema changes to target database",
-	Long: `Calculate diff from source to target and apply SQL to target database.
+	Long: `Compare source and target schemas, then apply SQL to make the target database match the source schema.
 This command requires interactive confirmation before executing each SQL.
 
 Examples:
