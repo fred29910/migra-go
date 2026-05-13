@@ -250,7 +250,7 @@ func (r *Renderer) renderCreateIndex(op *diff.CreateIndexOp) string {
 	}
 	items := strings.Join(quotedItems, ", ")
 	return fmt.Sprintf("-- op: add_index risk:low\nCREATE %sINDEX %s ON %s (%s);",
-		unique, quoteQualifiedIdentifier(op.Schema, idx.Name), quoteQualifiedIdentifier(op.Schema, idx.Table), items)
+		unique, quoteIdentifier(idx.Name), quoteQualifiedIdentifier(op.Schema, idx.Table), items)
 }
 
 func (r *Renderer) renderDropIndex(op *diff.DropIndexOp) string {
