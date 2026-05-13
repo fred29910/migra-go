@@ -11,7 +11,7 @@
 
 ## 可用 Skills
 
-Skills 位于 `.claude/skills/` 目录，每个 skill 有独立的 `SKILL.md` 文件。
+Skills 位于 `.agents/skills/` 目录，每个 skill 有独立的 `SKILL.md` 文件。
 
 - **brainstorming**: 在任何创造性工作之前必须使用此技能——创建功能、构建组件、添加功能或修改行为。在实现之前先探索用户意图、需求和设计。
 - **chinese-code-review**: 中文代码审查规范——在保持专业严谨的同时，用符合国内团队文化的方式给出有效反馈
