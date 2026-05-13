@@ -1,5 +1,6 @@
 ---
 description: 需求澄清 subagent，触发 brainstorming skill，通过苏格拉底式提问把模糊需求转化为设计规格
+model: opencode/deepseek-v4-flash-free
 mode: subagent
 temperature: 0.4
 permission:

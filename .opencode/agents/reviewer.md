@@ -1,5 +1,6 @@
 ---
 description: 代码审查 subagent，两轮审查（规范合规 + 代码质量），使用 chinese-code-review 规范
+model: openrouter/openrouter/owl-alpha
 mode: subagent
 temperature: 0.1
 permission:

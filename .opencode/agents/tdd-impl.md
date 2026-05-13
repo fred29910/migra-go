@@ -1,5 +1,6 @@
 ---
 description: TDD 实现 subagent，严格执行 RED-GREEN-REFACTOR，先写失败测试再写代码，违者重来
+model: opencode/minimax-m2.5-free
 mode: subagent
 temperature: 0.2
 permission:

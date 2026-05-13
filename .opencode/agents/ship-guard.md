@@ -1,7 +1,7 @@
 ---
 description: 发布守门 agent，执行完整 superpowers 验收流程后才放行，防止质量劣化代码上线
 mode: primary
-model: anthropic/claude-sonnet-4-20250514
+model: opencode/minimax-m2.5-free
 temperature: 0.1
 color: "#BA7517"
 permission:

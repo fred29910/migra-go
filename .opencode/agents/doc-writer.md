@@ -2,6 +2,7 @@
 description: 中文文档 subagent，遵循 chinese-documentation 排版规范，生成符合中文习惯的技术文档
 mode: subagent
 temperature: 0.4
+model: opencode/deepseek-v4-flash-free
 permission:
   read: allow
   edit:

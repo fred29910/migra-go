@@ -1,7 +1,7 @@
 ---
 description: 纯规划分析 agent，只读不改代码，专注需求澄清和方案设计
 mode: primary
-model: anthropic/claude-sonnet-4-20250514
+model: opencode/deepseek-v4-flash-free
 temperature: 0.1
 color: "#1D9E75"
 permission:

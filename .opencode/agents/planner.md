@@ -1,5 +1,6 @@
 ---
 description: 任务拆分 subagent，调用 writing-plans skill，把设计规格拆成可执行的原子任务列表
+model: opencode/deepseek-v4-flash-free
 mode: subagent
 temperature: 0.2
 permission:

@@ -1,7 +1,7 @@
 ---
 description: 高步数深度构建 agent，适合大型重构或跨文件复杂功能，内置完整 superpowers 工作流
 mode: primary
-model: anthropic/claude-sonnet-4-20250514
+model: opencode/deepseek-v4-flash-free
 temperature: 0.2
 steps: 80
 color: "#378ADD"

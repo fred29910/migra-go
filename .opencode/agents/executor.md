@@ -1,6 +1,7 @@
 ---
 description: 并行执行 subagent，根据 writing-plans 产出的任务列表调度并行 agent，每任务独立 worktree
 mode: subagent
+model: openrouter/openrouter/owl-alpha
 temperature: 0.2
 permission:
   read: allow
