@@ -180,3 +180,35 @@ rtk init --global       # Add RTK to ~/.claude/CLAUDE.md
 
 Overall average: **60-90% token reduction** on common development operations.
 <!-- /rtk-instructions -->
+
+# 项目 AI 协作规范
+
+## 工作纪律（来自 superpowers-zh，不可绕过）
+
+所有 AI agent 必须遵循以下顺序，不允许跳步：
+
+1. 新需求 → brainstorming skill（澄清规格）
+2. 规格确认 → writing-plans skill（拆分任务）
+3. 任务执行 → test-driven-development skill（TDD 实现）
+4. 完成声明前 → verification-before-completion skill（证据验收）
+
+违反以上顺序视为工作流错误，用户可要求重来。
+
+## 中国本地化规范
+
+- 代码注释语言：中文（技术术语保留英文）
+- commit message：遵循 chinese-commit-conventions skill
+- 代码审查：遵循 chinese-code-review 文化规范
+- Git 平台：GitHub（海外）/ Gitee（国内镜像）
+
+## Agent 选择指引
+
+| 场景 | 使用 |
+|------|------|
+| 新功能开发 | arch-master（Tab 默认） |
+| 需求分析/方案评审 | plan-master |
+| 发布前检查 | ship-guard |
+| 大型重构（>5 文件） | zen-builder |
+| 临时调试 | @debugger |
+| 补文档 | @doc-writer |
+| 构建 MCP 工具 | @mcp-builder |
