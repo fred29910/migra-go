@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/fred29910/migra-go/internal/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -12,6 +13,9 @@ var rootCmd = &cobra.Command{
 	Use:   "migra",
 	Short: "PostgreSQL schema migration tool",
 	Long:  `A modern Go implementation of schema diff and migration tool for PostgreSQL databases`,
+	Run: func(cmd *cobra.Command, args []string) {
+		_ = cmd.Help()
+	},
 }
 
 func init() {
@@ -19,7 +23,20 @@ func init() {
 
 	// Global flags
 	rootCmd.PersistentFlags().StringP("config", "c", "", "config file (default is $HOME/.migra.yaml)")
-	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "verbose output")
+	rootCmd.PersistentFlags().BoolP("verbose", "V", false, "verbose output")
+	rootCmd.PersistentFlags().BoolP("version", "v", false, "print version and exit")
+
+	// Handle --version in PersistentPreRun using function composition
+	existingPreRun := rootCmd.PersistentPreRun
+	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		if existingPreRun != nil {
+			existingPreRun(cmd, args)
+		}
+		if v, _ := cmd.Flags().GetBool("version"); v {
+			fmt.Println(version.Info())
+			os.Exit(0)
+		}
+	}
 }
 
 func setupFlags(cmd *cobra.Command) error {
@@ -28,6 +45,9 @@ func setupFlags(cmd *cobra.Command) error {
 	}
 	if err := viper.BindPFlag("verbose", cmd.PersistentFlags().Lookup("verbose")); err != nil {
 		return fmt.Errorf("failed to bind verbose flag: %w", err)
+	}
+	if err := viper.BindPFlag("version", cmd.PersistentFlags().Lookup("version")); err != nil {
+		return fmt.Errorf("failed to bind version flag: %w", err)
 	}
 	return nil
 }
