@@ -41,7 +41,7 @@ func init() {
 
 	// Diff-specific flags（默认值从 viper 读取）
 	diffCmd.Flags().StringSliceP("schema", "s", viper.GetStringSlice("diff.schemas"), "schemas to compare (can be multiple)")
-	diffCmd.Flags().StringP("format", "f", viper.GetString("diff.format"), "output format: sql or json")
+	diffCmd.Flags().StringP("format", "f", "sql", "output format: sql or json")
 	diffCmd.Flags().Bool("unsafe-drop", viper.GetBool("diff.unsafe_drop"), "allow destructive drop operations")
 	diffCmd.Flags().Bool("strict", viper.GetBool("diff.strict"), "fail on unsupported statements")
 	diffCmd.Flags().StringP("output", "o", viper.GetString("output.file"), "output file (default: stdout)")

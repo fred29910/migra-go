@@ -98,7 +98,13 @@ var typeAliases = map[string]string{
 	"timestamp with time zone":    "timestamptz",
 }
 
+// charVaryingWithLenRe matches "character varying(N)" (case-insensitive), used in normalizeDataType
 var charVaryingWithLenRe = regexp.MustCompile(`(?i)^character varying\((\d+)\)$`)
+
+// These two regexes work together in normalizeDefaultExpr and must run in this order:
+// 1. nestedTypeCastRe first strips 'literal'::type → 'literal' (nested casts)
+// 2. typeCastRe then strips any remaining ::type suffix
+// Reversing the order would break cases like nextval('seq'::regclass).
 var typeCastRe = regexp.MustCompile(`::[\w\s]+$`)
 var nestedTypeCastRe = regexp.MustCompile(`'([^']*)'::[\w\s]+`)
 
@@ -139,13 +145,7 @@ func normalizeDefaultExpr(expr string) string {
 		expr = strings.TrimSpace(expr[1 : len(expr)-1])
 	}
 
-	expr = nestedTypeCastRe.ReplaceAllStringFunc(expr, func(m string) string {
-		sub := nestedTypeCastRe.FindStringSubmatch(m)
-		if len(sub) > 1 {
-			return "'" + sub[1] + "'"
-		}
-		return m
-	})
+	expr = nestedTypeCastRe.ReplaceAllString(expr, "'$1'")
 
 	expr = typeCastRe.ReplaceAllString(expr, "")
 	return strings.TrimSpace(expr)

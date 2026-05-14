@@ -151,6 +151,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 		UnsafeDrop: true, // Show all ops (including destructive) in preview
 		Timeout:    cfg.Timeout,
 	}
+	// ComputeDiff(source, target): returns ops needed to apply to target to match source
 	ops, _, err := app.ComputeDiff(targetSchema, sourceSchema, appCfg)
 	if err != nil {
 		return err
@@ -158,18 +159,16 @@ func runPush(cmd *cobra.Command, args []string) error {
 
 	// Warn about destructive ops when user hasn't opted in
 	if !cfg.UnsafeDrop {
-		destructiveCount := 0
+		var destructiveOps []diff.Operation
 		for _, op := range ops {
 			if op.IsDestructive() {
-				destructiveCount++
+				destructiveOps = append(destructiveOps, op)
 			}
 		}
-		if destructiveCount > 0 {
-			fmt.Fprintf(os.Stderr, "Warning: %d destructive operation(s) detected!\n", destructiveCount)
-			for _, op := range ops {
-				if op.IsDestructive() {
-					fmt.Fprintf(os.Stderr, "  - %s: %s (destructive)\n", op.Kind(), op.ObjectKey())
-				}
+		if len(destructiveOps) > 0 {
+			fmt.Fprintf(os.Stderr, "Warning: %d destructive operation(s) detected!\n", len(destructiveOps))
+			for _, op := range destructiveOps {
+				fmt.Fprintf(os.Stderr, "  - %s: %s (destructive)\n", op.Kind(), op.ObjectKey())
 			}
 			fmt.Fprintf(os.Stderr, "Use --unsafe-drop to include destructive DROP operations\n\n")
 		}
@@ -315,7 +314,8 @@ next:
 		if err != nil {
 			fmt.Printf("Warning: failed to load target schema for verification: %v\n", err)
 		} else {
-			remainOps, _, err := app.ComputeDiff(newTargetSchema, sourceSchema, app.Config{
+			// ComputeDiff(source, target): returns remaining ops if target doesn't yet match source
+		remainOps, _, err := app.ComputeDiff(newTargetSchema, sourceSchema, app.Config{
 				UnsafeDrop: true, // Check all ops including destructive for honest validation
 			})
 			if err != nil {

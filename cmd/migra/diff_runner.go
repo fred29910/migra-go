@@ -46,6 +46,7 @@ func parseDiffConfig(cmd *cobra.Command, args []string) (app.Config, error) {
 	if err != nil {
 		return app.Config{}, fmt.Errorf("failed to get format flag: %w", err)
 	}
+	// Fallback: allow config file to override flag default
 	if format == "" {
 		format = viper.GetString("diff.format")
 	}
