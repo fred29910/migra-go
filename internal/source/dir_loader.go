@@ -20,16 +20,17 @@ type DirectoryLoader struct {
 
 // Match returns true if source is an existing directory.
 func (l *DirectoryLoader) Match(source string) bool {
-	// Skip sources that other loaders handle
 	lower := strings.ToLower(source)
 	if strings.HasPrefix(lower, "postgres://") ||
 		strings.HasPrefix(lower, "postgresql://") ||
-		strings.HasPrefix(lower, "pg://") ||
-		strings.HasPrefix(lower, "file://") ||
-		strings.HasSuffix(lower, ".sql") {
+		strings.HasPrefix(lower, "pg://") {
 		return false
 	}
-	info, err := os.Stat(source)
+	path := source
+	if strings.HasPrefix(lower, "file://") {
+		path = source[len("file://"):]
+	}
+	info, err := os.Stat(path)
 	if err != nil {
 		return false
 	}
@@ -41,8 +42,13 @@ func (l *DirectoryLoader) Match(source string) bool {
 // If any file fails to parse, the entire load fails (even in non-strict mode).
 // If duplicate table/enum names are found across files, the load fails.
 func (l *DirectoryLoader) Load(ctx context.Context, source string, opt LoadOptions) (*model.Schema, []error, error) {
+	sourcePath := source
+	if strings.HasPrefix(strings.ToLower(source), "file://") {
+		sourcePath = source[len("file://"):]
+	}
+
 	var files []string
-	err := filepath.WalkDir(source, func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir(sourcePath, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -62,6 +68,10 @@ func (l *DirectoryLoader) Load(ctx context.Context, source string, opt LoadOptio
 	}
 
 	sort.Strings(files)
+
+	if len(files) == 0 {
+		return model.NewSchema(), []error{fmt.Errorf("no .sql files found in directory: %s", source)}, nil
+	}
 
 	merged := model.NewSchema()
 	allErrs := make([]error, 0)

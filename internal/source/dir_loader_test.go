@@ -87,7 +87,7 @@ func TestDirectoryLoader_Load_EmptyDir(t *testing.T) {
 	dir := t.TempDir()
 
 	loader := &DirectoryLoader{}
-	schema, _, err := loader.Load(nil, dir, LoadOptions{})
+	schema, errs, err := loader.Load(nil, dir, LoadOptions{})
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
@@ -96,6 +96,12 @@ func TestDirectoryLoader_Load_EmptyDir(t *testing.T) {
 	}
 	if len(schema.Schemas) != 0 {
 		t.Errorf("expected empty schema, got %d namespaces", len(schema.Schemas))
+	}
+	if len(errs) == 0 {
+		t.Error("expected warning for empty directory, got none")
+	}
+	if !strings.Contains(errs[0].Error(), "no .sql files found") {
+		t.Errorf("expected 'no .sql files found' warning, got: %v", errs[0])
 	}
 }
 
