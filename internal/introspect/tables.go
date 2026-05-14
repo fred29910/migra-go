@@ -16,6 +16,7 @@ func loadTables(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mode
 		t.table_name,
 		c.column_name,
 		c.data_type,
+		c.character_maximum_length,
 		c.is_nullable,
 		c.column_default,
 		c.ordinal_position
@@ -34,6 +35,7 @@ func loadTables(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mode
 		tableName  string
 		colName    string
 		dataType   string
+		charMaxLen sql.NullInt64
 		isNullable string
 		colDefault sql.NullString
 		ordinalPos int
@@ -41,12 +43,15 @@ func loadTables(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mode
 
 	currentTable := ""
 	for rows.Next() {
-		err := rows.Scan(&tableName, &colName, &dataType, &isNullable, &colDefault, &ordinalPos)
+		err := rows.Scan(&tableName, &colName, &dataType, &charMaxLen, &isNullable, &colDefault, &ordinalPos)
 		if err != nil {
 			return fmt.Errorf("scan table row: %w", err)
 		}
 
-		// Create table if it's new
+		if charMaxLen.Valid {
+			dataType = fmt.Sprintf("%s(%d)", dataType, charMaxLen.Int64)
+		}
+
 		if tableName != currentTable {
 			if _, exists := ns.Tables[tableName]; !exists {
 				ns.Tables[tableName] = model.NewTable(schemaName, tableName)
@@ -61,10 +66,14 @@ func loadTables(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mode
 			IsNullable: isNullable == "YES",
 		}
 		if colDefault.Valid {
-			col.DefaultExpr = &colDefault.String
+			defaultStr := colDefault.String
+			col.DefaultExpr = &defaultStr
 		}
 		table.AddColumn(col)
 	}
 
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate table rows: %w", err)
+	}
+	return nil
 }

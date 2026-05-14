@@ -6,39 +6,28 @@ import (
 	"github.com/fred29910/migra-go/internal/model"
 )
 
-// Engine defines the interface for schema diff computation.
-type Engine interface {
-	Diff(source, target *model.Schema) []Operation
-	Warnings() []string
+// DiffEngine defines the interface for schema diff computation.
+type DiffEngine interface {
+	Diff(source, target *model.Schema) ([]Operation, []string)
 }
 
-// Compile-time check: Differ must satisfy Engine.
-var _ Engine = (*Differ)(nil)
+// Compile-time check: Differ must satisfy DiffEngine.
+var _ DiffEngine = (*Differ)(nil)
 
-// Differ performs diff between two schemas
-type Differ struct {
-	lastWarnings []string
-}
+// Differ performs diff between two schemas.
+// Note: Differ is not safe for concurrent use.
+type Differ struct{}
 
 // NewDiffer creates a new Differ
 func NewDiffer() *Differ {
-	return &Differ{
-		lastWarnings: make([]string, 0),
-	}
+	return &Differ{}
 }
 
-func (d *Differ) Warnings() []string {
-	out := make([]string, len(d.lastWarnings))
-	copy(out, d.lastWarnings)
-	return out
-}
-
-// Diff compares two schemas and returns a list of operations
-func (d *Differ) Diff(source, target *model.Schema) []Operation {
+// Diff compares two schemas and returns operations and warnings
+func (d *Differ) Diff(source, target *model.Schema) ([]Operation, []string) {
 	ctx := &diffContext{ops: make([]Operation, 0, 16), warnings: make([]string, 0, 4)}
 	ctx.diffSchemas(source, target)
-	d.lastWarnings = append(d.lastWarnings[:0], ctx.warnings...)
-	return ctx.ops
+	return ctx.ops, ctx.warnings
 }
 
 // diffSchemas compares namespaces in two schemas
@@ -69,8 +58,6 @@ func (c *diffContext) diffSchemas(source, target *model.Schema) {
 
 	for _, name := range sourceNames {
 		if _, exists := target.Schemas[name]; !exists {
-			// Namespace dropped - MVP: skip or handle explicitly
-			_ = source.Schemas[name]
 			c.warnf("namespace drop is not implemented yet (ignored): %s", name)
 		}
 	}
@@ -130,6 +117,13 @@ func (c *diffContext) diffTypes(source, target *model.Namespace) {
 		}
 	}
 
+	// Find types that exist in both
+	for _, name := range targetTypeNames {
+		if sourceType, exists := source.Types[name]; exists {
+			c.diffEnumType(target.Name, name, sourceType, target.Types[name])
+		}
+	}
+
 	// Find types to drop
 	sourceTypeNames := make([]string, 0, len(source.Types))
 	for name := range source.Types {
@@ -148,4 +142,38 @@ func (c *diffContext) diffTypes(source, target *model.Namespace) {
 			})
 		}
 	}
+}
+
+func (c *diffContext) diffEnumType(schema, name string, sourceType, targetType *model.EnumType) {
+	if isEnumAppend(sourceType.Labels, targetType.Labels) {
+		for _, label := range targetType.Labels[len(sourceType.Labels):] {
+			c.addOp(NewAddEnumLabelOp(schema, name, label))
+		}
+	} else if !sameStringSlice(sourceType.Labels, targetType.Labels) {
+		c.warnf("enum %s.%s change is not append-only and is not implemented", schema, name)
+	}
+}
+
+func isEnumAppend(sourceLabels, targetLabels []string) bool {
+	if len(targetLabels) <= len(sourceLabels) {
+		return false
+	}
+	for i, label := range sourceLabels {
+		if targetLabels[i] != label {
+			return false
+		}
+	}
+	return true
+}
+
+func sameStringSlice(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

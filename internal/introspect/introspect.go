@@ -68,6 +68,11 @@ func loadNamespace(ctx context.Context, conn *pgx.Conn, schemaName string) (*mod
 		return nil, fmt.Errorf("failed to load constraints: %w", err)
 	}
 
+	// Load foreign key constraints
+	if err := loadForeignKeys(ctx, conn, schemaName, ns); err != nil {
+		return nil, fmt.Errorf("failed to load foreign keys: %w", err)
+	}
+
 	// Load indexes
 	if err := loadIndexes(ctx, conn, schemaName, ns); err != nil {
 		return nil, fmt.Errorf("failed to load indexes: %w", err)

@@ -19,12 +19,16 @@ const (
 	KindDropConstraint  Kind = "drop_constraint"
 	KindAddEnumType     Kind = "add_enum_type"
 	KindDropEnumType    Kind = "drop_enum_type"
+	KindAddEnumLabel    Kind = "add_enum_label"
+	KindSetDefault      Kind = "set_default"
+	KindDropDefault     Kind = "drop_default"
 )
 
 // Operation is the interface for all diff operations
 type Operation interface {
 	Kind() Kind
 	ObjectKey() model.ObjectKey
+	DependsOn() []model.ObjectKey
 	IsDestructive() bool
 }
 
@@ -40,6 +44,10 @@ func (op *baseOperation) Kind() Kind {
 
 func (op *baseOperation) ObjectKey() model.ObjectKey {
 	return op.objectKey
+}
+
+func (op *baseOperation) DependsOn() []model.ObjectKey {
+	return nil
 }
 
 // AddTableOp represents adding a new table
@@ -60,6 +68,16 @@ func NewAddTableOp(schema, name string, table *model.Table) *AddTableOp {
 
 func (op *AddTableOp) IsDestructive() bool {
 	return false
+}
+
+func (op *AddTableOp) DependsOn() []model.ObjectKey {
+	var deps []model.ObjectKey
+	for _, constraint := range op.Table.Constraints {
+		if constraint.Type == "foreign_key" && constraint.RefTable != "" {
+			deps = append(deps, model.NewObjectKey(constraint.RefSchema, constraint.RefTable, model.KindTable))
+		}
+	}
+	return deps
 }
 
 // DropTableOp represents dropping a table
@@ -108,6 +126,12 @@ func (op *AddColumnOp) IsDestructive() bool {
 	return false
 }
 
+func (op *AddColumnOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
+	}
+}
+
 // AlterColumnTypeOp represents changing a column's data type
 type AlterColumnTypeOp struct {
 	baseOperation
@@ -136,6 +160,12 @@ func (op *AlterColumnTypeOp) IsDestructive() bool {
 	return true
 }
 
+func (op *AlterColumnTypeOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
+	}
+}
+
 // SetNotNullOp represents setting a column to NOT NULL
 type SetNotNullOp struct {
 	baseOperation
@@ -158,6 +188,12 @@ func NewSetNotNullOp(schema, table, column string) *SetNotNullOp {
 
 func (op *SetNotNullOp) IsDestructive() bool {
 	return false
+}
+
+func (op *SetNotNullOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
+	}
 }
 
 // DropNotNullOp represents dropping NOT NULL constraint
@@ -184,6 +220,12 @@ func (op *DropNotNullOp) IsDestructive() bool {
 	return false
 }
 
+func (op *DropNotNullOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
+	}
+}
+
 // CreateIndexOp represents creating a new index
 type CreateIndexOp struct {
 	baseOperation
@@ -204,6 +246,12 @@ func NewCreateIndexOp(schema string, index *model.Index) *CreateIndexOp {
 
 func (op *CreateIndexOp) IsDestructive() bool {
 	return false
+}
+
+func (op *CreateIndexOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Index.Table, model.KindTable),
+	}
 }
 
 // DropIndexOp represents dropping an index
@@ -272,6 +320,128 @@ func (op *DropEnumTypeOp) IsDestructive() bool {
 	return true
 }
 
+// DropColumnOp represents dropping a column
+type DropColumnOp struct {
+	baseOperation
+	Schema string
+	Table  string
+	Column string
+}
+
+func NewDropColumnOp(schema, table, column string) *DropColumnOp {
+	return &DropColumnOp{
+		baseOperation: baseOperation{
+			kind:      KindDropColumn,
+			objectKey: model.NewObjectKey(schema, table+"."+column, model.KindColumn),
+		},
+		Schema: schema,
+		Table:  table,
+		Column: column,
+	}
+}
+
+func (op *DropColumnOp) IsDestructive() bool {
+	return true
+}
+
+func (op *DropColumnOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
+	}
+}
+
+// AddEnumLabelOp represents adding a label to an enum type
+type AddEnumLabelOp struct {
+	baseOperation
+	Schema string
+	Type   string
+	Label  string
+}
+
+func NewAddEnumLabelOp(schema, typeName, label string) *AddEnumLabelOp {
+	return &AddEnumLabelOp{
+		baseOperation: baseOperation{
+			kind:      KindAddEnumLabel,
+			objectKey: model.NewObjectKey(schema, typeName+"."+label, model.KindType),
+		},
+		Schema: schema,
+		Type:   typeName,
+		Label:  label,
+	}
+}
+
+func (op *AddEnumLabelOp) IsDestructive() bool {
+	return false
+}
+
+func (op *AddEnumLabelOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Type, model.KindType),
+	}
+}
+
+// SetDefaultOp represents setting a default expression on a column
+type SetDefaultOp struct {
+	baseOperation
+	Schema      string
+	Table       string
+	Column      string
+	DefaultExpr string
+}
+
+func NewSetDefaultOp(schema, table, column, defaultExpr string) *SetDefaultOp {
+	return &SetDefaultOp{
+		baseOperation: baseOperation{
+			kind:      KindSetDefault,
+			objectKey: model.NewObjectKey(schema, table+"."+column, model.KindColumn),
+		},
+		Schema:      schema,
+		Table:       table,
+		Column:      column,
+		DefaultExpr: defaultExpr,
+	}
+}
+
+func (op *SetDefaultOp) IsDestructive() bool {
+	return false
+}
+
+func (op *SetDefaultOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
+	}
+}
+
+// DropDefaultOp represents dropping a default expression from a column
+type DropDefaultOp struct {
+	baseOperation
+	Schema string
+	Table  string
+	Column string
+}
+
+func NewDropDefaultOp(schema, table, column string) *DropDefaultOp {
+	return &DropDefaultOp{
+		baseOperation: baseOperation{
+			kind:      KindDropDefault,
+			objectKey: model.NewObjectKey(schema, table+"."+column, model.KindColumn),
+		},
+		Schema: schema,
+		Table:  table,
+		Column: column,
+	}
+}
+
+func (op *DropDefaultOp) IsDestructive() bool {
+	return false
+}
+
+func (op *DropDefaultOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
+	}
+}
+
 type AddConstraintOp struct {
 	baseOperation
 	Schema     string
@@ -290,6 +460,14 @@ func NewAddConstraintOp(schema, table string, c *model.Constraint) *AddConstrain
 
 func (op *AddConstraintOp) IsDestructive() bool {
 	return false
+}
+
+func (op *AddConstraintOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
+		// Ensure ADD CONSTRAINT runs after DROP CONSTRAINT for the same constraint
+		model.NewObjectKey(op.Schema, op.Table+"."+op.Constraint.Name, model.KindConstraint),
+	}
 }
 
 type DropConstraintOp struct {

@@ -63,5 +63,8 @@ func loadIndexes(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mod
 		table.Indexes[indexName] = index
 	}
 
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate index rows: %w", err)
+	}
+	return nil
 }

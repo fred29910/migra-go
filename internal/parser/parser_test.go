@@ -1,11 +1,13 @@
 package parser
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/fred29910/migra-go/internal/diff"
 	"github.com/fred29910/migra-go/internal/render"
+	pg_nodes "github.com/lfittl/pg_query_go/nodes"
 )
 
 // TestParseCreateTable tests parsing CREATE TABLE statements
@@ -77,10 +79,51 @@ func TestParseCreateIndex(t *testing.T) {
 	t.Skip("CREATE INDEX not in MVP scope (only CREATE TABLE and ALTER TABLE ADD COLUMN are supported)")
 }
 
-// TestParseCreateEnumType tests parsing CREATE TYPE ... AS ENUM statements
-// MVP 范围不包含 CREATE TYPE，此测试跳过
 func TestParseCreateEnumType(t *testing.T) {
-	t.Skip("CREATE TYPE not in MVP scope (only CREATE TABLE and ALTER TABLE ADD COLUMN are supported)")
+	p := NewParser()
+	schema, err := p.ParseSQL(`CREATE TYPE user_role AS ENUM ('admin', 'user');`)
+	if err != nil {
+		t.Fatalf("ParseSQL failed: %v", err)
+	}
+	enumType := schema.Schemas["public"].Types["user_role"]
+	if enumType == nil {
+		t.Fatal("expected enum type")
+	}
+	if strings.Join(enumType.Labels, ",") != "admin,user" {
+		t.Fatalf("unexpected enum labels: %#v", enumType.Labels)
+	}
+}
+
+func TestParseCreateTablePrimaryKeyAndForeignKey(t *testing.T) {
+	p := NewParser()
+	schema, err := p.ParseSQL(`
+		CREATE TABLE posts (id integer PRIMARY KEY);
+		CREATE TABLE comments (
+			id integer PRIMARY KEY,
+			post_id integer NOT NULL,
+			FOREIGN KEY (post_id) REFERENCES posts(id)
+		);
+	`)
+	if err != nil {
+		t.Fatalf("ParseSQL failed: %v", err)
+	}
+	comments := schema.Schemas["public"].Tables["comments"]
+	if comments.PrimaryKey == nil || strings.Join(comments.PrimaryKey.Columns, ",") != "id" {
+		t.Fatalf("expected comments primary key, got %#v", comments.PrimaryKey)
+	}
+	if comments.ColumnByName["id"].IsNullable {
+		t.Fatal("column-level primary key should make id NOT NULL")
+	}
+	if comments.Constraints["comments_pkey"] == nil {
+		t.Fatal("expected primary key to also be stored as a table constraint")
+	}
+	fk := comments.Constraints["comments_post_id_fkey"]
+	if fk == nil {
+		t.Fatal("expected generated foreign key constraint")
+	}
+	if fk.Type != "foreign_key" || fk.RefSchema != "public" || fk.RefTable != "posts" || strings.Join(fk.RefColumns, ",") != "id" {
+		t.Fatalf("unexpected foreign key: %#v", fk)
+	}
 }
 
 // TestParseAlterTableAddColumn tests parsing ALTER TABLE ADD COLUMN
@@ -162,6 +205,25 @@ func TestParseErrors(t *testing.T) {
 	// Check errors
 	if len(p.Errors()) == 0 {
 		t.Error("expected parsing errors")
+	}
+}
+
+func TestParseSQLReturnsFirstErrorDetail(t *testing.T) {
+	p := NewParser()
+	// 使用能触发 visitNode 错误的 SQL，而非 pg_query 语法错误
+	_, err := p.ParseSQL("SELECT * FROM users;")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	// 错误应包含 "parsing completed with" 和首个错误详情
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "parsing completed with") {
+		t.Errorf("expected error to contain 'parsing completed with', got: %s", errMsg)
+	}
+	// 验证错误包装了首个错误（可通过 Unwrap 提取）
+	unwrapped := errors.Unwrap(err)
+	if unwrapped == nil {
+		t.Errorf("expected error to wrap the first error via Unwrap")
 	}
 }
 
@@ -250,7 +312,7 @@ func TestIntegrationParserToDiff(t *testing.T) {
 
 	// Run diff
 	d := diff.NewDiffer()
-	ops := d.Diff(sourceSchema, targetSchema)
+	ops, _ := d.Diff(sourceSchema, targetSchema)
 
 	if len(ops) == 0 {
 		t.Fatal("expected diff operations, got none")
@@ -265,5 +327,72 @@ func TestIntegrationParserToDiff(t *testing.T) {
 	// Verify SQL contains expected content
 	if !strings.Contains(sql, "ALTER TABLE") {
 		t.Error("expected ALTER TABLE statement in rendered SQL")
+	}
+}
+
+func TestParserInitializationRobustness(t *testing.T) {
+	t.Run("NewParserWith nil dependencies", func(t *testing.T) {
+		p := NewParserWith(nil, nil)
+		_, err := p.ParseSQL("CREATE TABLE t1 (id int);")
+		if err != nil {
+			t.Fatalf("expected NewParserWith(nil, nil) to be functional, got err: %v", err)
+		}
+	})
+
+	t.Run("Parser struct literal lazy initialization", func(t *testing.T) {
+		p := &Parser{} // Naked literal
+		_, err := p.ParseSQL("CREATE TABLE t1 (id int);")
+		if err != nil {
+			t.Fatalf("expected naked Parser literal to be functional via ParseSQL lazy init, got err: %v", err)
+		}
+	})
+}
+
+func TestParseDefaultFunctionExpressionConsistentForCreateAndAlter(t *testing.T) {
+	p := NewParser()
+	schema, err := p.ParseSQL(`
+		CREATE TABLE events (
+			id integer,
+			created_at timestamp DEFAULT now()
+		);
+		ALTER TABLE events ADD COLUMN updated_at timestamp DEFAULT now();
+	`)
+	if err != nil {
+		t.Fatalf("ParseSQL failed: %v", err)
+	}
+
+	table := schema.Schemas["public"].Tables["events"]
+	created := table.ColumnByName["created_at"]
+	updated := table.ColumnByName["updated_at"]
+	if created.DefaultExpr == nil || *created.DefaultExpr != "now()" {
+		t.Fatalf("expected created_at default now(), got %#v", created.DefaultExpr)
+	}
+	if updated.DefaultExpr == nil || *updated.DefaultExpr != "now()" {
+		t.Fatalf("expected updated_at default now(), got %#v", updated.DefaultExpr)
+	}
+}
+
+type panickingHandler struct{}
+
+func (h *panickingHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error) {
+	panic("intentional panic for testing recover")
+}
+
+func TestParser_RecoverFromPanic(t *testing.T) {
+	registry := NewHandlerRegistry()
+	// Map CreateStmt to our panicking handler
+	registry.Register(pg_nodes.CreateStmt{}, &panickingHandler{})
+
+	p := NewParserWith(registry, nil)
+	_, err := p.ParseSQL("CREATE TABLE t1 (id int);")
+
+	if err == nil {
+		t.Fatal("expected error from recovered panic, got nil")
+	}
+	if !strings.Contains(err.Error(), "recovered from panic") {
+		t.Errorf("expected error to mention panic recovery, got: %s", err.Error())
+	}
+	if !strings.Contains(err.Error(), "intentional panic for testing recover") {
+		t.Errorf("expected error to contain panic message, got: %s", err.Error())
 	}
 }

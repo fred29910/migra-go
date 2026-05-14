@@ -22,11 +22,11 @@ func (c *diffContext) diffColumn(schema, table string, source, target *model.Col
 
 	// Check for default expression change
 	if !sameDefault(source.DefaultExpr, target.DefaultExpr) {
-		// MVP: handle default changes as part of alter column
-		// TODO: implement SetDefaultOp and DropDefaultOp
-		_ = source.DefaultExpr
-		_ = target.DefaultExpr
-		c.warnf("column %s.%s.%s default change is not implemented yet (ignored)", schema, table, source.Name)
+		if target.DefaultExpr == nil {
+			c.addOp(NewDropDefaultOp(schema, table, source.Name))
+		} else {
+			c.addOp(NewSetDefaultOp(schema, table, source.Name, *target.DefaultExpr))
+		}
 	}
 }
 

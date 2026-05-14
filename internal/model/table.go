@@ -2,13 +2,14 @@ package model
 
 // Table represents a database table
 type Table struct {
-	Schema       string
-	Name         string
-	Columns      []*Column          // Preserve order for column ordering strategies
-	ColumnByName map[string]*Column `json:"-"` // Index for quick lookup by name, excluded from JSON
-	PrimaryKey   *PrimaryKey
-	Constraints  map[string]*Constraint
-	Indexes      map[string]*Index
+	Schema        string
+	Name          string
+	Columns       []*Column          // Preserve order for column ordering strategies
+	ColumnByName  map[string]*Column `json:"-"` // Index for quick lookup by name, excluded from JSON
+	PrimaryKey    *PrimaryKey
+	Constraints   map[string]*Constraint
+	Indexes       map[string]*Index
+	IsPlaceholder bool `json:"-"` // Internal state for parser-time placeholder tables
 }
 
 // PrimaryKey represents a primary key constraint
@@ -19,30 +20,42 @@ type PrimaryKey struct {
 
 // Index represents a database index
 type Index struct {
-	Name    string
-	Table   string
-	Columns []string
-	Unique  bool
-	Method  string
+	Name         string
+	Table        string
+	Columns      []string    // deprecated: use Elements
+	Elements     []IndexElem // new field replacing Columns
+	Unique       bool
+	Method       string // btree, hash, gin, etc.
+	Primary      bool   // is primary key index
+	IsConstraint bool   // is it for a pkey/unique constraint
+	WhereClause  string // partial index predicate (WHERE clause)
+	Concurrent   bool   // concurrent index build
+	IfNotExists  bool   // IF NOT EXISTS
 }
 
-// Constraint represents a table constraint (check, unique, etc.)
+// Constraint represents a table constraint (check, unique, foreign key, etc.)
 type Constraint struct {
 	Name       string
 	Type       string
 	Definition string
 	Table      string
+	Columns    []string
+	RefSchema  string
+	RefTable   string
+	RefColumns []string
+	Expression string
 }
 
 // NewTable creates a new table with initialized maps
 func NewTable(schema, name string) *Table {
 	return &Table{
-		Schema:       schema,
-		Name:         name,
-		Columns:      make([]*Column, 0),
-		ColumnByName: make(map[string]*Column),
-		Constraints:  make(map[string]*Constraint),
-		Indexes:      make(map[string]*Index),
+		Schema:        schema,
+		Name:          name,
+		Columns:       make([]*Column, 0),
+		ColumnByName:  make(map[string]*Column),
+		Constraints:   make(map[string]*Constraint),
+		Indexes:       make(map[string]*Index),
+		IsPlaceholder: false,
 	}
 }
 
@@ -55,4 +68,15 @@ func (t *Table) GetColumn(name string) *Column {
 func (t *Table) AddColumn(col *Column) {
 	t.Columns = append(t.Columns, col)
 	t.ColumnByName[col.Name] = col
+}
+
+// RemoveColumn removes a column by name from the table
+func (t *Table) RemoveColumn(name string) {
+	delete(t.ColumnByName, name)
+	for i, col := range t.Columns {
+		if col.Name == name {
+			t.Columns = append(t.Columns[:i], t.Columns[i+1:]...)
+			return
+		}
+	}
 }

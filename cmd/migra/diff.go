@@ -4,14 +4,21 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/fred29910/migra-go/internal/app"
-	"github.com/fred29910/migra-go/internal/introspect"
 	"github.com/fred29910/migra-go/internal/model"
-	"github.com/fred29910/migra-go/internal/parser"
+	"github.com/fred29910/migra-go/internal/source"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
+
+// sourceRegistry is the global registry of schema loaders
+var sourceRegistry = func() *source.Registry {
+	reg := source.NewRegistry()
+	reg.Register(&source.DBLoader{})
+	reg.Register(&source.SQLFileLoader{})
+	return reg
+}()
 
 // diffCmd represents the diff command
 var diffCmd = &cobra.Command{
@@ -22,21 +29,30 @@ var diffCmd = &cobra.Command{
 Examples:
   migra diff file.sql postgres://localhost/db
   migra diff postgres://localhost/db1 postgres://localhost/db2
-  migra diff file_a.sql file_b.sql`,
-	Args: cobra.ExactArgs(2),
+  migra diff file_a.sql file_b.sql
+  migra diff file.sql  # target from config database.url
+  migra diff          # both from config database.source and database.target`,
+	Args: cobra.RangeArgs(0, 2),
 	RunE: runDiff,
 }
 
 func init() {
 	rootCmd.AddCommand(diffCmd)
 
-	// Diff-specific flags
-	diffCmd.Flags().StringSliceP("schema", "s", []string{"public"}, "schemas to compare (can be multiple)")
+	// Diff-specific flags（默认值从 viper 读取）
+	diffCmd.Flags().StringSliceP("schema", "s", viper.GetStringSlice("diff.schemas"), "schemas to compare (can be multiple)")
 	diffCmd.Flags().StringP("format", "f", "sql", "output format: sql or json")
-	diffCmd.Flags().Bool("unsafe-drop", false, "allow destructive drop operations")
-	diffCmd.Flags().Bool("strict", false, "fail on unsupported statements")
-	diffCmd.Flags().StringP("output", "o", "", "output file (default: stdout)")
+	diffCmd.Flags().Bool("unsafe-drop", viper.GetBool("diff.unsafe_drop"), "allow destructive drop operations")
+	diffCmd.Flags().Bool("strict", viper.GetBool("diff.strict"), "fail on unsupported statements")
+	diffCmd.Flags().StringP("output", "o", viper.GetString("output.file"), "output file (default: stdout)")
 	diffCmd.Flags().Duration("timeout", defaultDiffTimeout, "timeout for schema loading (e.g. 30s, 2m)")
+
+	// 绑定到 viper
+	_ = viper.BindPFlag("diff.schemas", diffCmd.Flags().Lookup("schema"))
+	_ = viper.BindPFlag("diff.format", diffCmd.Flags().Lookup("format"))
+	_ = viper.BindPFlag("diff.unsafe_drop", diffCmd.Flags().Lookup("unsafe-drop"))
+	_ = viper.BindPFlag("diff.strict", diffCmd.Flags().Lookup("strict"))
+	_ = viper.BindPFlag("output.file", diffCmd.Flags().Lookup("output"))
 }
 
 func runDiff(cmd *cobra.Command, args []string) error {
@@ -54,56 +70,19 @@ func runDiff(cmd *cobra.Command, args []string) error {
 	return writeOutput(out, cfg.OutputFile)
 }
 
-// loadSchemaWithContext loads a schema from either a SQL file or PostgreSQL connection
-func loadSchemaWithContext(ctx context.Context, source string, schemas []string, strict bool) (*model.Schema, error) {
-	if isPostgresURL(source) {
-		return loadFromDB(ctx, source, schemas)
-	}
-	if isSQLFile(source) {
-		return loadFromSQLFile(source, strict)
-	}
-	return nil, fmt.Errorf("unsupported source: %s (must be .sql file or postgres:// URL)", source)
-}
-
-// loadFromDB loads schema from a PostgreSQL database
-func loadFromDB(ctx context.Context, connStr string, schemas []string) (*model.Schema, error) {
-	opt := introspect.LoadOptions{
+// loadSchemaWithContext loads a schema using the source registry
+func loadSchemaWithContext(ctx context.Context, sourceStr string, schemas []string, strict bool) (*model.Schema, error) {
+	opts := source.LoadOptions{
 		Schemas: schemas,
+		Strict:  strict,
 	}
-	schema, err := introspect.LoadFromDB(ctx, connStr, opt)
+	schema, errs, err := sourceRegistry.Load(ctx, sourceStr, opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load schema from database: %w", err)
+		return nil, err
+	}
+	// Log parsing errors if any
+	for _, e := range errs {
+		fmt.Fprintf(os.Stderr, "Warning [%s]: %v\n", sourceStr, e)
 	}
 	return schema, nil
-}
-
-// loadFromSQLFile loads schema from a SQL file
-func loadFromSQLFile(path string, strict bool) (*model.Schema, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s: %w", path, err)
-	}
-
-	p := parser.NewParser()
-	schema, parseErr := p.ParseSQL(string(data))
-	if parseErr != nil && strict {
-		return nil, fmt.Errorf("failed to parse SQL file %s: %w", path, parseErr)
-	}
-
-	// Log errors if any
-	for _, warnErr := range p.Errors() {
-		fmt.Fprintf(os.Stderr, "Warning [%s]: %v\n", path, warnErr)
-	}
-
-	return schema, nil
-}
-
-// isPostgresURL checks if the string is a PostgreSQL connection URL
-func isPostgresURL(s string) bool {
-	return strings.HasPrefix(s, "postgres://") || strings.HasPrefix(s, "pg://")
-}
-
-// isSQLFile checks if the string is a SQL file
-func isSQLFile(s string) bool {
-	return strings.HasSuffix(strings.ToLower(s), ".sql")
 }

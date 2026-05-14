@@ -20,13 +20,13 @@ type PlannedOp struct {
 	Stage Stage
 }
 
-// Engine defines the interface for execution plan creation.
-type Engine interface {
+// PlanEngine defines the interface for execution plan creation.
+type PlanEngine interface {
 	Plan(ops []diff.Operation) map[Stage][]diff.Operation
 }
 
-// Compile-time check: Planner must satisfy Engine.
-var _ Engine = (*Planner)(nil)
+// Compile-time check: Planner must satisfy PlanEngine.
+var _ PlanEngine = (*Planner)(nil)
 
 // Planner creates execution plans from diff operations
 type Planner struct {
@@ -68,11 +68,11 @@ func (p *Planner) assignStage(op diff.Operation) Stage {
 		return StagePreDeploy
 
 	// Deploy: alter existing objects
-	case diff.KindAlterColumnType, diff.KindSetNotNull, diff.KindDropNotNull:
+	case diff.KindAlterColumnType, diff.KindSetNotNull, diff.KindDropNotNull, diff.KindAddEnumLabel, diff.KindSetDefault, diff.KindDropDefault:
 		return StageDeploy
 
 	// Post-deploy: drop objects (dangerous)
-	case diff.KindDropTable, diff.KindDropIndex, diff.KindDropConstraint, diff.KindDropEnumType:
+	case diff.KindDropTable, diff.KindDropColumn, diff.KindDropIndex, diff.KindDropConstraint, diff.KindDropEnumType:
 		if p.unsafeDrops {
 			return StagePostDeploy
 		}

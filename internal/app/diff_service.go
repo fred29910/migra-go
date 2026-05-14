@@ -24,30 +24,30 @@ type Config struct {
 	Timeout    time.Duration
 }
 
-// Service defines the interface for the diff service
-type Service interface {
+// DiffService defines the interface for the diff service
+type DiffService interface {
 	Run(ctx context.Context, cfg Config) (output string, warnings []string, err error)
 }
 
-// RunnerDeps holds injectable dependencies for DiffService
+// RunnerDeps holds injectable dependencies for diffService
 type RunnerDeps struct {
 	LoadSchema func(ctx context.Context, source string, schemas []string, strict bool) (*model.Schema, error)
 	Compute    func(source, target *model.Schema, cfg Config) ([]diff.Operation, []string, error)
 	Render     func(ops []diff.Operation, format string) (string, error)
 }
 
-// DiffService orchestrates the diff pipeline
-type DiffService struct {
+// diffService orchestrates the diff pipeline
+type diffService struct {
 	deps RunnerDeps
 }
 
 // NewDiffService creates a new diff service
-func NewDiffService(deps RunnerDeps) *DiffService {
-	return &DiffService{deps: deps}
+func NewDiffService(deps RunnerDeps) DiffService {
+	return &diffService{deps: deps}
 }
 
 // Run executes the diff pipeline
-func (s *DiffService) Run(parent context.Context, cfg Config) (string, []string, error) {
+func (s *diffService) Run(parent context.Context, cfg Config) (string, []string, error) {
 	ctx, cancel := context.WithTimeout(parent, cfg.Timeout)
 	defer cancel()
 
@@ -73,51 +73,60 @@ func (s *DiffService) Run(parent context.Context, cfg Config) (string, []string,
 	return output, warnings, nil
 }
 
-// ComputeDiff runs the normalize -> diff -> plan pipeline and returns operations and warnings
-func ComputeDiff(source, target *model.Schema, cfg Config) ([]diff.Operation, []string, error) {
-	// Normalize schemas
+// NormalizeSchemas normalizes source and target schemas in place
+func NormalizeSchemas(source, target *model.Schema) error {
 	if err := normalize.CanonicalizeSchema(source); err != nil {
-		return nil, nil, fmt.Errorf("failed to normalize source schema: %w", err)
+		return fmt.Errorf("failed to normalize source schema: %w", err)
 	}
 	if err := normalize.CanonicalizeSchema(target); err != nil {
-		return nil, nil, fmt.Errorf("failed to normalize target schema: %w", err)
+		return fmt.Errorf("failed to normalize target schema: %w", err)
+	}
+	return nil
+}
+
+// FilterDestructiveOps filters operations based on destructive flag
+func FilterDestructiveOps(ops []diff.Operation, unsafeDrop bool) ([]diff.Operation, []string) {
+	if unsafeDrop {
+		return ops, nil
 	}
 
-	// Diff schemas
-	differ := diff.NewDiffer()
-	operations := differ.Diff(source, target)
-	warnings := differ.Warnings()
+	filtered := make([]diff.Operation, 0, len(ops))
+	warnings := make([]string, 0, 4)
 
-	// Report destructive changes
 	destructiveCount := 0
-	for _, op := range operations {
-		if op.IsDestructive() {
+	for _, op := range ops {
+		if !op.IsDestructive() {
+			filtered = append(filtered, op)
+		} else {
 			destructiveCount++
 		}
 	}
+
 	if destructiveCount > 0 {
 		warnings = append(warnings, fmt.Sprintf("%d destructive operation(s) detected!", destructiveCount))
-		for _, op := range operations {
+		for _, op := range ops {
 			if op.IsDestructive() {
 				warnings = append(warnings, fmt.Sprintf("  - %s: %s (destructive)", op.Kind(), op.ObjectKey()))
 			}
 		}
-		if !cfg.UnsafeDrop {
-			warnings = append(warnings, "Use --unsafe-drop to include destructive DROP operations in output")
-		}
+		warnings = append(warnings, "Use --unsafe-drop to include destructive DROP operations in output")
 	}
 
-	// Plan execution
-	planner := plan.NewPlanner(cfg.UnsafeDrop)
-	stages := planner.Plan(operations)
+	return filtered, warnings
+}
 
-	// Build execution list with deterministic stage order and topo sorting
+// BuildExecutionPlan creates an ordered execution plan from operations
+func BuildExecutionPlan(ops []diff.Operation, unsafeDrop bool) ([]diff.Operation, error) {
+	planner := plan.NewPlanner(unsafeDrop)
+	stages := planner.Plan(ops)
+
 	stageOrder := []plan.Stage{
 		plan.StagePreDeploy,
 		plan.StageDeploy,
 		plan.StagePostDeploy,
 	}
-	var allOps []diff.Operation
+
+	allOps := make([]diff.Operation, 0, len(ops))
 	for _, stage := range stageOrder {
 		stageOps := stages[stage]
 		if len(stageOps) == 0 {
@@ -125,12 +134,32 @@ func ComputeDiff(source, target *model.Schema, cfg Config) ([]diff.Operation, []
 		}
 		sortedStageOps, err := plan.TopoSort(stageOps)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to topologically sort %s operations: %w", stage, err)
+			return nil, fmt.Errorf("failed to topologically sort %s operations: %w", stage, err)
 		}
 		allOps = append(allOps, sortedStageOps...)
 	}
 
-	return allOps, warnings, nil
+	return allOps, nil
+}
+
+// ComputeDiff runs the normalize -> diff -> plan pipeline and returns operations and warnings
+func ComputeDiff(source, target *model.Schema, cfg Config) ([]diff.Operation, []string, error) {
+	if err := NormalizeSchemas(source, target); err != nil {
+		return nil, nil, err
+	}
+
+	differ := diff.NewDiffer()
+	operations, warnings := differ.Diff(source, target)
+
+	filteredOps, filterWarnings := FilterDestructiveOps(operations, cfg.UnsafeDrop)
+	warnings = append(warnings, filterWarnings...)
+
+	sortedOps, err := BuildExecutionPlan(filteredOps, cfg.UnsafeDrop)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return sortedOps, warnings, nil
 }
 
 // RenderOutput renders operations to the specified format

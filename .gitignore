@@ -49,3 +49,6 @@ temp/
 
 # OS files
 Thumbs.db
+migra.yaml
+.cache
+.sisyphus/

@@ -3,6 +3,7 @@ package render
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/fred29910/migra-go/internal/diff"
@@ -84,10 +85,14 @@ func (r *Renderer) Render(op diff.Operation) string {
 	case *diff.DropIndexOp:
 		return r.renderDropIndex(v)
 	case *diff.AddConstraintOp:
+		definition := renderConstraintDefinition(v.Constraint)
+		if definition == "" {
+			return ""
+		}
 		return fmt.Sprintf("-- op: add_constraint risk:medium\nALTER TABLE %s ADD CONSTRAINT %s %s;",
 			quoteQualifiedIdentifier(v.Schema, v.Table),
 			quoteIdentifier(v.Constraint.Name),
-			v.Constraint.Definition,
+			definition,
 		)
 	case *diff.DropConstraintOp:
 		return fmt.Sprintf("-- op: drop_constraint risk:medium\nALTER TABLE %s DROP CONSTRAINT %s%s;",
@@ -99,14 +104,41 @@ func (r *Renderer) Render(op diff.Operation) string {
 		return r.renderAddEnumType(v)
 	case *diff.DropEnumTypeOp:
 		return r.renderDropEnumType(v)
+	case *diff.AddEnumLabelOp:
+		return fmt.Sprintf("-- op: add_enum_label risk:low\nALTER TYPE %s ADD VALUE %s;",
+			quoteQualifiedIdentifier(v.Schema, v.Type),
+			quoteString(v.Label),
+		)
+	case *diff.SetDefaultOp:
+		return fmt.Sprintf("-- op: set_default risk:low\nALTER TABLE %s ALTER COLUMN %s SET DEFAULT %s;",
+			quoteQualifiedIdentifier(v.Schema, v.Table),
+			quoteIdentifier(v.Column),
+			v.DefaultExpr,
+		)
+	case *diff.DropDefaultOp:
+		return fmt.Sprintf("-- op: drop_default risk:low\nALTER TABLE %s ALTER COLUMN %s DROP DEFAULT;",
+			quoteQualifiedIdentifier(v.Schema, v.Table),
+			quoteIdentifier(v.Column),
+		)
+	case *diff.DropColumnOp:
+		return fmt.Sprintf("-- op: drop_column risk:high\nALTER TABLE %s DROP COLUMN IF EXISTS %s;",
+			quoteQualifiedIdentifier(v.Schema, v.Table),
+			quoteIdentifier(v.Column),
+		)
 	default:
 		return fmt.Sprintf("-- Unknown operation: %T", op)
 	}
 }
 
+// RenderSingle renders a single operation to SQL string
+// Used by push command for interactive confirmation
+func (r *Renderer) RenderSingle(op diff.Operation) string {
+	return r.Render(op)
+}
+
 func (r *Renderer) renderAddTable(op *diff.AddTableOp) string {
 	table := op.Table
-	columns := make([]string, 0)
+	lines := make([]string, 0)
 
 	for _, col := range table.Columns {
 		colDef := fmt.Sprintf("    %s %s", quoteIdentifier(col.Name), col.DataType)
@@ -116,14 +148,40 @@ func (r *Renderer) renderAddTable(op *diff.AddTableOp) string {
 		if col.DefaultExpr != nil {
 			colDef += fmt.Sprintf(" DEFAULT %s", *col.DefaultExpr)
 		}
-		columns = append(columns, colDef)
+		lines = append(lines, colDef)
 	}
 
-	// TODO: Add primary key, constraints
+	if table.PrimaryKey != nil {
+		pk := &model.Constraint{
+			Name:    table.PrimaryKey.Name,
+			Type:    "primary_key",
+			Columns: table.PrimaryKey.Columns,
+		}
+		if rendered := renderConstraint(pk); rendered != "" {
+			lines = append(lines, "    "+rendered)
+		}
+	}
+
+	if len(table.Constraints) > 0 {
+		names := make([]string, 0, len(table.Constraints))
+		for name := range table.Constraints {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			c := table.Constraints[name]
+			if table.PrimaryKey != nil && c.Name == table.PrimaryKey.Name {
+				continue
+			}
+			if rendered := renderConstraint(c); rendered != "" {
+				lines = append(lines, "    "+rendered)
+			}
+		}
+	}
 
 	sql := fmt.Sprintf("-- op: add_table risk:low\nCREATE TABLE %s (\n%s\n);",
 		quoteQualifiedIdentifier(table.Schema, table.Name),
-		strings.Join(columns, ",\n"))
+		strings.Join(lines, ",\n"))
 	return sql
 }
 
@@ -174,9 +232,25 @@ func (r *Renderer) renderCreateIndex(op *diff.CreateIndexOp) string {
 	if idx.Unique {
 		unique = "UNIQUE "
 	}
-	columns := strings.Join(idx.Columns, ", ")
+	// Build column list from Elements, fallback to Columns for backward compatibility
+	quotedItems := make([]string, 0, len(idx.Elements))
+	if len(idx.Elements) > 0 {
+		for _, elem := range idx.Elements {
+			if elem.Name != "" {
+				quotedItems = append(quotedItems, quoteIdentifier(elem.Name))
+			} else if elem.Expr != "" {
+				quotedItems = append(quotedItems, "("+elem.Expr+")")
+			}
+		}
+	} else if len(idx.Columns) > 0 {
+		// Backward compatibility
+		for _, c := range idx.Columns {
+			quotedItems = append(quotedItems, quoteIdentifier(c))
+		}
+	}
+	items := strings.Join(quotedItems, ", ")
 	return fmt.Sprintf("-- op: add_index risk:low\nCREATE %sINDEX %s ON %s (%s);",
-		unique, quoteQualifiedIdentifier(op.Schema, idx.Name), quoteQualifiedIdentifier(op.Schema, idx.Table), columns)
+		unique, quoteIdentifier(idx.Name), quoteQualifiedIdentifier(op.Schema, idx.Table), items)
 }
 
 func (r *Renderer) renderDropIndex(op *diff.DropIndexOp) string {
@@ -200,6 +274,50 @@ func (r *Renderer) renderDropEnumType(op *diff.DropEnumTypeOp) string {
 }
 
 // Helper functions
+
+func quoteIdentifierList(items []string) string {
+	quoted := make([]string, len(items))
+	for i, item := range items {
+		quoted[i] = quoteIdentifier(item)
+	}
+	return strings.Join(quoted, ", ")
+}
+
+func renderConstraint(c *model.Constraint) string {
+	if c == nil {
+		return ""
+	}
+	definition := renderConstraintDefinition(c)
+	if definition == "" {
+		return ""
+	}
+	return fmt.Sprintf("CONSTRAINT %s %s", quoteIdentifier(c.Name), definition)
+}
+
+func renderConstraintDefinition(c *model.Constraint) string {
+	if c == nil {
+		return ""
+	}
+	switch c.Type {
+	case "primary_key":
+		return fmt.Sprintf("PRIMARY KEY (%s)", quoteIdentifierList(c.Columns))
+	case "foreign_key":
+		return fmt.Sprintf("FOREIGN KEY (%s) REFERENCES %s (%s)",
+			quoteIdentifierList(c.Columns),
+			quoteQualifiedIdentifier(c.RefSchema, c.RefTable),
+			quoteIdentifierList(c.RefColumns),
+		)
+	case "check":
+		if c.Expression != "" {
+			return fmt.Sprintf("CHECK (%s)", c.Expression)
+		}
+		return ""
+	}
+	if c.Definition != "" {
+		return c.Definition
+	}
+	return ""
+}
 
 func quoteIdentifier(id string) string {
 	// Always quote to be safe with reserved words
