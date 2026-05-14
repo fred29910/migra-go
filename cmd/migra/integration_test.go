@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -232,4 +234,104 @@ func TestFullPipeline(t *testing.T) {
 	// This is a placeholder for a more complete test
 	t.Log("Full pipeline test - placeholder for more comprehensive tests")
 	fmt.Println("Integration tests completed successfully!")
+}
+
+func TestDirectoryVsDirectory_Diff(t *testing.T) {
+	sourceDir := t.TempDir()
+	sourceSQL := `CREATE TABLE users (
+		id SERIAL PRIMARY KEY,
+		username VARCHAR(50) NOT NULL
+	);
+	CREATE TABLE posts (
+		id SERIAL PRIMARY KEY,
+		user_id INTEGER NOT NULL,
+		title VARCHAR(200) NOT NULL
+	);
+	CREATE TYPE user_role AS ENUM ('admin', 'user');`
+
+	if err := os.WriteFile(filepath.Join(sourceDir, "schema.sql"), []byte(sourceSQL), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	targetDir := t.TempDir()
+	targetSQL := `CREATE TABLE users (
+		id SERIAL PRIMARY KEY,
+		username VARCHAR(50) NOT NULL,
+		age INTEGER
+	);
+	CREATE TABLE posts (
+		id SERIAL PRIMARY KEY,
+		user_id INTEGER NOT NULL,
+		title VARCHAR(200) NOT NULL
+	);
+	CREATE TABLE comments (
+		id SERIAL PRIMARY KEY,
+		post_id INTEGER NOT NULL,
+		content TEXT NOT NULL
+	);
+	CREATE TYPE user_role AS ENUM ('admin', 'user', 'guest');`
+
+	if err := os.WriteFile(filepath.Join(targetDir, "schema.sql"), []byte(targetSQL), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+		Source:     sourceDir,
+		Target:     targetDir,
+		Schemas:    []string{"public"},
+		Format:     "sql",
+		Timeout:    defaultDiffTimeout,
+		UnsafeDrop: false,
+	})
+	if err != nil {
+		t.Fatalf("diff service failed: %v", err)
+	}
+
+	for _, want := range []string{
+		`ADD COLUMN "age"`,
+		`CREATE TABLE "public"."comments"`,
+		`ALTER TYPE "public"."user_role" ADD VALUE 'guest'`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestDirectoryVsFile_Diff(t *testing.T) {
+	sourceDir := t.TempDir()
+	sourceSQL := `CREATE TABLE users (
+		id SERIAL PRIMARY KEY,
+		username VARCHAR(50) NOT NULL
+	);`
+	if err := os.WriteFile(filepath.Join(sourceDir, "users.sql"), []byte(sourceSQL), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	targetDir := t.TempDir()
+	targetSQL := `CREATE TABLE users (
+		id SERIAL PRIMARY KEY,
+		username VARCHAR(50) NOT NULL,
+		email VARCHAR(100)
+	);`
+	targetFile := filepath.Join(targetDir, "schema.sql")
+	if err := os.WriteFile(targetFile, []byte(targetSQL), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+		Source:     sourceDir,
+		Target:     targetFile,
+		Schemas:    []string{"public"},
+		Format:     "sql",
+		Timeout:    defaultDiffTimeout,
+		UnsafeDrop: false,
+	})
+	if err != nil {
+		t.Fatalf("diff service failed: %v", err)
+	}
+
+	if !strings.Contains(out, `ADD COLUMN "email"`) {
+		t.Fatalf("expected output to contain ADD COLUMN email, got:\n%s", out)
+	}
 }
