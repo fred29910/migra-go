@@ -101,10 +101,21 @@ func (l *DirectoryLoader) Load(ctx context.Context, source string, opt LoadOptio
 ### 4.2 Registry 匹配顺序
 
 ```
-DBLoader → SQLFileLoader → DirectoryLoader（兜底）
+DBLoader → DirectoryLoader → SQLFileLoader
 ```
 
-`DirectoryLoader` 最后注册，作为兜底 loader。当 `DBLoader`（匹配 `postgres://`）和 `SQLFileLoader`（匹配 `.sql` / `file://`）都不匹配时，`DirectoryLoader` 检查路径是否为目录。
+`DirectoryLoader` 在 `SQLFileLoader` 之前注册，通过 `os.Stat().IsDir()` 判断路径是否为目录，确保以下场景正确路由：
+
+| 输入路径 | 匹配 loader | 原因 |
+|---------|------------|------|
+| `postgres://...` | DBLoader | DBLoader 优先匹配 |
+| `./schemas/v1/` | DirectoryLoader | os.Stat 判断为目录 |
+| `file:///path/to/dir/` | DirectoryLoader | strip `file://` 后 os.Stat 判断为目录 |
+| `./schemas/v1.sql/` | DirectoryLoader | os.Stat 判断为目录（此前会被 SQLFileLoader 误匹配） |
+| `file.sql` | SQLFileLoader | DirectoryLoader 判断非目录 |
+| `file:///path/to/file.sql` | SQLFileLoader | DirectoryLoader strip `file://` 后判断非目录 |
+
+**注意：** 目录名若以 `.sql` 结尾（例如 `./schemas/v1.sql/`），`SQLFileLoader` 不会误匹配，因为 `DirectoryLoader` 先通过 `os.Stat` 判断为目录。这是已知的预期行为，生产环境中仍建议避免此类命名以减少混淆。
 
 ### 4.3 注册
 
@@ -136,22 +147,30 @@ dir_a/
 
 ```
 merged = new Schema()
+seenTables = {}    // map[namespace.table] → file path
+seenEnums = {}     // map[namespace.enum] → file path
+
 for each sorted .sql file:
-    schema_i, parseErr = SQLFileLoader.Load(file)
+    schema_i, parseErr = SQLFileLoader.Load(file, strict=true)  // 始终使用 strict 模式
     if parseErr != nil:
         return fatal error  // 任一文件失败则整个目录加载失败
-    for each namespace in schema_i:
-        if namespace not in merged:
-            merged.AddNamespace(namespace)
-        else:
-            for each table in namespace:
-                if table exists in merged:
-                    return fatal error: "duplicate table 'X' in file Y (first in Z)"
-                merged.PutTable(table)
-            for each enum in namespace:
-                if enum exists in merged:
-                    return fatal error: "duplicate enum 'X' in file Y (first in Z)"
-                merged.PutEnum(enum)
+
+    for each (nsName, ns) in schema_i.Schemas:
+        mergedNs = merged.GetOrCreateNamespace(nsName)
+
+        for each (tableName, table) in ns.Tables:
+            key = nsName + "." + tableName
+            if key in seenTables:
+                return fatal error: "duplicate table 'tableName' in file (first in seenTables[key])"
+            seenTables[key] = file
+            mergedNs.Tables[tableName] = table
+
+        for each (typeName, enum) in ns.Types:
+            key = nsName + "." + typeName
+            if key in seenEnums:
+                return fatal error: "duplicate enum 'typeName' in file (first in seenEnums[key])"
+            seenEnums[key] = file
+            mergedNs.Types[typeName] = enum
 ```
 
 **关键规则：**
@@ -164,9 +183,18 @@ for each sorted .sql file:
 |------|------|
 | 路径不存在 | fatal error: "directory not found: %s" |
 | 路径不是目录 | `Match()` 返回 false，Registry 不会选中此 loader |
-| 目录为空（无 .sql 文件） | 返回空 schema + warning |
+| 目录为空（无 .sql 文件） | 返回空 schema + warning（`[]error: "no .sql files found"`） |
 | 某个 .sql 文件解析失败 | fatal error，整个目录加载失败 |
 | 同名 table/enum 冲突 | fatal error，包含冲突对象名和文件路径 |
+
+### 与 SQLFileLoader 的行为差异
+
+| 场景 | SQLFileLoader | DirectoryLoader |
+|------|--------------|-----------------|
+| .sql 文件解析失败（非 strict 模式） | 返回 warning + 部分 schema | fatal error（始终使用 `Strict: true`） |
+| 空文件/空字符串 | 返回空 schema | （同 SQLFileLoader） |
+
+**设计理由：** DirectoryLoader 合并多个文件构建完整 schema，其中任何一个文件失败都会导致 schema 不完整。因此即使调用方传入非 strict 模式，DirectoryLoader 内部也始终使用 `Strict: true`。
 
 ## 8. 测试策略
 

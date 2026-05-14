@@ -1,0 +1,1 @@
+CREATE TABLE nope (id INTEGER);

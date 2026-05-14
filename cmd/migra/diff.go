@@ -16,8 +16,8 @@ import (
 var sourceRegistry = func() *source.Registry {
 	reg := source.NewRegistry()
 	reg.Register(&source.DBLoader{})
-	reg.Register(&source.SQLFileLoader{})
 	reg.Register(&source.DirectoryLoader{})
+	reg.Register(&source.SQLFileLoader{})
 	return reg
 }()
 
