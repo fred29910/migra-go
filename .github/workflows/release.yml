@@ -23,6 +23,17 @@ jobs:
           make build
           chmod +x migra
 
+      - name: Generate SHA256 checksum
+        run: |
+          shasum -a 256 migra > migra.sha256
+
+      - name: Generate SBOM
+        run: |
+          # 安装 Syft
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          # 生成 SPDX 格式的 SBOM
+          syft packages migra -o spdx-json > migra-sbom.spdx.json
+
       - name: Run integration tests (with DB)
         run: go test ./... -v
         env:
@@ -32,7 +43,10 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: migra
+          files: |
+            migra
+            migra.sha256
+            migra-sbom.spdx.json
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
