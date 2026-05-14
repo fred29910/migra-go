@@ -7,12 +7,5 @@
   "instructions": [
     "AGENTS.md",
     ".opencode/CONVENTIONS.md"
-  ],
-  "permission": {
-    "skill": { "*": "allow" }
-  },
-  "agent": {
-    "build": { "disable": true },
-    "plan": { "disable": true }
-  }
+  ]
 }
