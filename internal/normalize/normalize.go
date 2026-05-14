@@ -1,6 +1,7 @@
 package normalize
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/fred29910/migra-go/internal/model"
@@ -72,9 +73,21 @@ func canonicalizeConstraintInPlace(c *model.Constraint) {
 
 func canonicalizeIndexInPlace(idx *model.Index) {
 	idx.Name = normalizeIdentifier(idx.Name)
+	// DB introspect populates Columns but not Elements; SQL file parser populates Elements.
+	// Unify them so sameIndexContent comparison is correct and push is idempotent.
+	if len(idx.Elements) == 0 && len(idx.Columns) > 0 {
+		idx.Elements = make([]model.IndexElem, len(idx.Columns))
+		for i, col := range idx.Columns {
+			idx.Elements[i] = model.IndexElem{
+				Name:          col,
+				Ordering:      "default",
+				NullsOrdering: "default",
+			}
+		}
+	}
 }
 
-// typeAliases maps type aliases to canonical names
+// typeAliases maps type aliases to canonical names (exact matches only, no length suffix)
 var typeAliases = map[string]string{
 	"int4":                        "integer",
 	"int8":                        "bigint",
@@ -85,14 +98,23 @@ var typeAliases = map[string]string{
 	"timestamp with time zone":    "timestamptz",
 }
 
+var charVaryingWithLenRe = regexp.MustCompile(`(?i)^character varying\((\d+)\)$`)
+var typeCastRe = regexp.MustCompile(`::[\w\s]+$`)
+var nestedTypeCastRe = regexp.MustCompile(`'([^']*)'::[\w\s]+`)
+
 // normalizeDataType normalizes type aliases to canonical names
 func normalizeDataType(dt string) string {
-	dt = strings.ToLower(strings.TrimSpace(dt))
+	dt = strings.TrimSpace(dt)
+	lower := strings.ToLower(dt)
 
-	if canonical, ok := typeAliases[dt]; ok {
+	if m := charVaryingWithLenRe.FindStringSubmatch(lower); m != nil {
+		return "varchar(" + m[1] + ")"
+	}
+
+	if canonical, ok := typeAliases[lower]; ok {
 		return canonical
 	}
-	return dt
+	return lower
 }
 
 // normalizeIdentifier normalizes quoted/unquoted identifiers
@@ -109,16 +131,24 @@ func normalizeIdentifier(id string) string {
 
 // normalizeDefaultExpr normalizes default value expressions
 func normalizeDefaultExpr(expr string) string {
-	// Remove unnecessary parentheses
 	expr = strings.TrimSpace(expr)
 	for len(expr) >= 2 && expr[0] == '(' && expr[len(expr)-1] == ')' {
-		// Check if parentheses are redundant (not a subquery)
 		if !isBalancedParens(expr[1 : len(expr)-1]) {
 			break
 		}
 		expr = strings.TrimSpace(expr[1 : len(expr)-1])
 	}
-	return expr
+
+	expr = nestedTypeCastRe.ReplaceAllStringFunc(expr, func(m string) string {
+		sub := nestedTypeCastRe.FindStringSubmatch(m)
+		if len(sub) > 1 {
+			return "'" + sub[1] + "'"
+		}
+		return m
+	})
+
+	expr = typeCastRe.ReplaceAllString(expr, "")
+	return strings.TrimSpace(expr)
 }
 
 // normalizeConstraintDef normalizes constraint definitions

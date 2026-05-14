@@ -51,3 +51,4 @@ temp/
 Thumbs.db
 migra.yaml
 .cache
+.sisyphus/

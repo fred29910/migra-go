@@ -46,6 +46,12 @@ func parseDiffConfig(cmd *cobra.Command, args []string) (app.Config, error) {
 	if err != nil {
 		return app.Config{}, fmt.Errorf("failed to get format flag: %w", err)
 	}
+	if format == "" {
+		format = viper.GetString("diff.format")
+	}
+	if format == "" {
+		format = "sql"
+	}
 	unsafeDrop, err := cmd.Flags().GetBool("unsafe-drop")
 	if err != nil {
 		return app.Config{}, fmt.Errorf("failed to get unsafe-drop flag: %w", err)

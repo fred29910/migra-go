@@ -148,17 +148,31 @@ func runPush(cmd *cobra.Command, args []string) error {
 		Target:     cfg.Target,
 		Schemas:    cfg.Schemas,
 		Format:     "sql",
-		UnsafeDrop: cfg.UnsafeDrop,
+		UnsafeDrop: true, // Show all ops (including destructive) in preview
 		Timeout:    cfg.Timeout,
 	}
-
-	ops, warnings, err := app.ComputeDiff(targetSchema, sourceSchema, appCfg)
+	ops, _, err := app.ComputeDiff(targetSchema, sourceSchema, appCfg)
 	if err != nil {
 		return err
 	}
 
-	for _, w := range warnings {
-		fmt.Fprintf(os.Stderr, "Warning: %s\n", w)
+	// Warn about destructive ops when user hasn't opted in
+	if !cfg.UnsafeDrop {
+		destructiveCount := 0
+		for _, op := range ops {
+			if op.IsDestructive() {
+				destructiveCount++
+			}
+		}
+		if destructiveCount > 0 {
+			fmt.Fprintf(os.Stderr, "Warning: %d destructive operation(s) detected!\n", destructiveCount)
+			for _, op := range ops {
+				if op.IsDestructive() {
+					fmt.Fprintf(os.Stderr, "  - %s: %s (destructive)\n", op.Kind(), op.ObjectKey())
+				}
+			}
+			fmt.Fprintf(os.Stderr, "Use --unsafe-drop to include destructive DROP operations\n\n")
+		}
 	}
 
 	if len(ops) == 0 {
@@ -233,6 +247,10 @@ next:
 		}
 
 		if autoMode {
+			if isDestructive && !cfg.UnsafeDrop {
+				fmt.Printf("SQL #%d skipped (destructive) \u2014 use --unsafe-drop to execute\n", i+1)
+				continue next
+			}
 			if err := execSQL(tx, ctx, sql, i+1); err != nil {
 				fmt.Println("Rolling back transaction...")
 				_ = tx.Rollback(ctx)
@@ -297,9 +315,12 @@ next:
 		if err != nil {
 			fmt.Printf("Warning: failed to load target schema for verification: %v\n", err)
 		} else {
-			differ := diff.NewDiffer()
-			remainOps, _ := differ.Diff(newTargetSchema, sourceSchema)
-			if len(remainOps) > 0 {
+			remainOps, _, err := app.ComputeDiff(newTargetSchema, sourceSchema, app.Config{
+				UnsafeDrop: true, // Check all ops including destructive for honest validation
+			})
+			if err != nil {
+				fmt.Printf("Warning: failed to compute validation diff: %v\n", err)
+			} else if len(remainOps) > 0 {
 				fmt.Printf("Warning: %d operations still pending after migration:\n", len(remainOps))
 				for _, op := range remainOps {
 					fmt.Printf("  - %s: %s\n", op.Kind(), op.ObjectKey())

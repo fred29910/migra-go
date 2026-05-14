@@ -1,8 +1,8 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "default_agent": "arch-master",
   "plugin": [
-    "superpowers@git+https://github.com/jnMetaCode/superpowers-zh.git"
+    "superpowers@git+https://github.com/jnMetaCode/superpowers-zh.git",
+    "oh-my-openagent@latest"
   ],
   "instructions": [
     "AGENTS.md",

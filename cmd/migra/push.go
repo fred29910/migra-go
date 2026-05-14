@@ -24,7 +24,7 @@ func init() {
 
 	pushCmd.Flags().StringSliceP("schema", "s", viper.GetStringSlice("diff.schemas"), "schemas to compare (can be multiple)")
 	pushCmd.Flags().Bool("unsafe-drop", viper.GetBool("diff.unsafe_drop"), "skip confirmation for destructive DROP operations")
-	pushCmd.Flags().Bool("dry-run", true, "show SQL without executing (default: true)")
+	pushCmd.Flags().Bool("dry-run", false, "show SQL without executing (default: false)")
 	pushCmd.Flags().Bool("execute", false, "execute SQL without confirmation (not recommended)")
 	pushCmd.Flags().Bool("no-verify", false, "skip post-execution validation")
 	pushCmd.Flags().Duration("timeout", defaultDiffTimeout, "timeout for schema loading")
