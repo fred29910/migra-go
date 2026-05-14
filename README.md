@@ -1,7 +1,7 @@
 # MIGRA-Go
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/fred29910/migra-go)](https://goreportcard.com/report/github.com/fred29910/migra-go)
-[![CI](https://github.com/fred29910/migra-go/actions/workflows/test.yml/badge.svg)](https://github.com/fred29910/migra-go/actions/workflows/test.yml)
+[![Test](https://github.com/fred29910/migra-go/actions/workflows/test.yml/badge.svg)](https://github.com/fred29910/migra-go/actions/workflows/test.yml)
 [![Lint](https://github.com/fred29910/migra-go/actions/workflows/lint.yml/badge.svg)](https://github.com/fred29910/migra-go/actions/workflows/lint.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -9,17 +9,19 @@
 
 ## 功能特性
 
-- 🔍 **双向 Diff**：比较 SQL 文件、PostgreSQL 实例或两者之间的差异。
-- 🏗️ **结构化模型**：使用中间 SchemaModel 表示数据库结构，支持表、列、主键、索引、枚举类型和约束。
+- 🔍 **多源比较**：支持 SQL 文件、PostgreSQL 实例任意组合的双向对比。
+- 🏗️ **结构化模型**：基于中间 SchemaModel 表示数据库结构，涵盖表、列、主键、索引、约束（外键/唯一/检查）和枚举类型。
 - 📋 **SQL 生成与执行**：输出可执行的迁移 SQL，并支持 `push` 命令将变更直接应用到目标数据库。
 - 🛡️ **交互式安全执行**：`push` 命令提供逐条确认、危险操作中断、事务保护与自动回滚。
-- 🛡️ **安全保护**：标记破坏性操作（DROP），默认抛出告警提示，可选跳过危险变更（`--unsafe-drop`）。
-- 🎯 **语义归一化**：减少因同义表达导致的误报。
-- 🚀 **高性能**：基于 Kahn 算法实现的 DAG（有向无环图）拓扑排序，保证生成脚本的执行顺序确定且高效。
-- ⚙️ **三阶段执行计划**：自动将操作分为 pre-deploy（创建）、deploy（修改）、post-deploy（删除）三个阶段。
+- 🛡️ **安全保护**：DROP 操作默认拦截告警，可选 `--unsafe-drop` 放行。
+- 🎯 **语义归一化**：同义类型名（如 `int4` → `integer`）自动映射，减少误报。
+- 🚀 **DAG 拓扑排序**：基于 Kahn 算法对有向无环图进行排序，保证执行顺序正确且高效（外键依赖先创建、后删除）。
+- ⚙️ **三阶段执行计划**：自动将操作分为 Pre-deploy（创建）、Deploy（修改）、Post-deploy（删除）三个阶段。
 - 🔧 **可扩展解析器**：基于 HandlerRegistry + 访问者模式的 OCP 设计，新增 DDL 类型只需实现 Handler + Mutation 并注册。
+- 🧩 **丰富的差异检测**：支持表、列、类型、默认值、非空约束、索引内容、约束（主键/外键/唯一/检查）的全量对比。
 - 📊 **多格式输出**：支持 SQL 和 JSON 两种输出格式。
 - ⏱️ **超时控制**：支持 `--timeout` 参数控制 Schema 加载超时时间。
+- 🔌 **多种连接方式**：支持连接字符串、环境变量、`pg_service.conf`、`.pgpass` 等 PostgreSQL 标准连接方式。
 
 ## 快速开始
 
@@ -57,16 +59,26 @@ migra diff --format json file_a.sql file_b.sql
 # 启用危险 DROP 操作输出
 migra diff --unsafe-drop file_a.sql file_b.sql
 
-# 将 schema 变更应用到目标数据库（交互式确认）
+# 从配置文件读取源和目标（需设置 database.source / database.target）
+migra diff
+migra diff file.sql  # 目标从 database.url 读取
+```
+
+### push 命令
+
+将 Schema 变更应用到目标数据库（需要两个参数）：
+
+```bash
+# 将 SQL 文件中的 Schema 变更应用到数据库
 migra push file.sql postgres://localhost/db
 
 # 比较两个数据库，将差异应用到目标库
 migra push postgres://localhost/db1 postgres://localhost/db2
 
-# 预览模式（默认）：显示 diff SQL 但不执行
+# 预览模式：显示 Diff SQL 但不执行
 migra push --dry-run file.sql postgres://localhost/db
 
-# 指定多个 schema 进行推送
+# 指定多个 Schema 进行推送
 migra push --schema public --schema auth file.sql postgres://localhost/db
 
 # 跳过危险操作确认（自动允许 DROP）
@@ -84,7 +96,7 @@ migra push --timeout 2m file.sql postgres://localhost/db
 
 ### push 交互流程
 
-`migra push` 默认以 dry-run 模式运行，仅预览 SQL 变更。添加 `--execute` 后进入交互执行模式：
+`migra push` 默认进入交互模式，逐条确认后执行。使用 `--dry-run` 仅预览不执行，`--execute` 跳过确认直接执行。
 
 ```
 $ migra push --execute file.sql postgres://localhost/db
@@ -136,7 +148,7 @@ Validation passed: target schema matches expected state
 | `--strict` | diff | 遇到不支持的语句时直接失败退出 | `false` |
 | `--timeout` | diff, push | Schema 加载超时时间（如 `30s`, `2m`） | `30s` |
 | `-o, --output` | diff | 输出到文件（默认输出到 stdout） | - |
-| `--dry-run` | push | 显示 SQL 预览但不执行 | `true` |
+| `--dry-run` | push | 显示 SQL 预览但不执行 | `false` |
 | `--execute` | push | 跳过交互确认直接执行（不推荐） | `false` |
 | `--no-verify` | push | 跳过执行后校验 | `false` |
 | `-c, --config` | 全局 | 指定配置文件路径 | `~/.migra.yaml` 或 `./migra.yaml` |
@@ -159,13 +171,26 @@ cp examples/config.yaml ./migra.yaml
 
 **环境变量**（可选）：
 使用 `MIGRA_` 前缀的环境变量（通过 viper.SetEnvPrefix 自动绑定）：
+
 ```bash
 export MIGRA_DATABASE_URL="postgres://user:password@localhost:5432/dbname"
 export MIGRA_DIFF_SCHEMAS="public,auth"
 export MIGRA_DIFF_FORMAT="sql"
+export MIGRA_DATABASE_SOURCE="postgres://localhost/db1"
+export MIGRA_DATABASE_TARGET="postgres://localhost/db2"
 ```
 
 详细配置说明请参考 [docs/configuration.md](docs/configuration.md)。
+
+### diff 命令的三种参数模式
+
+`diff` 命令支持灵活的传参方式：
+
+| 参数数量 | 场景 | 说明 |
+|----------|------|------|
+| 2 个参数 | `migra diff A B` | 比较 A 与 B（最常见） |
+| 1 个参数 | `migra diff A` | 比较 A 与配置文件中的 `database.url` |
+| 0 个参数 | `migra diff` | 比较配置文件中 `database.source` 与 `database.target` |
 
 ### 数据库连接方式
 
@@ -202,73 +227,129 @@ migra diff file.sql "postgres://myuser@localhost/mydb"
 
 ## 架构概览
 
-### 数据流
+### 流水线架构
+
+整个工具的核心是一条清晰的五阶段流水线：
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│  SQL / DB   │────▶│   Parser     │────▶│   Diff       │────▶│   Renderer   │
-│  (Source &  │     │  (AST →      │     │  (Schema A   │     │  (Operations │
-│   Target)   │     │   SchemaModel)│     │   vs B →     │     │   → SQL/JSON)│
-└─────────────┘     └──────────────┘     │   DiffOps)   │     └──────┬───────┘
-                                         └──────┬───────┘            │
-                                                │           ┌────────▼────────┐
-                                         ┌──────▼───────┐   │    Push        │
-                                         │   Planner    │──▶│ (交互确认执行  │
-                                         │ (DAG 拓扑排序│   │  事务+回滚)    │
-                                         │  三阶段执行)  │   └─────────────────┘
-                                         └──────────────┘
+┌──────────┐   ┌──────────┐   ┌───────────┐   ┌─────────┐   ┌──────────┐
+│  Source  │──▶│  Parser  │──▶│ Normalize │──▶│  Diff   │──▶│  Plan    │──▶ Render
+│  (Loader)│   │ (AST →   │   │ (语义归一化)│   │ (Schema │   │ (DAG 排序│   (SQL/JSON)
+│          │   │  Schema) │   │           │   │  A vs B)│   │  三阶段) │
+└──────────┘   └──────────┘   └───────────┘   └─────────┘   └──────────┘
+                                                              │
+                                                              ▼
+                                                         ┌──────────┐
+                                                         │   Push   │
+                                                         │ (交互执行 │
+                                                         │ 事务+回滚)│
+                                                         └──────────┘
 ```
+
+阶段说明：
+
+1. **Source** — 通过 Loader 接口统一加载来源（SQL 文件或数据库），支持 Registry 模式扩展新来源
+2. **Parser** — 基于 pg_query_go 解析 AST，通过 Handler 访问者模式将 DDL 转换为 SchemaModel
+3. **Normalize** — 语义归一化（如 `int4` → `integer`），减少同义表达导致的误报
+4. **Diff** — 逐层比较两个 SchemaModel（表、列、索引、约束、枚举），生成 Operation 列表
+5. **Plan** — 按三阶段分组（Pre-deploy/Deploy/Post-deploy），基于 Kahn 算法做 DAG 拓扑排序
 
 ### 项目结构
 
 ```
 .
-├── cmd/migra/          # CLI 入口（Cobra + Viper）
-│   ├── main.go         # 根命令与配置初始化
-│   ├── diff.go         # diff 子命令与参数解析
-│   ├── diff_runner.go  # 差异计算流水线编排
-│   ├── diff_test.go    # CLI 层测试
-│   ├── push.go         # push 子命令定义与参数解析
-│   ├── push_runner.go  # push 执行逻辑（交互确认、事务、回滚）
-│   └── push_test.go    # push 命令测试
+├── cmd/migra/              # CLI 入口（Cobra + Viper）
+│   ├── main.go             # 根命令与配置初始化
+│   ├── diff.go             # diff 子命令与参数解析
+│   ├── diff_runner.go      # 差异计算流水线编排
+│   ├── diff_test.go        # CLI 层测试
+│   ├── push.go             # push 子命令定义与参数解析
+│   ├── push_runner.go      # push 执行逻辑（交互确认、事务、回滚）
+│   ├── push_test.go        # push 命令测试
+│   └── integration_test.go # 端到端集成测试
 ├── internal/
-│   ├── app/            # 应用层服务（依赖注入编排）
-│   │   └── diff_service.go
-│   ├── model/          # 中间数据模型（Schema、Table、Column 等）
-│   │   ├── schema.go
-│   │   ├── table.go
-│   │   ├── column.go
-│   │   ├── index_elem.go
-│   │   └── object_key.go
-│   ├── parser/         # SQL 解析（基于 pg_query_go，OCP 架构）
-│   │   ├── parser.go           # 主解析器 + 异常恢复
-│   │   ├── registry.go         # Handler 注册表（reflect.Type 路由）
-│   │   ├── applier.go          # Mutation 应用器
-│   │   ├── mutation.go         # SchemaMutation 接口与核心类型
-│   │   ├── create_table_handler.go
-│   │   ├── alter_table_handler.go
-│   │   ├── index_handler.go    # 完整索引支持（IndexElem）
-│   │   ├── enum_handler.go
-│   │   └── parserutil/         # 辅助函数包
-│   ├── introspect/     # 数据库内省（读取 pg_catalog）
-│   ├── normalize/      # 语义归一化
-│   ├── diff/           # 差异比较引擎
-│   │   ├── differ.go          # Differ 核心逻辑
-│   │   ├── operation.go       # Operation 类型定义
-│   │   ├── diff_tables.go     # 表级差异
-│   │   ├── diff_columns.go    # 列级差异
-│   │   └── diff_index.go      # 索引差异
-│   ├── plan/           # 执行计划与拓扑排序（DAG）
-│   │   ├── plan.go            # 三阶段执行计划
-│   │   └── dag.go             # DAG 构建与排序
-│   ├── render/         # SQL / JSON 渲染器
-│   └── testutil/       # 测试工具集
-├── scripts/            # 辅助构建脚本
-├── examples/           # 示例配置与环境变量
-├── docs/               # 使用手册、架构设计及评审纪要
-├── testdata/           # 单元测试与集成测试用例
-├── Makefile            # 常用构建命令集合
-└── .github/            # GitHub Actions CI/CD 工作流
+│   ├── app/                # 应用层服务（依赖注入编排）
+│   │   ├── diff_service.go # 差异计算服务 + ComputeDiff 管线
+│   │   └── diff_service_test.go
+│   ├── model/              # 中间数据模型（Schema、Table、Column 等）
+│   │   ├── schema.go       # Schema / Namespace / EnumType
+│   │   ├── table.go        # Table / PrimaryKey / Index / Constraint
+│   │   ├── column.go       # Column 定义
+│   │   ├── index_elem.go   # IndexElem（索引元素）
+│   │   ├── object_key.go   # ObjectKey（对象统一标识 + 依赖追踪）
+│   │   ├── golden_test.go  # Golden 文件测试
+│   │   └── testdata/       # 模型层测试数据
+│   ├── source/             # Schema 来源加载（Loader 抽象层）
+│   │   ├── loader.go       # Loader 接口定义
+│   │   ├── registry.go     # 来源注册表（策略模式路由）
+│   │   ├── db_loader.go    # 数据库来源加载器
+│   │   ├── sql_file_loader.go # SQL 文件来源加载器
+│   │   └── loader_test.go  # 加载器测试
+│   ├── parser/             # SQL 解析（基于 pg_query_go，OCP 架构）
+│   │   ├── parser.go       # 主解析器 + 异常恢复
+│   │   ├── registry.go     # Handler 注册表（reflect.Type 路由）
+│   │   ├── applier.go      # Mutation 应用器
+│   │   ├── mutation.go     # SchemaMutation 接口与核心类型
+│   │   ├── create_table_handler.go # CREATE TABLE 处理
+│   │   ├── alter_table_handler.go  # ALTER TABLE 处理（ADD/DROP/ALTER COLUMN）
+│   │   ├── index_handler.go        # CREATE/DROP INDEX 处理
+│   │   ├── index_mutation.go       # 索引相关 Mutation 实现
+│   │   ├── enum_handler.go         # CREATE TYPE AS ENUM 处理
+│   │   ├── parserutil/             # 解析器辅助函数
+│   │   │   └── util.go             # 类型映射、表达式解析、列解析
+│   │   ├── handler_test.go         # Handler 单元测试
+│   │   ├── index_handler_test.go   # 索引 Handler 测试
+│   │   ├── index_mutation_test.go  # 索引 Mutation 测试
+│   │   ├── mutation_test.go        # Mutation 测试
+│   │   └── parser_test.go          # 解析器测试
+│   ├── introspect/         # 数据库内省（读取 pg_catalog）
+│   │   ├── introspect.go   # 主入口（表/约束/索引/枚举全量加载）
+│   │   ├── tables.go       # 表与列信息加载
+│   │   ├── constraints.go  # 约束加载（主键、外键、唯一、检查）
+│   │   ├── indexes.go      # 索引信息加载
+│   │   ├── enums.go        # 枚举类型加载
+│   │   ├── tables_test.go  # 表加载测试
+│   │   └── enums_test.go   # 枚举加载测试
+│   ├── normalize/          # 语义归一化
+│   │   ├── normalize.go    # 同义类型映射、表达式规范化
+│   │   └── normalize_test.go
+│   ├── diff/               # 差异比较引擎
+│   │   ├── differ.go       # Differ 核心逻辑 + DiffEngine 接口
+│   │   ├── context.go      # diffContext（单次 diff 的本地状态）
+│   │   ├── operation.go    # 全部 Operation 类型定义（15+ 种）
+│   │   ├── diff_tables.go  # 表级差异（列/索引/约束对比）
+│   │   ├── diff_columns.go # 列级差异（类型/非空/默认值）
+│   │   ├── differ_test.go  # 差异引擎测试
+│   │   ├── diff_constraint_test.go # 约束差异测试
+│   │   ├── diff_index_test.go     # 索引差异测试
+│   │   └── operation_test.go      # Operation 测试
+│   ├── plan/               # 执行计划与拓扑排序（DAG）
+│   │   ├── plan.go         # 三阶段执行计划（PlanEngine 接口）
+│   │   ├── dag.go          # Kahn 算法 DAG 构建与拓扑排序
+│   │   ├── plan_test.go    # 计划测试
+│   │   └── dag_test.go     # DAG 测试
+│   ├── render/             # SQL / JSON 渲染器
+│   │   ├── render.go       # 渲染器（SQLEngine 接口，15+ 操作渲染）
+│   │   └── render_test.go  # 渲染测试
+│   └── testutil/           # 测试工具集
+│       └── testutil.go     # Schema 构建辅助函数
+├── scripts/                # 辅助构建脚本
+│   ├── setup.sh            # 开发环境初始化
+│   └── release.sh          # 版本发布脚本
+├── examples/               # 示例配置与环境变量
+│   ├── config.yaml         # 配置文件示例
+│   └── .env.example        # 环境变量示例
+├── docs/                   # 使用手册、架构设计及评审纪要
+│   ├── configuration.md    # 配置文档
+│   ├── plan.md             # 架构设计文档
+│   └── planv2.md           # 架构设计 v2
+├── testdata/               # 单元测试与集成测试用例
+├── Makefile                # 常用构建命令集合
+└── .github/                # GitHub Actions CI/CD 工作流
+    ├── workflows/
+    │   ├── test.yml        # 单元测试（push/PR 触发）
+    │   ├── lint.yml        # 代码规范检查（gofmt + vet + golangci-lint）
+    │   └── release.yml     # 发版构建与 GitHub Release
 ```
 
 ## 开发指南
@@ -302,6 +383,14 @@ make ci       # 本地运行完整 CI 检查流程
 - **数据库驱动**：[pgx v5](https://github.com/jackc/pgx)
 - **SQL 解析**：[pg_query_go](https://github.com/lfittl/pg_query_go)
 - **测试框架**：[testify](https://github.com/stretchr/testify)
+
+## 代码规范
+
+代码风格遵循 Go 标准实践：
+
+- **格式化**：使用 `gofmt` 格式化，提交前运行 `make fmt`
+- **静态检查**：启用 `go vet` 和 `golangci-lint`
+- **测试覆盖**：核心逻辑要求单元测试覆盖，提交前运行 `make ci`
 
 ## 参与贡献
 
