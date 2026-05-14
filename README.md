@@ -9,7 +9,7 @@
 
 ## 功能特性
 
-- 🔍 **多源比较**：支持 SQL 文件、PostgreSQL 实例任意组合的双向对比。
+- 🔍 **多源比较**：支持 SQL 文件、目录、PostgreSQL 实例任意组合的双向对比。
 - 🏗️ **结构化模型**：基于中间 SchemaModel 表示数据库结构，涵盖表、列、主键、索引、约束（外键/唯一/检查）和枚举类型。
 - 📋 **SQL 生成与执行**：输出可执行的迁移 SQL，并支持 `push` 命令将变更直接应用到目标数据库。
 - 🛡️ **交互式安全执行**：`push` 命令提供逐条确认、危险操作中断、事务保护与自动回滚。
@@ -21,6 +21,7 @@
 - 🧩 **丰富的差异检测**：支持表、列、类型、默认值、非空约束、索引内容、约束（主键/外键/唯一/检查）的全量对比。
 - 📊 **多格式输出**：支持 SQL 和 JSON 两种输出格式。
 - ⏱️ **超时控制**：支持 `--timeout` 参数控制 Schema 加载超时时间。
+- 📁 **目录作为 Schema 来源**：支持递归扫描目录下所有 `.sql` 文件，合并为完整 schema 参与 diff，自动跳过隐藏文件/目录、支持嵌套子目录。
 - 🔌 **多种连接方式**：支持连接字符串、环境变量、`pg_service.conf`、`.pgpass` 等 PostgreSQL 标准连接方式。
 
 ## 快速开始
@@ -49,6 +50,15 @@ migra diff postgres://localhost/db1 postgres://localhost/db2
 
 # 比较两个 SQL 文件
 migra diff file_a.sql file_b.sql
+
+# 比较两个目录（递归扫描 .sql 文件）
+migra diff ./schemas/v1/ ./schemas/v2/
+
+# 目录 vs 单文件
+migra diff ./schemas/v1/ ./schemas/v2/snapshot.sql
+
+# 目录 vs 数据库
+migra diff ./schemas/v1/ postgres://localhost/db
 
 # 指定 schema 和超时时间
 migra diff --schema public --schema auth --timeout 2m file.sql postgres://localhost/db
@@ -248,7 +258,11 @@ migra diff file.sql "postgres://myuser@localhost/mydb"
 
 阶段说明：
 
-1. **Source** — 通过 Loader 接口统一加载来源（SQL 文件或数据库），支持 Registry 模式扩展新来源
+1. **Source** — 通过 Loader 接口统一加载来源，支持三种来源类型：
+   - **SQL 文件**（`SQLFileLoader`）：解析单个 `.sql` 文件
+   - **目录**（`DirectoryLoader`）：递归扫描目录合并多个 `.sql` 文件
+   - **数据库**（`DBLoader`）：从 PostgreSQL 实例内省 schema
+   - 通过 Registry 策略模式自动匹配来源类型
 2. **Parser** — 基于 pg_query_go 解析 AST，通过 Handler 访问者模式将 DDL 转换为 SchemaModel
 3. **Normalize** — 语义归一化（如 `int4` → `integer`），减少同义表达导致的误报
 4. **Diff** — 逐层比较两个 SchemaModel（表、列、索引、约束、枚举），生成 Operation 列表
@@ -262,6 +276,7 @@ migra diff file.sql "postgres://myuser@localhost/mydb"
 │   ├── main.go             # 根命令与配置初始化
 │   ├── diff.go             # diff 子命令与参数解析
 │   ├── diff_runner.go      # 差异计算流水线编排
+│   ├── diff_runner_test.go # diff 运行器测试
 │   ├── diff_test.go        # CLI 层测试
 │   ├── push.go             # push 子命令定义与参数解析
 │   ├── push_runner.go      # push 执行逻辑（交互确认、事务、回滚）
@@ -284,6 +299,8 @@ migra diff file.sql "postgres://myuser@localhost/mydb"
 │   │   ├── registry.go     # 来源注册表（策略模式路由）
 │   │   ├── db_loader.go    # 数据库来源加载器
 │   │   ├── sql_file_loader.go # SQL 文件来源加载器
+│   │   ├── dir_loader.go    # 目录来源加载器（递归扫描 + schema 合并）
+│   │   ├── dir_loader_test.go # 目录加载器测试
 │   │   └── loader_test.go  # 加载器测试
 │   ├── parser/             # SQL 解析（基于 pg_query_go，OCP 架构）
 │   │   ├── parser.go       # 主解析器 + 异常恢复
@@ -341,9 +358,17 @@ migra diff file.sql "postgres://myuser@localhost/mydb"
 │   └── .env.example        # 环境变量示例
 ├── docs/                   # 使用手册、架构设计及评审纪要
 │   ├── configuration.md    # 配置文档
-│   ├── plan.md             # 架构设计文档
-│   └── planv2.md           # 架构设计 v2
+│   ├── plans/              # 实施计划文档
+│   ├── reviews/            # 技术评审与代码审查报告
+│   └── superpowers/        # 设计规格与评审纪要（superpowers 工作流）
 ├── testdata/               # 单元测试与集成测试用例
+│   ├── example_source.sql  # 示例源 schema（单文件）
+│   ├── example_target.sql  # 示例目标 schema（单文件）
+│   └── diff/               # 目录 diff 场景测试数据
+│       ├── v1/             # 源版本（users + posts + indexes + enum）
+│       ├── v2/             # 目标版本（v1 + comments + age + guest）
+│       ├── nested/         # 嵌套子目录结构
+│       └── edge/           # 边界情况（隐藏文件、非 SQL 文件、空目录）
 ├── Makefile                # 常用构建命令集合
 └── .github/                # GitHub Actions CI/CD 工作流
     ├── workflows/
@@ -370,6 +395,7 @@ make test
 ```bash
 make build    # 构建项目可执行文件
 make test     # 运行单元与集成测试
+make test-coverage # 运行测试并生成覆盖率报告
 make lint     # 运行代码规范检查
 make fmt      # 格式化 Go 代码
 make vet      # 运行 go vet 静态检查
