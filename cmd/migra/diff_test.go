@@ -64,6 +64,7 @@ func TestSetupFlags_BindsViperKeys(t *testing.T) {
 	cmd := &cobra.Command{Use: "test"}
 	cmd.PersistentFlags().String("config", "", "")
 	cmd.PersistentFlags().Bool("verbose", false, "")
+	cmd.PersistentFlags().Bool("version", false, "")
 	if err := setupFlags(cmd); err != nil {
 		t.Fatalf("setupFlags failed: %v", err)
 	}
