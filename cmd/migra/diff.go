@@ -17,6 +17,7 @@ var sourceRegistry = func() *source.Registry {
 	reg := source.NewRegistry()
 	reg.Register(&source.DBLoader{})
 	reg.Register(&source.SQLFileLoader{})
+	reg.Register(&source.DirectoryLoader{})
 	return reg
 }()
 
@@ -24,14 +25,16 @@ var sourceRegistry = func() *source.Registry {
 var diffCmd = &cobra.Command{
 	Use:   "diff [source] [target]",
 	Short: "Compare two schema sources and output the differences",
-	Long: `Compare two schema sources (SQL files or PostgreSQL connections) and output the SQL needed to migrate from source to target.
+	Long: `Compare two schema sources (SQL files, directories, or PostgreSQL connections) and output the SQL needed to migrate from source to target.
 
 Examples:
-  migra diff file.sql postgres://localhost/db
-  migra diff postgres://localhost/db1 postgres://localhost/db2
-  migra diff file_a.sql file_b.sql
-  migra diff file.sql  # target from config database.url
-  migra diff          # both from config database.source and database.target`,
+	 migra diff file.sql postgres://localhost/db
+	 migra diff postgres://localhost/db1 postgres://localhost/db2
+	 migra diff file_a.sql file_b.sql
+	 migra diff dir_a/ dir_b/
+	 migra diff dir_a/ postgres://localhost/db
+	 migra diff file.sql  # target from config database.url
+	 migra diff          # both from config database.source and database.target`,
 	Args: cobra.RangeArgs(0, 2),
 	RunE: runDiff,
 }
