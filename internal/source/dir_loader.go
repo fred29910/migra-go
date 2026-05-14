@@ -21,15 +21,15 @@ type DirectoryLoader struct {
 // Match returns true if source is an existing directory.
 func (l *DirectoryLoader) Match(source string) bool {
 	lower := strings.ToLower(source)
+	// DB URLs are handled by DBLoader (registered before us in the
+	// registry), but we defensively reject them here in case
+	// registration order changes in the future.
 	if strings.HasPrefix(lower, "postgres://") ||
 		strings.HasPrefix(lower, "postgresql://") ||
 		strings.HasPrefix(lower, "pg://") {
 		return false
 	}
-	path := source
-	if strings.HasPrefix(lower, "file://") {
-		path = source[len("file://"):]
-	}
+	path := stripFileScheme(source)
 	info, err := os.Stat(path)
 	if err != nil {
 		return false
@@ -42,10 +42,7 @@ func (l *DirectoryLoader) Match(source string) bool {
 // If any file fails to parse, the entire load fails (even in non-strict mode).
 // If duplicate table/enum names are found across files, the load fails.
 func (l *DirectoryLoader) Load(ctx context.Context, source string, opt LoadOptions) (*model.Schema, []error, error) {
-	sourcePath := source
-	if strings.HasPrefix(strings.ToLower(source), "file://") {
-		sourcePath = source[len("file://"):]
-	}
+	sourcePath := stripFileScheme(source)
 
 	var files []string
 	err := filepath.WalkDir(sourcePath, func(path string, d os.DirEntry, err error) error {
@@ -64,13 +61,13 @@ func (l *DirectoryLoader) Load(ctx context.Context, source string, opt LoadOptio
 		return nil
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to scan directory %s: %w", source, err)
+		return nil, nil, fmt.Errorf("failed to scan directory %s: %w", sourcePath, err)
 	}
 
 	sort.Strings(files)
 
 	if len(files) == 0 {
-		return model.NewSchema(), []error{fmt.Errorf("no .sql files found in directory: %s", source)}, nil
+		return model.NewSchema(), []error{fmt.Errorf("no .sql files found in directory: %s", sourcePath)}, nil
 	}
 
 	merged := model.NewSchema()
@@ -127,4 +124,12 @@ func (l *DirectoryLoader) Load(ctx context.Context, source string, opt LoadOptio
 	}
 
 	return merged, allErrs, nil
+}
+
+// stripFileScheme removes the "file://" prefix from s if present.
+func stripFileScheme(s string) string {
+	if strings.HasPrefix(strings.ToLower(s), "file://") {
+		return s[len("file://"):]
+	}
+	return s
 }

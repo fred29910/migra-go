@@ -1,6 +1,7 @@
 package source
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +29,7 @@ func TestDirectoryLoader_Match(t *testing.T) {
 		{"sql file", file, false},
 		{"postgres url", "postgres://localhost/db", false},
 		{"file prefix", "file:///tmp/test.sql", false},
+		{"file:// directory", "file://" + dir, true},
 		{"non-existent", "/non/existent/path", false},
 	}
 
@@ -61,7 +63,7 @@ func TestDirectoryLoader_Load_MultiFile(t *testing.T) {
 	}
 
 	loader := &DirectoryLoader{}
-	schema, errs, err := loader.Load(nil, dir, LoadOptions{})
+	schema, errs, err := loader.Load(context.TODO(), dir, LoadOptions{})
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
@@ -87,7 +89,7 @@ func TestDirectoryLoader_Load_EmptyDir(t *testing.T) {
 	dir := t.TempDir()
 
 	loader := &DirectoryLoader{}
-	schema, errs, err := loader.Load(nil, dir, LoadOptions{})
+	schema, errs, err := loader.Load(context.TODO(), dir, LoadOptions{})
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
@@ -123,7 +125,7 @@ func TestDirectoryLoader_Load_NestedDir(t *testing.T) {
 	}
 
 	loader := &DirectoryLoader{}
-	schema, _, err := loader.Load(nil, dir, LoadOptions{})
+	schema, _, err := loader.Load(context.TODO(), dir, LoadOptions{})
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
@@ -153,7 +155,7 @@ func TestDirectoryLoader_Load_DuplicateTable(t *testing.T) {
 	}
 
 	loader := &DirectoryLoader{}
-	_, _, err := loader.Load(nil, dir, LoadOptions{})
+	_, _, err := loader.Load(context.TODO(), dir, LoadOptions{})
 	if err == nil {
 		t.Fatal("expected error for duplicate table, got nil")
 	}
@@ -176,7 +178,7 @@ func TestDirectoryLoader_Load_ParseError(t *testing.T) {
 	}
 
 	loader := &DirectoryLoader{}
-	_, _, err := loader.Load(nil, dir, LoadOptions{})
+	_, _, err := loader.Load(context.TODO(), dir, LoadOptions{})
 	if err == nil {
 		t.Fatal("expected error for parse failure, got nil")
 	}
@@ -196,7 +198,7 @@ func TestDirectoryLoader_Load_SkipNonSQL(t *testing.T) {
 	}
 
 	loader := &DirectoryLoader{}
-	schema, _, err := loader.Load(nil, dir, LoadOptions{})
+	schema, _, err := loader.Load(context.TODO(), dir, LoadOptions{})
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
@@ -223,7 +225,7 @@ func TestDirectoryLoader_Load_SkipHidden(t *testing.T) {
 	}
 
 	loader := &DirectoryLoader{}
-	schema, _, err := loader.Load(nil, dir, LoadOptions{})
+	schema, _, err := loader.Load(context.TODO(), dir, LoadOptions{})
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
