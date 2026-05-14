@@ -30,6 +30,6 @@ func init() {
 	pushCmd.Flags().Duration("timeout", defaultDiffTimeout, "timeout for schema loading")
 
 	// 绑定到 viper
-	viper.BindPFlag("diff.schemas", pushCmd.Flags().Lookup("schema"))
-	viper.BindPFlag("diff.unsafe_drop", pushCmd.Flags().Lookup("unsafe-drop"))
+	_ = viper.BindPFlag("diff.schemas", pushCmd.Flags().Lookup("schema"))
+	_ = viper.BindPFlag("diff.unsafe_drop", pushCmd.Flags().Lookup("unsafe-drop"))
 }

@@ -10,7 +10,7 @@ func TestCreateIndexMutation_Apply(t *testing.T) {
 	mut := CreateIndexMutation{
 		Schema: "public",
 		Index: model.Index{
-			Name: "idx_users_email",
+			Name:  "idx_users_email",
 			Table: "users",
 			Elements: []model.IndexElem{
 				{Name: "email"},
@@ -47,9 +47,9 @@ func TestCreateIndexMutation_IfNotExists(t *testing.T) {
 	mut := CreateIndexMutation{
 		Schema: "public",
 		Index: model.Index{
-			Name:     "idx_users_email",
-			Table:    "users",
-			Elements: []model.IndexElem{{Name: "email"}},
+			Name:        "idx_users_email",
+			Table:       "users",
+			Elements:    []model.IndexElem{{Name: "email"}},
 			IfNotExists: true,
 		},
 	}

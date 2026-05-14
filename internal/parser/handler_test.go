@@ -72,8 +72,8 @@ func TestAlterTableHandler_MultipleAddColumns(t *testing.T) {
 
 func TestHandlers_TypeSafety(t *testing.T) {
 	// Create a node that is NOT what the handlers expect
-	node := pg_nodes.VacuumStmt{} 
-	
+	node := pg_nodes.VacuumStmt{}
+
 	t.Run("CreateTableHandler", func(t *testing.T) {
 		h := &CreateTableHandler{}
 		_, err := h.Handle(node)

@@ -12,11 +12,11 @@ func TestDiffIndex_ContentChange(t *testing.T) {
 	ns := sourceSchema.GetOrCreateNamespace("public")
 	sourceTable := model.NewTable("public", "users")
 	sourceTable.Indexes["idx_users_email"] = &model.Index{
-		Name:    "idx_users_email",
-		Table:   "users",
+		Name:     "idx_users_email",
+		Table:    "users",
 		Elements: []model.IndexElem{{Name: "email"}},
-		Unique:  false,
-		Method:  "btree",
+		Unique:   false,
+		Method:   "btree",
 	}
 	ns.Tables["users"] = sourceTable
 
@@ -25,11 +25,11 @@ func TestDiffIndex_ContentChange(t *testing.T) {
 	ns2 := targetSchema.GetOrCreateNamespace("public")
 	targetTable := model.NewTable("public", "users")
 	targetTable.Indexes["idx_users_email"] = &model.Index{
-		Name:    "idx_users_email",
-		Table:   "users",
+		Name:     "idx_users_email",
+		Table:    "users",
 		Elements: []model.IndexElem{{Name: "email"}},
-		Unique:  true, // changed
-		Method:  "btree",
+		Unique:   true, // changed
+		Method:   "btree",
 	}
 	ns2.Tables["users"] = targetTable
 
@@ -64,11 +64,11 @@ func TestDiffIndex_SameContent(t *testing.T) {
 	ns := sourceSchema.GetOrCreateNamespace("public")
 	sourceTable := model.NewTable("public", "users")
 	sourceTable.Indexes["idx_users_email"] = &model.Index{
-		Name:    "idx_users_email",
-		Table:   "users",
+		Name:     "idx_users_email",
+		Table:    "users",
 		Elements: []model.IndexElem{{Name: "email"}},
-		Unique:  false,
-		Method:  "btree",
+		Unique:   false,
+		Method:   "btree",
 	}
 	ns.Tables["users"] = sourceTable
 
@@ -76,11 +76,11 @@ func TestDiffIndex_SameContent(t *testing.T) {
 	ns2 := targetSchema.GetOrCreateNamespace("public")
 	targetTable := model.NewTable("public", "users")
 	targetTable.Indexes["idx_users_email"] = &model.Index{
-		Name:    "idx_users_email",
-		Table:   "users",
+		Name:     "idx_users_email",
+		Table:    "users",
 		Elements: []model.IndexElem{{Name: "email"}},
-		Unique:  false,
-		Method:  "btree",
+		Unique:   false,
+		Method:   "btree",
 	}
 	ns2.Tables["users"] = targetTable
 
@@ -104,8 +104,8 @@ func TestDiffIndex_ExpressionChange(t *testing.T) {
 	ns := sourceSchema.GetOrCreateNamespace("public")
 	sourceTable := model.NewTable("public", "users")
 	sourceTable.Indexes["idx_users_lower"] = &model.Index{
-		Name:    "idx_users_lower",
-		Table:   "users",
+		Name:     "idx_users_lower",
+		Table:    "users",
 		Elements: []model.IndexElem{{Name: "email"}},
 	}
 	ns.Tables["users"] = sourceTable
@@ -115,8 +115,8 @@ func TestDiffIndex_ExpressionChange(t *testing.T) {
 	ns2 := targetSchema.GetOrCreateNamespace("public")
 	targetTable := model.NewTable("public", "users")
 	targetTable.Indexes["idx_users_lower"] = &model.Index{
-		Name:    "idx_users_lower",
-		Table:   "users",
+		Name:     "idx_users_lower",
+		Table:    "users",
 		Elements: []model.IndexElem{{Expr: "lower(email)"}},
 	}
 	ns2.Tables["users"] = targetTable

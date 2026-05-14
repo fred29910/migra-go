@@ -33,7 +33,7 @@ func (l *DBLoader) Load(ctx context.Context, source string, opt LoadOptions) (*m
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	introspectOpt := introspect.LoadOptions{
 		Schemas: opt.Schemas,

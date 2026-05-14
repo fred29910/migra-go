@@ -20,17 +20,17 @@ type PrimaryKey struct {
 
 // Index represents a database index
 type Index struct {
-	Name          string
-	Table         string
-	Columns       []string      // deprecated: use Elements
-	Elements      []IndexElem   // new field replacing Columns
-	Unique        bool
-	Method        string       // btree, hash, gin, etc.
-	Primary       bool         // is primary key index
-	IsConstraint  bool        // is it for a pkey/unique constraint
-	WhereClause   string       // partial index predicate (WHERE clause)
-	Concurrent    bool         // concurrent index build
-	IfNotExists   bool         // IF NOT EXISTS
+	Name         string
+	Table        string
+	Columns      []string    // deprecated: use Elements
+	Elements     []IndexElem // new field replacing Columns
+	Unique       bool
+	Method       string // btree, hash, gin, etc.
+	Primary      bool   // is primary key index
+	IsConstraint bool   // is it for a pkey/unique constraint
+	WhereClause  string // partial index predicate (WHERE clause)
+	Concurrent   bool   // concurrent index build
+	IfNotExists  bool   // IF NOT EXISTS
 }
 
 // Constraint represents a table constraint (check, unique, foreign key, etc.)

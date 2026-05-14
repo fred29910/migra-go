@@ -32,13 +32,13 @@ func loadTables(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mode
 	defer rows.Close()
 
 	var (
-		tableName    string
-		colName      string
-		dataType     string
-		charMaxLen   sql.NullInt64
-		isNullable   string
-		colDefault   sql.NullString
-		ordinalPos   int
+		tableName  string
+		colName    string
+		dataType   string
+		charMaxLen sql.NullInt64
+		isNullable string
+		colDefault sql.NullString
+		ordinalPos int
 	)
 
 	currentTable := ""

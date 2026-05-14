@@ -204,7 +204,7 @@ func executeWithConfirmation(ctx context.Context, cfg pushConfig, sourceSchema *
 	if err != nil {
 		return fmt.Errorf("failed to connect to target database: %w", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -315,7 +315,7 @@ next:
 			fmt.Printf("Warning: failed to load target schema for verification: %v\n", err)
 		} else {
 			// ComputeDiff(source, target): returns remaining ops if target doesn't yet match source
-		remainOps, _, err := app.ComputeDiff(newTargetSchema, sourceSchema, app.Config{
+			remainOps, _, err := app.ComputeDiff(newTargetSchema, sourceSchema, app.Config{
 				UnsafeDrop: true, // Check all ops including destructive for honest validation
 			})
 			if err != nil {

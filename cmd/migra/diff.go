@@ -48,11 +48,11 @@ func init() {
 	diffCmd.Flags().Duration("timeout", defaultDiffTimeout, "timeout for schema loading (e.g. 30s, 2m)")
 
 	// 绑定到 viper
-	viper.BindPFlag("diff.schemas", diffCmd.Flags().Lookup("schema"))
-	viper.BindPFlag("diff.format", diffCmd.Flags().Lookup("format"))
-	viper.BindPFlag("diff.unsafe_drop", diffCmd.Flags().Lookup("unsafe-drop"))
-	viper.BindPFlag("diff.strict", diffCmd.Flags().Lookup("strict"))
-	viper.BindPFlag("output.file", diffCmd.Flags().Lookup("output"))
+	_ = viper.BindPFlag("diff.schemas", diffCmd.Flags().Lookup("schema"))
+	_ = viper.BindPFlag("diff.format", diffCmd.Flags().Lookup("format"))
+	_ = viper.BindPFlag("diff.unsafe_drop", diffCmd.Flags().Lookup("unsafe-drop"))
+	_ = viper.BindPFlag("diff.strict", diffCmd.Flags().Lookup("strict"))
+	_ = viper.BindPFlag("output.file", diffCmd.Flags().Lookup("output"))
 }
 
 func runDiff(cmd *cobra.Command, args []string) error {

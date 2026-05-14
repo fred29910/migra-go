@@ -112,12 +112,12 @@ func loadForeignKeys(ctx context.Context, conn *pgx.Conn, schemaName string, ns 
 	defer rows.Close()
 
 	var (
-		conName       string
-		tableName     string
-		columnNames   []string
-		definition    string
-		refTable      string
-		refSchema     string
+		conName        string
+		tableName      string
+		columnNames    []string
+		definition     string
+		refTable       string
+		refSchema      string
 		refColumnNames []string
 	)
 

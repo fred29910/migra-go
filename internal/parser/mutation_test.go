@@ -69,7 +69,7 @@ func TestAddColumnMutation_Apply_CreatesPlaceholderTable(t *testing.T) {
 
 func TestMutationOrder_AlterBeforeCreate(t *testing.T) {
 	schema := model.NewSchema()
-	
+
 	// 1. ALTER TABLE users ADD COLUMN age integer (happens first)
 	alterMut := AddColumnMutation{
 		Schema: "public",
@@ -86,7 +86,7 @@ func TestMutationOrder_AlterBeforeCreate(t *testing.T) {
 			{Name: "id", DataType: "integer"},
 		},
 	}
-	
+
 	// This currently fails in current implementation because of "already exists"
 	err := createMut.Apply(schema)
 	require.NoError(t, err, "CREATE TABLE should merge with placeholder table created by ALTER TABLE")
@@ -142,7 +142,7 @@ func TestCreateTableMutation_Apply_PrimaryKeyAndConstraints(t *testing.T) {
 
 func TestMutationOrder_TypeConflict(t *testing.T) {
 	schema := model.NewSchema()
-	
+
 	// 1. ALTER TABLE users ADD COLUMN age integer
 	alterMut := AddColumnMutation{
 		Schema: "public",
@@ -159,7 +159,7 @@ func TestMutationOrder_TypeConflict(t *testing.T) {
 			{Name: "age", DataType: "text"},
 		},
 	}
-	
+
 	err := createMut.Apply(schema)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "type mismatch")

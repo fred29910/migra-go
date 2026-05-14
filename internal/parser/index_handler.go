@@ -53,16 +53,16 @@ func (h *CreateIndexHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error
 	}
 
 	index := model.Index{
-		Name:          indexName,
-		Table:         tableName,
-		Elements:      elements,
-		Unique:        stmt.Unique,
-		Method:        method,
-		Primary:       stmt.Primary,
-		IsConstraint:  stmt.Isconstraint,
-		WhereClause:   whereClause,
-		Concurrent:    stmt.Concurrent,
-		IfNotExists:   stmt.IfNotExists,
+		Name:         indexName,
+		Table:        tableName,
+		Elements:     elements,
+		Unique:       stmt.Unique,
+		Method:       method,
+		Primary:      stmt.Primary,
+		IsConstraint: stmt.Isconstraint,
+		WhereClause:  whereClause,
+		Concurrent:   stmt.Concurrent,
+		IfNotExists:  stmt.IfNotExists,
 	}
 
 	return []SchemaMutation{CreateIndexMutation{
