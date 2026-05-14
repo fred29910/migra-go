@@ -2,7 +2,10 @@ package source
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/fred29910/migra-go/internal/model"
@@ -35,10 +38,83 @@ func (l *DirectoryLoader) Match(source string) bool {
 
 // Load recursively scans all .sql files in the directory, parses each file,
 // and merges them into a single Schema.
+// If any file fails to parse, the entire load fails (even in non-strict mode).
+// If duplicate table/enum names are found across files, the load fails.
 func (l *DirectoryLoader) Load(ctx context.Context, source string, opt LoadOptions) (*model.Schema, []error, error) {
-	// TODO: implement in next task
-	_ = ctx
-	_ = source
-	_ = opt
-	return nil, nil, nil
+	var files []string
+	err := filepath.WalkDir(source, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if strings.HasPrefix(d.Name(), ".") {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !d.IsDir() && strings.HasSuffix(strings.ToLower(path), ".sql") {
+			files = append(files, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to scan directory %s: %w", source, err)
+	}
+
+	sort.Strings(files)
+
+	merged := model.NewSchema()
+	allErrs := make([]error, 0)
+	seenTables := make(map[string]string)
+	seenEnums := make(map[string]string)
+
+	fl := l.fileLoader
+	if fl == nil {
+		fl = &SQLFileLoader{}
+	}
+
+	for _, file := range files {
+		// Always use strict mode for individual files so that parse errors
+		// are returned as fatal errors rather than silently swallowed.
+		strictOpt := LoadOptions{Strict: true}
+		schema, errs, loadErr := fl.Load(ctx, file, strictOpt)
+		if loadErr != nil {
+			return nil, nil, fmt.Errorf("failed to parse %s: %w", file, loadErr)
+		}
+		allErrs = append(allErrs, errs...)
+
+		if schema == nil {
+			continue
+		}
+
+		for nsName, ns := range schema.Schemas {
+			mergedNs := merged.GetOrCreateNamespace(nsName)
+
+			for tableName, table := range ns.Tables {
+				key := nsName + "." + tableName
+				if firstFile, exists := seenTables[key]; exists {
+					return nil, nil, fmt.Errorf(
+						"duplicate table '%s' found in %s (first defined in %s)",
+						tableName, file, firstFile,
+					)
+				}
+				seenTables[key] = file
+				mergedNs.Tables[tableName] = table
+			}
+
+			for typeName, enumType := range ns.Types {
+				key := nsName + "." + typeName
+				if firstFile, exists := seenEnums[key]; exists {
+					return nil, nil, fmt.Errorf(
+						"duplicate enum '%s' found in %s (first defined in %s)",
+						typeName, file, firstFile,
+					)
+				}
+				seenEnums[key] = file
+				mergedNs.Types[typeName] = enumType
+			}
+		}
+	}
+
+	return merged, allErrs, nil
 }
