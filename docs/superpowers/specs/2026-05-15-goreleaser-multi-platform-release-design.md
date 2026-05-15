@@ -27,14 +27,12 @@ GitHub Actions (release.yml)
        │     └─ GoReleaser ──→ linux/amd64  ──→ tar.gz
        │                       linux/arm64  ──→ tar.gz
        │                       windows/amd64 ──→ zip
-       │                       → checksums.txt (partial)
-       │                       → sbom.spdx.json
+       │                       → checksums-linux-windows.txt
        │
        ├─ job: build-darwin (macos-latest)
        │     └─ GoReleaser ──→ darwin/amd64 ──→ tar.gz
        │                       darwin/arm64 ──→ tar.gz
-       │                       → checksums.txt (partial)
-       │                       → sbom.spdx.json
+       │                       → checksums-darwin.txt
        │
        └─ job: create-release
              └─ 合并所有制品 → GitHub Release
@@ -43,7 +41,7 @@ GitHub Actions (release.yml)
                    ├─ migra-darwin-amd64.tar.gz
                    ├─ migra-darwin-arm64.tar.gz
                    ├─ migra-windows-amd64.zip
-                   ├─ migra_checksums.txt
+                   ├─ migra_checksums.txt  (合并后)
                    └─ migra.sbom.spdx.json
 ```
 
@@ -73,8 +71,8 @@ GoReleaser 核心配置，定义：
   - `darwin/*` → 默认 clang（macOS 自带）
 - **打包格式**：默认 tar.gz，Windows 覆盖为 zip
 - **ldflags**：注入版本信息（与现有 Makefile 对齐）
-- **校验和**：生成 `migra_checksums.txt`（SHA256）
-- **SBOM**：使用 syft 生成 `migra.sbom.spdx.json`（SPDX 格式）
+- **校验和**：生成 `checksums.txt`（SHA256），文件名由 GoReleaser 模板控制
+- **SBOM**：使用 syft 生成 `migra.sbom.spdx.json`（SPDX 格式），仅在 linux/amd64 构建时生成一次
 - **dist 目录**：`./dist`
 
 ### 2. `Makefile`（修改）
@@ -94,18 +92,18 @@ GoReleaser 核心配置，定义：
 1. **build-linux-windows**：
    - runner: `ubuntu-latest`
    - 安装交叉编译链：`gcc-aarch64-linux-gnu`, `gcc-mingw-w64`
-   - 运行 `goreleaser release --clean --skip=validate,publish`（跳过 publish，由最后 job 处理）
-   - 上传制品为 artifact
+   - 运行 `goreleaser release --clean --skip=publish`（跳过 publish，由最后 job 处理）
+   - 上传制品为 artifact（包含 binaries + checksums + SBOM）
 
 2. **build-darwin**：
    - runner: `macos-latest`
-   - 运行 `goreleaser release --clean --skip=validate,publish`
-   - 上传制品为 artifact
+   - 运行 `goreleaser release --clean --skip=publish`
+   - 上传制品为 artifact（包含 binaries + checksums，无 SBOM）
 
 3. **create-release**：
    - needs: `[build-linux-windows, build-darwin]`
    - 下载两个 artifact
-   - 合并校验和文件
+   - 合并校验和文件为 `migra_checksums.txt`
    - 使用 `softprops/action-gh-release@v2` 上传所有制品
    - token: `secrets.RELEASE_TOKEN`
 
