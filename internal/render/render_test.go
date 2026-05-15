@@ -26,8 +26,16 @@ func TestRenderOutput_SupportsSQLAndJSON(t *testing.T) {
 		t.Fatalf("unexpected sql render: %v %q", err, sql)
 	}
 	js, err := r.RenderOutput(ops, "json")
-	if err != nil || !strings.Contains(js, `"kind"`) {
-		t.Fatalf("unexpected json render: %v %q", err, js)
+	if err != nil {
+		t.Fatalf("unexpected json render error: %v", err)
+	}
+	for _, want := range []string{`"kind"`, `"object_key"`, `"sql"`} {
+		if !strings.Contains(js, want) {
+			t.Fatalf("json output missing field %q, got:\n%s", want, js)
+		}
+	}
+	if !strings.Contains(js, "public.idx_a") {
+		t.Fatalf("json output missing object_key value 'public.idx_a', got:\n%s", js)
 	}
 }
 
