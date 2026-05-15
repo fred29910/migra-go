@@ -1,0 +1,2 @@
+-- This file contains only comments and blank lines
+-- It should load without errors but produce no schema changes
