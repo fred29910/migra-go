@@ -9,14 +9,15 @@ import (
 	"strings"
 
 	"github.com/fred29910/migra-go/internal/model"
+	"github.com/fred29910/migra-go/internal/parser"
 )
 
 // DirectoryLoader implements Loader for directory sources.
-// It recursively scans all .sql files in a directory, parses each file
-// using SQLFileLoader, and merges them into a single Schema.
-type DirectoryLoader struct {
-	fileLoader *SQLFileLoader
-}
+// It recursively scans all .sql files in a directory, merges their SQL
+// content, and parses everything in a single pass. This ensures that
+// cross-file DDL dependencies (e.g., CREATE TABLE in one file and
+// CREATE INDEX referencing that table in another) are resolved correctly.
+type DirectoryLoader struct{}
 
 // Match returns true if source is an existing directory.
 func (l *DirectoryLoader) Match(source string) bool {
@@ -37,10 +38,10 @@ func (l *DirectoryLoader) Match(source string) bool {
 	return info.IsDir()
 }
 
-// Load recursively scans all .sql files in the directory, parses each file,
-// and merges them into a single Schema.
-// If any file fails to parse, the entire load fails (even in non-strict mode).
-// If duplicate table/enum names are found across files, the load fails.
+// Load recursively scans all .sql files in the directory, merges their
+// contents, then parses the combined SQL in a single pass.
+// This approach (方案 B) resolves cross-file DDL dependencies that would
+// fail when parsing each file in isolation.
 func (l *DirectoryLoader) Load(ctx context.Context, source string, opt LoadOptions) (*model.Schema, []error, error) {
 	sourcePath := stripFileScheme(source)
 
@@ -70,60 +71,33 @@ func (l *DirectoryLoader) Load(ctx context.Context, source string, opt LoadOptio
 		return model.NewSchema(), []error{fmt.Errorf("no .sql files found in directory: %s", sourcePath)}, nil
 	}
 
-	merged := model.NewSchema()
-	allErrs := make([]error, 0)
-	seenTables := make(map[string]string)
-	seenEnums := make(map[string]string)
-
-	fl := l.fileLoader
-	if fl == nil {
-		fl = &SQLFileLoader{}
-	}
-
+	// Merge all SQL file contents into a single string.
+	// This way, a single Parser sees all DDL statements in order, so
+	// cross-file dependencies (tables referenced by indexes, foreign keys, etc.)
+	// are resolved within a single parse session.
+	var combinedSQL strings.Builder
 	for _, file := range files {
-		// Always use strict mode for individual files so that parse errors
-		// are returned as fatal errors rather than silently swallowed.
-		strictOpt := LoadOptions{Strict: true}
-		schema, errs, loadErr := fl.Load(ctx, file, strictOpt)
-		if loadErr != nil {
-			return nil, nil, fmt.Errorf("failed to parse %s: %w", file, loadErr)
+		data, readErr := os.ReadFile(file)
+		if readErr != nil {
+			return nil, nil, fmt.Errorf("failed to read %s: %w", file, readErr)
 		}
-		allErrs = append(allErrs, errs...)
-
-		if schema == nil {
-			continue
+		if combinedSQL.Len() > 0 {
+			combinedSQL.WriteString("\n")
 		}
-
-		for nsName, ns := range schema.Schemas {
-			mergedNs := merged.GetOrCreateNamespace(nsName)
-
-			for tableName, table := range ns.Tables {
-				key := nsName + "." + tableName
-				if firstFile, exists := seenTables[key]; exists {
-					return nil, nil, fmt.Errorf(
-						"duplicate table '%s' found in %s (first defined in %s)",
-						tableName, file, firstFile,
-					)
-				}
-				seenTables[key] = file
-				mergedNs.Tables[tableName] = table
-			}
-
-			for typeName, enumType := range ns.Types {
-				key := nsName + "." + typeName
-				if firstFile, exists := seenEnums[key]; exists {
-					return nil, nil, fmt.Errorf(
-						"duplicate enum '%s' found in %s (first defined in %s)",
-						typeName, file, firstFile,
-					)
-				}
-				seenEnums[key] = file
-				mergedNs.Types[typeName] = enumType
-			}
-		}
+		combinedSQL.Write(data)
 	}
 
-	return merged, allErrs, nil
+	// Always treat parse errors as fatal for merged parsing: any file
+	// with invalid SQL corrupts the entire combined input, so partial
+	// recovery is not meaningful.
+	p := parser.NewParser()
+	schema, parseErr := p.ParseSQL(combinedSQL.String())
+	errs := p.Errors()
+	if parseErr != nil {
+		return nil, errs, fmt.Errorf("failed to parse directory contents: %w", parseErr)
+	}
+
+	return schema, errs, nil
 }
 
 // stripFileScheme removes the "file://" prefix from s if present.

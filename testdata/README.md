@@ -15,17 +15,14 @@ testdata/
 ├── edge_cases.sql                ← 边界 SQL 模式（引号标识符、继承表、分区表）
 │
 └── diff/                         ← 目录型 diff 场景（DirectoryLoader + 全流水线测试）
-    ├── v1/                       ← 版本 v1：users + posts + 索引 + 枚举
-    │   ├── schema.sql            ←   合并单文件（原始，向后兼容）
-    │   ├── 01_users.sql          ←   拆分多文件：用户表
-    │   ├── 02_posts.sql          ←   拆分多文件：文章表
-    │   ├── 03_indexes.sql        ←   拆分多文件：索引
-    │   ├── 04_enums.sql          ←   拆分多文件：枚举
-    │   └── snapshot.sql          ←   拆分文件的合并快照
+├── v1/                       ← 版本 v1：users + posts + 索引 + 枚举
+│   ├── 01_users.sql          ←   拆分多文件：用户表
+│   ├── 02_posts.sql          ←   拆分多文件：文章表
+│   ├── 03_indexes.sql        ←   拆分多文件：索引
+│   └── 04_enums.sql          ←   拆分多文件：枚举
     │
-    ├── v2/                       ← 版本 v2：v1 + age 列 + comments 表 + guest 枚举
-    │   ├── schema.sql            ←   合并单文件
-    │   └── snapshot.sql          ←   合并快照
+├── v2/                       ← 版本 v2：v1 + age 列 + comments 表 + guest 枚举
+│   └── schema.sql            ←   合并单文件
     │
     ├── v3/                       ← 版本 v3：修改/删除场景
     │   ├── schema.sql            ←   删 age 列/comments 表；增 phone 列/categories 表/UNIQUE(email)
@@ -438,12 +435,13 @@ filepath.WalkDir(source)
   ├─ 跳过隐藏文件/目录（HasPrefix "."）→ SkipDir
   ├─ 仅收录 .sql 后缀文件（不区分大小写）
   ├─ 排序（sort.Strings）保证确定性顺序
-  └─ 检查重复表/枚举名 → 失败
+  └─ 合并 SQL 内容 → 一次性解析
 
 合并策略：
-  - 多个文件的表合并到同一个 Schema（同 namespace 下）
-  - 重复表名 → 错误退出（含首次定义文件路径）
-  - 重复枚举名 → 错误退出
+  - 所有 .sql 文件的内容合并为一个字符串，一次性解析
+  - 确保跨文件 DDL 依赖（索引引用另一文件的表、外键等）正确解析
+  - 重复表名由 `CreateTableMutation.Apply` 检测并返回错误
+  - **注意**: 目录中不应同时包含 `schema.sql`（完整快照）和分文件，否则会导致重复定义
 ```
 
 ### 参数模式验证
@@ -553,7 +551,7 @@ ALTER TYPE "public"."user_role" ADD VALUE 'guest';
 
 ```bash
 # 目录 vs 快照文件（应无差异）
-./migra diff testdata/diff/v2/ testdata/diff/v2/snapshot.sql
+./migra diff testdata/diff/v2/ testdata/diff/snapshot.sql
 
 # 目录 vs 另一版本的快照文件
 ./migra diff testdata/diff/v2/ testdata/diff/snapshot.sql
@@ -717,7 +715,7 @@ make build
 ./migra diff testdata/diff/v1/ testdata/diff/v2/
 
 # 目录 vs 快照
-./migra diff testdata/diff/v2/ testdata/diff/v2/snapshot.sql
+./migra diff testdata/diff/v2/ testdata/diff/snapshot.sql
 
 # 删除场景（安全模式）
 ./migra diff testdata/diff/v2/schema.sql testdata/diff/v3/schema.sql
@@ -746,8 +744,8 @@ make build
 | 测试数据组合 | 预期输出 | 关键验证 |
 |---|---|---|
 | `example_source.sql` → `example_target.sql` | ADD TABLE comments, ADD COLUMN age, ADD ENUM VALUE guest | 基础流水线、三阶段排序 |
-| `diff/v1/` → `diff/v2/` | 同上（目录版本） | DirectoryLoader 多文件加载 |
-| `diff/v2/` → `diff/v2/snapshot.sql` | 无变更 | 目录加载 ≡ 单文件加载语义等价 |
+| `diff/v1/` → `diff/v2/` | 同上（目录版本） | DirectoryLoader 多文件合并后一次性解析 |
+| `diff/v2/` → `diff/snapshot.sql` | 无变更 | 目录加载 ≡ 单文件加载语义等价 |
 | `diff/v2/schema.sql` → `diff/v3/schema.sql` (safe) | 仅非 DROP 操作 + 警告 | unsafe-drop 安全过滤 |
 | `diff/v2/schema.sql` → `diff/v3/schema.sql` (unsafe) | DROP + ADD + ALTER 全量 | DROP 操作正确输出 |
 | `diff/nested/` → `diff/nested_target/` | ADD COLUMN email, ADD CONSTRAINT fk | 嵌套子目录递归扫描 |

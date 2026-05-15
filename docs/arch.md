@@ -137,7 +137,7 @@ type Loader interface {
 | Loader | Match 条件 | Load 行为 |
 |--------|-----------|-----------|
 | `DBLoader` | `postgres://`, `postgresql://`, `pg://` 前缀 | 连接数据库 → `introspect.LoadFromDBWithConn` |
-| `DirectoryLoader` | `os.Stat(path).IsDir()` 为 true | `filepath.WalkDir` 递归扫描 → 排序 → 逐个解析 → 合并 schema |
+| `DirectoryLoader` | `os.Stat(path).IsDir()` 为 true | `filepath.WalkDir` 递归扫描 → 排序 → 合并 SQL → 一次性解析 |
 | `SQLFileLoader` | `.sql` 后缀 或 `file://` 前缀 | `os.ReadFile` → `parser.ParseSQL` |
 
 **Registry 分发流程**：
@@ -155,9 +155,9 @@ sourceRegistry.Load(source)
 
 - 使用 `filepath.WalkDir` 递归遍历
 - 跳过隐藏文件/目录（以 `.` 开头）
-- 按文件路径排序后依次解析（确定性输出）
-- 始终使用 `Strict: true` 模式解析每个文件
-- 通过 `seenTables`/`seenEnums` map 检测跨文件命名冲突
+- 按文件路径排序后合并 SQL 文本（确定性输出）
+- 合并后**一次性解析**，确保跨文件 DDL 依赖（如索引引用另一文件的表）正确解析
+- 重复表名由 `CreateTableMutation.Apply` 检测并返回 `"already exists"` 错误
 - 空目录返回空 schema + warning（无 fatal error）
 
 ### 2.4 模型层 (`internal/model/`)
@@ -433,11 +433,11 @@ cmd/migra/main.go  (Cobra root + Viper config)
 - 简单的按类型排序不够精确（外键依赖需要在同一个 stage 内精确排序）
 - Kahn 算法保证在存在依赖时仍然能找到合法顺序，并能检测循环依赖
 
-### 4.5 为什么 DirectoryLoader 始终用 Strict: true？
+### 4.5 DirectoryLoader 的 Strict 模式
 
-- 目录加载合并多个文件构建完整 schema，任何一个文件失败都会导致 schema 不完整
-- 单文件模式下用户可以容忍部分失败（`--strict` 控制），但目录模式下不允许
-- 行为差异在错误处理文档中有明确说明
+- 目录加载将所有 SQL 合并后**一次性解析**，parse error 使整个解析失败
+- Strict 模式由调用方传入的 `opt.Strict` 控制，默认 `false`（与 `--strict` CLI 标志绑定）
+- 合并后一次性解析意味着：单个文件失败 = 整个目录加载失败（不再支持逐文件容错）
 
 ---
 
