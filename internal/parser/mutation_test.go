@@ -164,3 +164,30 @@ func TestMutationOrder_TypeConflict(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "type mismatch")
 }
+
+func TestCreateSchemaMutation_Apply(t *testing.T) {
+	schema := model.NewSchema()
+	mut := CreateSchemaMutation{Schema: "auth"}
+
+	err := mut.Apply(schema)
+	require.NoError(t, err)
+
+	ns := schema.GetNamespace("auth")
+	require.NotNil(t, ns)
+	assert.Equal(t, "auth", ns.Name)
+	assert.Empty(t, ns.Tables)
+	assert.Empty(t, ns.Types)
+}
+
+func TestCreateSchemaMutation_Apply_Idempotent(t *testing.T) {
+	schema := model.NewSchema()
+	schema.GetOrCreateNamespace("auth")
+
+	mut := CreateSchemaMutation{Schema: "auth"}
+	err := mut.Apply(schema)
+	require.NoError(t, err, "CreateSchemaMutation should be idempotent")
+
+	require.Len(t, schema.Schemas, 1)
+	ns := schema.GetNamespace("auth")
+	require.NotNil(t, ns)
+}

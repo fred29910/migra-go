@@ -335,3 +335,94 @@ func TestDirectoryVsFile_Diff(t *testing.T) {
 		t.Fatalf("expected output to contain ADD COLUMN email, got:\n%s", out)
 	}
 }
+
+func TestMultiSchemaDiff(t *testing.T) {
+	sourceDir := t.TempDir()
+
+	publicSQL := `CREATE TABLE public.users (
+		id SERIAL PRIMARY KEY,
+		name VARCHAR(100) NOT NULL
+	);`
+	if err := os.WriteFile(filepath.Join(sourceDir, "01_public.sql"), []byte(publicSQL), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	authSQL := `CREATE SCHEMA auth;
+
+CREATE TABLE auth.roles (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE
+);
+
+CREATE TABLE auth.permissions (
+    id SERIAL PRIMARY KEY,
+    role_id INTEGER NOT NULL REFERENCES auth.roles(id),
+    resource VARCHAR(100) NOT NULL,
+    action VARCHAR(50) NOT NULL
+);`
+	if err := os.WriteFile(filepath.Join(sourceDir, "02_auth.sql"), []byte(authSQL), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	targetDir := t.TempDir()
+
+	targetPublicSQL := `CREATE TABLE public.users (
+		id SERIAL PRIMARY KEY,
+		name VARCHAR(100) NOT NULL,
+		email VARCHAR(255)
+	);
+
+CREATE TABLE public.profiles (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES public.users(id),
+    avatar_url TEXT,
+    bio TEXT
+);`
+	if err := os.WriteFile(filepath.Join(targetDir, "01_public.sql"), []byte(targetPublicSQL), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	targetAuthSQL := `CREATE SCHEMA auth;
+
+CREATE TABLE auth.roles (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    description TEXT DEFAULT ''
+);
+
+CREATE TABLE auth.permissions (
+    id SERIAL PRIMARY KEY,
+    role_id INTEGER NOT NULL REFERENCES auth.roles(id),
+    resource VARCHAR(100) NOT NULL,
+    action VARCHAR(50) NOT NULL
+);`
+	if err := os.WriteFile(filepath.Join(targetDir, "02_auth.sql"), []byte(targetAuthSQL), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+		Source:     sourceDir,
+		Target:     targetDir,
+		Schemas:    []string{"public", "auth"},
+		Format:     "sql",
+		Timeout:    defaultDiffTimeout,
+		UnsafeDrop: false,
+	})
+	if err != nil {
+		t.Fatalf("multi-schema diff failed: %v", err)
+	}
+
+	for _, want := range []string{
+		`CREATE TABLE "public"."profiles"`,
+		`ALTER TABLE "public"."users" ADD COLUMN "email"`,
+		`ALTER TABLE "auth"."roles" ADD COLUMN "description"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got:\n%s", want, out)
+		}
+	}
+
+	if strings.Contains(out, "parse error") {
+		t.Fatalf("unexpected parse error in output:\n%s", out)
+	}
+}

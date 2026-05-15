@@ -8,6 +8,7 @@
 | **严重程度** | 🔴 高（功能完全不可用） |
 | **影响范围** | 所有包含 `CREATE SCHEMA` 语句的 SQL 文件/目录 diff |
 | **触发命令** | `./migra diff --schema public --schema auth testdata/diff/multi_schema/v1/ testdata/diff/multi_schema/v2/` |
+| **状态** | Fixed |
 
 ---
 
@@ -161,6 +162,33 @@ CREATE TABLE public.users (\n    id SERIAL PRIMARY KEY,\n    name VARCHAR(100) N
 | `cmd/migra/diff.go` | CLI 入口，`--schema` 标志定义和传递 |
 | `testdata/diff/multi_schema/v1/02_auth.sql` | 触发 bug 的测试数据 |
 | `testdata/diff/multi_schema/v2/02_auth.sql` | 触发 bug 的测试数据 |
+
+---
+
+## 修复记录
+
+### 修复时间
+
+2026-05-15
+
+### 修改文件
+
+| 文件 | 变更说明 |
+|------|----------|
+| [`internal/parser/create_schema_handler.go`](../internal/parser/create_schema_handler.go) | **新增**：`CreateSchemaHandler` 处理 `CreateSchemaStmt` AST 节点；`CreateSchemaMutation` 确保 namespace 存在 |
+| [`internal/parser/registry.go`](../internal/parser/registry.go) | `DefaultRegistry` 中注册 `CreateSchemaStmt` → `CreateSchemaHandler` |
+| [`internal/parser/mutation.go`](../internal/parser/mutation.go) | 新增 `MutKindCreateSchema` 常量 |
+| [`internal/model/object_key.go`](../internal/model/object_key.go) | 新增 `KindSchema` 常量 |
+| [`internal/app/diff_service.go`](../internal/app/diff_service.go) | 新增 `FilterNamespaces` 函数；`ComputeDiff` 中于 Normalize 后、Diff 前调用 |
+| [`internal/parser/handler_test.go`](../internal/parser/handler_test.go) | 新增 `TestCreateSchemaHandler` + 类型安全检查 |
+| [`internal/parser/mutation_test.go`](../internal/parser/mutation_test.go) | 新增 `TestCreateSchemaMutation_Apply` + `_Idempotent` |
+| [`internal/app/diff_service_test.go`](../internal/app/diff_service_test.go) | 新增 `TestFilterNamespaces_*` |
+| [`cmd/migra/integration_test.go`](../cmd/migra/integration_test.go) | 新增 `TestMultiSchemaDiff` |
+
+### 修复要点
+
+1. **Parser 支持 `CREATE SCHEMA`**：新增 `CreateSchemaHandler`，从 AST 提取 `Schemaname`，返回 `CreateSchemaMutation` 确保 namespace 在 model.Schema 中存在
+2. **`--schema` 过滤对文件源生效**：在 `ComputeDiff` 的 Normalize 之后、Diff 之前，调用 `FilterNamespaces` 移除不在 `--schema` 列表中的 namespace。`schemas` 为空时不过滤，保持向后兼容
 
 ---
 
