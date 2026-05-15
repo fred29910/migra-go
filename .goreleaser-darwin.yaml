@@ -1,0 +1,42 @@
+# .goreleaser-darwin.yaml
+# GoReleaser 配置 — 用于 macos-latest runner（darwin/amd64, darwin/arm64）
+
+project_name: migra
+
+env:
+  - CGO_ENABLED=1
+
+builds:
+  - binary: migra
+    main: ./cmd/migra
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=1
+    ldflags:
+      - -s -w
+      - -X github.com/fred29910/migra-go/internal/version.Version={{ .Tag }}
+      - -X github.com/fred29910/migra-go/internal/version.BuildTime={{ .Date }}
+      - -X github.com/fred29910/migra-go/internal/version.GitCommit={{ .ShortCommit }}
+      - -X github.com/fred29910/migra-go/internal/version.GoVersion={{ .GoVersion }}
+
+archives:
+  - format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}-
+      {{- .Os }}-
+      {{- .Arch }}
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "checksums-darwin.txt"
+  algorithm: sha256
+
+# Darwin 不生成 SBOM（由 linux job 生成）
+
+dist: dist
