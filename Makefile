@@ -1,4 +1,4 @@
-.PHONY: build test clean lint fmt vet help ci
+.PHONY: build test clean lint fmt vet help ci install-tools release-local release-snapshot
 
 # Build the project
 build:
@@ -44,6 +44,18 @@ fmt:
 # CI target: fmt, vet, lint, test
 ci: fmt vet lint test
 
+# Install GoReleaser CLI
+install-tools:
+	go install github.com/goreleaser/goreleaser@latest
+
+# Local full release (requires GITHUB_TOKEN)
+release-local:
+	goreleaser release --clean
+
+# Local snapshot build (no publish, for testing)
+release-snapshot:
+	goreleaser release --snapshot --clean
+
 # Show help
 help:
 	@echo "Available targets:"
@@ -55,4 +67,7 @@ help:
 	@echo "  lint        - Run linter (golangci-lint)"
 	@echo "  fmt         - Format code (gofmt + go fmt)"
 	@echo "  ci          - Run CI checks (fmt, vet, lint, test)"
+	@echo "  install-tools - Install GoReleaser CLI"
+	@echo "  release-local - Run goreleaser release (full, requires GITHUB_TOKEN)"
+	@echo "  release-snapshot - Run goreleaser release --snapshot (local test)"
 	@echo "  help        - Show this help"
