@@ -1,0 +1,66 @@
+# .goreleaser.yaml
+# GoReleaser 配置 — 用于 ubuntu-latest runner（linux/amd64, linux/arm64, windows/amd64）
+
+project_name: migra
+
+env:
+  - CGO_ENABLED=1
+
+builds:
+  - binary: migra
+    main: ./cmd/migra
+    goos:
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    # windows/arm64 排除（不常用）
+    ignore:
+      - goos: windows
+        goarch: arm64
+    env:
+      - CGO_ENABLED=1
+    ldflags:
+      - -s -w
+      - -X github.com/fred29910/migra-go/internal/version.Version={{ .Tag }}
+      - -X github.com/fred29910/migra-go/internal/version.BuildTime={{ .Date }}
+      - -X github.com/fred29910/migra-go/internal/version.GitCommit={{ .ShortCommit }}
+      - -X github.com/fred29910/migra-go/internal/version.GoVersion={{ .GoVersion }}
+    overrides:
+      - goos: linux
+        goarch: arm64
+        env:
+          - CC=aarch64-linux-gnu-gcc
+          - CGO_ENABLED=1
+      - goos: windows
+        goarch: amd64
+        env:
+          - CC=x86_64-w64-mingw32-gcc
+          - CGO_ENABLED=1
+
+archives:
+  - format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: >-
+      {{ .ProjectName }}-
+      {{- .Os }}-
+      {{- .Arch }}
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "checksums-linux-windows.txt"
+  algorithm: sha256
+
+sboms:
+  - id: spdx
+    artifacts: binary
+    documents:
+      - "{{ .ProjectName }}.sbom.spdx.json"
+    args: ["$artifact", "--output", "spdx-json=$document"]
+
+dist: dist
