@@ -281,6 +281,7 @@ migra diff file.sql "postgres://myuser@localhost/mydb"
 │   ├── push.go             # push 子命令定义与参数解析
 │   ├── push_runner.go      # push 执行逻辑（交互确认、事务、回滚）
 │   ├── push_test.go        # push 命令测试
+│   ├── version_test.go     # 版本信息 CLI 测试
 │   └── integration_test.go # 端到端集成测试
 ├── internal/
 │   ├── app/                # 应用层服务（依赖注入编排）
@@ -292,6 +293,7 @@ migra diff file.sql "postgres://myuser@localhost/mydb"
 │   │   ├── column.go       # Column 定义
 │   │   ├── index_elem.go   # IndexElem（索引元素）
 │   │   ├── object_key.go   # ObjectKey（对象统一标识 + 依赖追踪）
+│   │   ├── schema_test.go  # Schema/Table 序列化测试
 │   │   ├── golden_test.go  # Golden 文件测试
 │   │   └── testdata/       # 模型层测试数据
 │   ├── source/             # Schema 来源加载（Loader 抽象层）
@@ -357,17 +359,28 @@ migra diff file.sql "postgres://myuser@localhost/mydb"
 │   ├── config.yaml         # 配置文件示例
 │   └── .env.example        # 环境变量示例
 ├── docs/                   # 使用手册、架构设计及评审纪要
+│   ├── arch.md             # 架构设计文档
 │   ├── configuration.md    # 配置文档
+│   ├── DDL.md              # PostgreSQL DDL 功能支持矩阵
+│   ├── bugs/               # 已知 Bug 跟踪
 │   ├── plans/              # 实施计划文档
 │   ├── reviews/            # 技术评审与代码审查报告
 │   └── superpowers/        # 设计规格与评审纪要（superpowers 工作流）
 ├── testdata/               # 单元测试与集成测试用例
 │   ├── example_source.sql  # 示例源 schema（单文件）
 │   ├── example_target.sql  # 示例目标 schema（单文件）
-│   └── diff/               # 目录 diff 场景测试数据
+│   ├── alter_operations.sql # ALTER TABLE 全操作集覆盖
+│   ├── complex_ddl.sql     # 复合约束、高级类型、自定义枚举
+│   ├── drop_scenarios.sql  # DROP 语义测试
+│   ├── edge_cases.sql      # 边界 SQL 模式（继承表、分区表等）
+│   └── diff/               # 目录型 diff 场景（DirectoryLoader 集成测试）
 │       ├── v1/             # 源版本（users + posts + indexes + enum）
 │       ├── v2/             # 目标版本（v1 + comments + age + guest）
+│       ├── v3/             # 修改/删除场景（删列、删表、重命名索引）
 │       ├── nested/         # 嵌套子目录结构
+│       ├── nested_target/  # 嵌套目录的目标版本（扩展列+外键）
+│       ├── multi_schema/   # 多 schema（public + auth）命名空间场景
+│       ├── snapshot.sql    # v2 快照（单文件等价于 v2/ 目录）
 │       └── edge/           # 边界情况（隐藏文件、非 SQL 文件、空目录）
 ├── Makefile                # 常用构建命令集合
 └── .github/                # GitHub Actions CI/CD 工作流
@@ -404,7 +417,7 @@ make ci       # 本地运行完整 CI 检查流程
 
 ### 技术栈
 
-- **语言**：Go 1.26+
+- **语言**：Go 1.26
 - **CLI 框架**：[Cobra](https://github.com/spf13/cobra) + [Viper](https://github.com/spf13/viper)
 - **数据库驱动**：[pgx v5](https://github.com/jackc/pgx)
 - **SQL 解析**：[pg_query_go](https://github.com/lfittl/pg_query_go)
