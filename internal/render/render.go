@@ -345,17 +345,21 @@ func ifExistsPrefix(use bool) string {
 func RenderJSON(ops []diff.Operation) (string, error) {
 	// Convert operations to a JSON-friendly format
 	type OpInfo struct {
-		Kind        string          `json:"kind"`
-		Object      model.ObjectKey `json:"object"`
-		Destructive bool            `json:"destructive"`
+		Kind        string `json:"kind"`
+		ObjectKey   string `json:"object_key"`
+		Destructive bool   `json:"destructive"`
+		SQL         string `json:"sql"`
 	}
 
+	r := NewRenderer()
 	infos := make([]OpInfo, len(ops))
 	for i, op := range ops {
+		obj := op.ObjectKey()
 		infos[i] = OpInfo{
 			Kind:        string(op.Kind()),
-			Object:      op.ObjectKey(),
+			ObjectKey:   obj.Schema + "." + obj.Name,
 			Destructive: op.IsDestructive(),
+			SQL:         r.RenderSingle(op),
 		}
 	}
 
