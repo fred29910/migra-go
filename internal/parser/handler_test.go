@@ -87,4 +87,37 @@ func TestHandlers_TypeSafety(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "expected pg_nodes.AlterTableStmt")
 	})
+
+	t.Run("CreateSchemaHandler", func(t *testing.T) {
+		h := &CreateSchemaHandler{}
+		_, err := h.Handle(node)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected pg_nodes.CreateSchemaStmt")
+	})
+}
+
+func TestCreateSchemaHandler(t *testing.T) {
+	node := mustParseFirstStmt(t, "CREATE SCHEMA auth")
+	h := &CreateSchemaHandler{}
+
+	mutations, err := h.Handle(node)
+	require.NoError(t, err)
+	require.Len(t, mutations, 1)
+
+	mut, ok := mutations[0].(CreateSchemaMutation)
+	require.True(t, ok)
+	assert.Equal(t, "auth", mut.Schema)
+}
+
+func TestCreateSchemaHandler_IfNotExists(t *testing.T) {
+	node := mustParseFirstStmt(t, "CREATE SCHEMA IF NOT EXISTS auth")
+	h := &CreateSchemaHandler{}
+
+	mutations, err := h.Handle(node)
+	require.NoError(t, err)
+	require.Len(t, mutations, 1)
+
+	mut, ok := mutations[0].(CreateSchemaMutation)
+	require.True(t, ok)
+	assert.Equal(t, "auth", mut.Schema)
 }

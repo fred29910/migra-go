@@ -73,6 +73,36 @@ func (s *diffService) Run(parent context.Context, cfg Config) (string, []string,
 	return output, warnings, nil
 }
 
+// FilterNamespaces filters source and target schemas in-place to only include
+// the specified schema names. If schemas is nil or empty, no filtering is performed.
+// Returns warnings if no schemas match the filter (likely a typo in --schema flag).
+func FilterNamespaces(source, target *model.Schema, schemas []string) []string {
+	if len(schemas) == 0 {
+		return nil
+	}
+
+	schemaSet := make(map[string]bool, len(schemas))
+	for _, s := range schemas {
+		schemaSet[s] = true
+	}
+
+	filterSchema := func(s *model.Schema) {
+		for name := range s.Schemas {
+			if !schemaSet[name] {
+				delete(s.Schemas, name)
+			}
+		}
+	}
+
+	filterSchema(source)
+	filterSchema(target)
+
+	if len(source.Schemas) == 0 && len(target.Schemas) == 0 {
+		return []string{"no schemas matched the filter — check your --schema flag(s)"}
+	}
+	return nil
+}
+
 // NormalizeSchemas normalizes source and target schemas in place
 func NormalizeSchemas(source, target *model.Schema) error {
 	if err := normalize.CanonicalizeSchema(source); err != nil {
@@ -148,11 +178,15 @@ func ComputeDiff(source, target *model.Schema, cfg Config) ([]diff.Operation, []
 		return nil, nil, err
 	}
 
+	// Filter to only compare specified schemas
+	filterWarnings := FilterNamespaces(source, target, cfg.Schemas)
+
 	differ := diff.NewDiffer()
 	operations, warnings := differ.Diff(source, target)
-
-	filteredOps, filterWarnings := FilterDestructiveOps(operations, cfg.UnsafeDrop)
 	warnings = append(warnings, filterWarnings...)
+
+	filteredOps, filterWarnings2 := FilterDestructiveOps(operations, cfg.UnsafeDrop)
+	warnings = append(warnings, filterWarnings2...)
 
 	sortedOps, err := BuildExecutionPlan(filteredOps, cfg.UnsafeDrop)
 	if err != nil {

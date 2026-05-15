@@ -99,3 +99,73 @@ func TestBuildExecutionPlan(t *testing.T) {
 
 	require.Equal(t, diff.KindAddTable, result[0].Kind())
 }
+
+func TestFilterNamespaces_EmptySchemas(t *testing.T) {
+	source := model.NewSchema()
+	source.GetOrCreateNamespace("public").Tables["t1"] = &model.Table{Name: "t1"}
+	source.GetOrCreateNamespace("auth").Tables["t2"] = &model.Table{Name: "t2"}
+
+	target := model.NewSchema()
+	target.GetOrCreateNamespace("public").Tables["t1"] = &model.Table{Name: "t1"}
+	target.GetOrCreateNamespace("auth").Tables["t2"] = &model.Table{Name: "t2"}
+	target.GetOrCreateNamespace("extra").Tables["t3"] = &model.Table{Name: "t3"}
+
+	// When schemas is nil/empty, all namespaces should be preserved
+	FilterNamespaces(source, target, nil)
+	require.Len(t, source.Schemas, 2)
+	require.Len(t, target.Schemas, 3)
+
+	FilterNamespaces(source, target, []string{})
+	require.Len(t, source.Schemas, 2)
+	require.Len(t, target.Schemas, 3)
+}
+
+func TestFilterNamespaces_FilterToSpecified(t *testing.T) {
+	source := model.NewSchema()
+	source.GetOrCreateNamespace("public").Tables["t1"] = &model.Table{Name: "t1"}
+	source.GetOrCreateNamespace("auth").Tables["t2"] = &model.Table{Name: "t2"}
+	source.GetOrCreateNamespace("internal").Tables["t3"] = &model.Table{Name: "t3"}
+
+	target := model.NewSchema()
+	target.GetOrCreateNamespace("public").Tables["t1"] = &model.Table{Name: "t1"}
+	target.GetOrCreateNamespace("auth").Tables["t2"] = &model.Table{Name: "t2"}
+	target.GetOrCreateNamespace("extra").Tables["t4"] = &model.Table{Name: "t4"}
+
+	FilterNamespaces(source, target, []string{"public", "auth"})
+
+	require.Len(t, source.Schemas, 2)
+	require.NotNil(t, source.GetNamespace("public"))
+	require.NotNil(t, source.GetNamespace("auth"))
+	require.Nil(t, source.GetNamespace("internal"))
+
+	require.Len(t, target.Schemas, 2)
+	require.NotNil(t, target.GetNamespace("public"))
+	require.NotNil(t, target.GetNamespace("auth"))
+	require.Nil(t, target.GetNamespace("extra"))
+}
+
+func TestFilterNamespaces_NonExistentSchema(t *testing.T) {
+	source := model.NewSchema()
+	source.GetOrCreateNamespace("public").Tables["t1"] = &model.Table{Name: "t1"}
+
+	target := model.NewSchema()
+	target.GetOrCreateNamespace("public").Tables["t1"] = &model.Table{Name: "t1"}
+
+	FilterNamespaces(source, target, []string{"public", "nonexistent"})
+	require.Len(t, source.Schemas, 1)
+	require.Len(t, target.Schemas, 1)
+}
+
+func TestFilterNamespaces_EmptyResultWarning(t *testing.T) {
+	source := model.NewSchema()
+	source.GetOrCreateNamespace("public").Tables["t1"] = &model.Table{Name: "t1"}
+
+	target := model.NewSchema()
+	target.GetOrCreateNamespace("public").Tables["t1"] = &model.Table{Name: "t1"}
+
+	warnings := FilterNamespaces(source, target, []string{"nonexistent"})
+	require.Len(t, source.Schemas, 0)
+	require.Len(t, target.Schemas, 0)
+	require.Len(t, warnings, 1)
+	require.Contains(t, warnings[0], "no schemas matched")
+}
