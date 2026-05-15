@@ -55,7 +55,7 @@ migra diff file_a.sql file_b.sql
 migra diff ./schemas/v1/ ./schemas/v2/
 
 # 目录 vs 单文件
-migra diff ./schemas/v1/ ./schemas/v2/snapshot.sql
+migra diff ./schemas/v1/ ./schemas/v2/snapshot_file.sql
 
 # 目录 vs 数据库
 migra diff ./schemas/v1/ postgres://localhost/db

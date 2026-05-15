@@ -26,7 +26,7 @@ migra diff ./schemas/v1/ ./schemas/v2/
 migra diff ./schemas/v1/ postgres://localhost/mydb
 
 # 目录 vs 单文件
-migra diff ./schemas/v1/ ./schemas/v2/snapshot.sql
+migra diff ./schemas/v1/ ./schemas/v2/snapshot_file.sql
 
 # 带参数
 migra diff ./v1/ ./v2/ --schema public,auth --format json

@@ -155,12 +155,76 @@ func TestDirectoryLoader_Load_DuplicateTable(t *testing.T) {
 	}
 
 	loader := &DirectoryLoader{}
-	_, _, err := loader.Load(context.TODO(), dir, LoadOptions{})
+	_, _, err := loader.Load(context.TODO(), dir, LoadOptions{Strict: true})
 	if err == nil {
 		t.Fatal("expected error for duplicate table, got nil")
 	}
-	if !strings.Contains(err.Error(), "duplicate table") {
-		t.Errorf("expected 'duplicate table' in error, got: %v", err)
+	// With merged parsing, duplicate table is caught by CreateTableMutation.Apply
+	if !strings.Contains(err.Error(), "already exists") {
+		t.Errorf("expected 'already exists' in error, got: %v", err)
+	}
+}
+
+func TestDirectoryLoader_Load_CrossFileIndex(t *testing.T) {
+	dir := t.TempDir()
+
+	// Reproduce the bug scenario: CREATE TABLE in one file, CREATE INDEX
+	// referencing that table in another. With merged parsing, the index
+	// creation sees the table and succeeds.
+	usersSQL := `CREATE TABLE users (
+		id SERIAL PRIMARY KEY,
+		username VARCHAR(50) NOT NULL
+	);`
+	postsSQL := `CREATE TABLE posts (
+		id SERIAL PRIMARY KEY,
+		user_id INTEGER NOT NULL,
+		title VARCHAR(200) NOT NULL
+	);`
+	indexesSQL := `CREATE INDEX idx_posts_user_id ON posts(user_id);
+CREATE UNIQUE INDEX idx_users_username ON users(username);`
+
+	if err := os.WriteFile(filepath.Join(dir, "01_users.sql"), []byte(usersSQL), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "02_posts.sql"), []byte(postsSQL), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "03_indexes.sql"), []byte(indexesSQL), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	loader := &DirectoryLoader{}
+	schema, errs, err := loader.Load(context.TODO(), dir, LoadOptions{Strict: true})
+	if err != nil {
+		t.Fatalf("Load failed (cross-file dependencies not resolved): %v", err)
+	}
+	if len(errs) > 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if schema == nil {
+		t.Fatal("expected non-nil schema")
+	}
+
+	ns := schema.Schemas["public"]
+	if ns == nil {
+		t.Fatal("expected public namespace")
+	}
+
+	if _, ok := ns.Tables["users"]; !ok {
+		t.Error("expected users table")
+	}
+	if _, ok := ns.Tables["posts"]; !ok {
+		t.Error("expected posts table")
+	}
+
+	usersTable := ns.Tables["users"]
+	if _, ok := usersTable.Indexes["idx_users_username"]; !ok {
+		t.Error("expected idx_users_username index on users table")
+	}
+
+	postsTable := ns.Tables["posts"]
+	if _, ok := postsTable.Indexes["idx_posts_user_id"]; !ok {
+		t.Error("expected idx_posts_user_id index on posts table")
 	}
 }
 
