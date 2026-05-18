@@ -5,12 +5,10 @@ build:
 	VERSION=$$(git describe --tags --always --dirty 2>/dev/null || echo "dev"); \
 	BUILD_TIME=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
 	COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown"); \
-	GO_VERSION=$$(go version | awk '{print $$3}'); \
 	go build --trimpath -ldflags="-s -w \
 		-X 'github.com/fred29910/migra-go/internal/version.Version=$$VERSION' \
 		-X 'github.com/fred29910/migra-go/internal/version.BuildTime=$$BUILD_TIME' \
-		-X 'github.com/fred29910/migra-go/internal/version.GitCommit=$$COMMIT' \
-		-X 'github.com/fred29910/migra-go/internal/version.GoVersion=$$GO_VERSION'" \
+		-X 'github.com/fred29910/migra-go/internal/version.GitCommit=$$COMMIT'" \
 		-o migra ./cmd/migra
 
 # Run all tests (db-less unit tests)

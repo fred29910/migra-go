@@ -45,7 +45,7 @@
           "variant": "medium"
         },
         {
-          "model": "openrouter/deepseek/deepseek-v4-flash:free",
+          "model": "openrouter/arcee-ai/trinity-large-thinking:free",
           "variant": "medium"
         },
         {
@@ -63,7 +63,7 @@
       "variant": "high",
       "fallback_models": [
         {
-          "model": "openrouter/deepseek/deepseek-v4-flash:free",
+          "model": "openrouter/arcee-ai/trinity-large-thinking:free",
           "variant": "high"
         },
         {
@@ -101,7 +101,7 @@
       ]
     },
     "librarian": {
-      "model": "openrouter/deepseek/deepseek-v4-flash:free",
+      "model": "openrouter/arcee-ai/trinity-large-thinking:free",
       "fallback_models": [
          {
           "model": "opencode/minimax-m2.5-free",
@@ -125,7 +125,7 @@
       "model": "google/antigravity-gemini-3-flash",
       "fallback_models": [
         {
-          "model": "openrouter/deepseek/deepseek-v4-flash:free"
+          "model": "openrouter/arcee-ai/trinity-large-thinking:free"
         },
         {
           "model": "anthropic/claude-haiku-4-5"
@@ -150,7 +150,7 @@
           "variant": "medium"
         },
         {
-          "model": "openrouter/deepseek/deepseek-v4-flash:free",
+          "model": "openrouter/arcee-ai/trinity-large-thinking:free",
           "variant": "high"
         },
         {
@@ -181,7 +181,7 @@
           "variant": "high"
         },
         {
-          "model": "openrouter/deepseek/deepseek-v4-flash:free",
+          "model": "openrouter/arcee-ai/trinity-large-thinking:free",
           "variant": "high"
         },
         {
@@ -229,7 +229,7 @@
           "variant": "high"
         },
         {
-          "model": "openrouter/deepseek/deepseek-v4-flash:free",
+          "model": "openrouter/arcee-ai/trinity-large-thinking:free",
           "variant": "high"
         },
         {
@@ -255,7 +255,7 @@
           "variant": "xhigh"
         },
         {
-          "model": "openrouter/deepseek/deepseek-v4-flash:free",
+          "model": "openrouter/arcee-ai/trinity-large-thinking:free",
           "variant": "high"
         },
         {
@@ -302,7 +302,7 @@
           "variant": "medium"
         },
         {
-          "model": "openrouter/deepseek/deepseek-v4-flash:free",
+          "model": "openrouter/arcee-ai/trinity-large-thinking:free",
           "variant": "high"
         },
         {
@@ -329,7 +329,7 @@
           "variant": "medium"
         },
         {
-          "model": "openrouter/deepseek/deepseek-v4-flash:free",
+          "model": "openrouter/arcee-ai/trinity-large-thinking:free",
           "variant": "high"
         },
         {

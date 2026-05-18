@@ -1,6 +1,8 @@
 # .goreleaser-darwin.yaml
 # GoReleaser 配置 — 用于 macos-latest runner（darwin/amd64, darwin/arm64）
 
+version: 2
+
 project_name: migra
 
 env:
@@ -21,10 +23,10 @@ builds:
       - -X github.com/fred29910/migra-go/internal/version.Version={{ .Tag }}
       - -X github.com/fred29910/migra-go/internal/version.BuildTime={{ .Date }}
       - -X github.com/fred29910/migra-go/internal/version.GitCommit={{ .ShortCommit }}
-      - -X github.com/fred29910/migra-go/internal/version.GoVersion={{ .GoVersion }}
 
 archives:
-  - format: tar.gz
+  - id: default
+    format: tar.gz
     name_template: >-
       {{ .ProjectName }}-
       {{- .Os }}-
