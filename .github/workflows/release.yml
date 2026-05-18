@@ -6,8 +6,8 @@ on:
       - 'v*'
 
 jobs:
-  build-linux-windows:
-    name: Build (Linux + Windows)
+  build-linux:
+    name: Build (Linux)
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/goreleaser/goreleaser-cross:v1.26
@@ -20,7 +20,7 @@ jobs:
           fetch-depth: 0
 
       # Go 和交叉编译工具链已内置在 goreleaser-cross 容器中
-      # 不再需要手动安装 gcc-aarch64-linux-gnu / gcc-mingw-w64
+      # 不再需要手动安装 gcc-aarch64-linux-gnu
 
       # 修复容器内 git 安全目录检查（CVE-2022-24765）：
       # 容器内工作目录由 runner 用户挂载，导致 git 报 dubious ownership
@@ -28,13 +28,11 @@ jobs:
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       # pg_query_go 的 C 代码需要跨架构 netdb.h
-      # goreleaser-cross 容器默认不包含这些跨编译头文件
-      - name: Install cross-compilation C headers
+      # goreleaser-cross 容器默认不包含 ARM64 跨编译头文件
+      - name: Install ARM64 C headers
         run: |
           apt-get update -qq
-          apt-get install -y -qq \
-            libc6-dev-arm64-cross \
-            mingw-w64-common
+          apt-get install -y -qq libc6-dev-arm64-cross
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -42,19 +40,64 @@ jobs:
           path: |
             /go/pkg/mod
             /root/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-linux-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-
+            ${{ runner.os }}-go-linux-
 
-      - name: Run GoReleaser (skip publish)
-        run: goreleaser release --clean --skip=publish
+      - name: Run GoReleaser (Linux)
+        run: goreleaser release --clean --skip=publish -f .goreleaser-linux.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
-      - name: Upload artifacts
+      - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dist-linux-windows
+          name: dist-linux
+          path: dist/*
+          retention-days: 1
+
+  build-windows:
+    name: Build (Windows)
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/goreleaser/goreleaser-cross:v1.26
+    # Windows 构建为可选：失败不会影响 Linux/Darwin 发版
+    continue-on-error: true
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fix git safe.directory (container ownership mismatch)
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # pg_query_go 的 C 代码需要 MinGW-w64 版本的 netdb.h
+      - name: Install MinGW C headers
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq mingw-w64-common
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            /go/pkg/mod
+            /root/.cache/go-build
+          key: ${{ runner.os }}-go-windows-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-windows-
+
+      - name: Run GoReleaser (Windows)
+        run: goreleaser release --clean --skip=publish -f .goreleaser-windows.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows
           path: dist/*
           retention-days: 1
 
@@ -92,18 +135,18 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    needs: [build-linux-windows, build-darwin]
+    needs: [build-linux, build-darwin]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Linux/Windows artifacts
+      - name: Download Linux artifacts
         uses: actions/download-artifact@v4
         with:
-          name: dist-linux-windows
-          path: dist-linux-windows
+          name: dist-linux
+          path: dist-linux
 
       - name: Download Darwin artifacts
         uses: actions/download-artifact@v4
@@ -111,21 +154,32 @@ jobs:
           name: dist-darwin
           path: dist-darwin
 
+      - name: Download Windows artifacts (if available)
+        continue-on-error: true
+        id: dl-windows
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-windows
+          path: dist-windows
+
       - name: Merge checksums
         run: |
           echo "# migra ${{ github.ref_name }} checksums" > migra_checksums.txt
           echo "" >> migra_checksums.txt
-          cat dist-linux-windows/checksums-linux-windows.txt >> migra_checksums.txt
+          cat dist-linux/checksums-linux.txt >> migra_checksums.txt
           cat dist-darwin/checksums-darwin.txt >> migra_checksums.txt
+          if [ -d dist-windows ] && [ -f dist-windows/checksums-windows.txt ]; then
+            cat dist-windows/checksums-windows.txt >> migra_checksums.txt
+          fi
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist-linux-windows/*.tar.gz
-            dist-linux-windows/*.zip
-            dist-linux-windows/*.sbom.spdx.json
+            dist-linux/*.tar.gz
+            dist-linux/*.sbom.spdx.json
             dist-darwin/*.tar.gz
+            dist-windows/*.zip
             migra_checksums.txt
           generate_release_notes: true
         env:
