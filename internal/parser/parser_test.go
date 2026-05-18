@@ -7,7 +7,7 @@ import (
 
 	"github.com/fred29910/migra-go/internal/diff"
 	"github.com/fred29910/migra-go/internal/render"
-	pg_nodes "github.com/lfittl/pg_query_go/nodes"
+	pg_query "github.com/pganalyze/pg_query_go/v6"
 )
 
 // TestParseCreateTable tests parsing CREATE TABLE statements
@@ -374,14 +374,14 @@ func TestParseDefaultFunctionExpressionConsistentForCreateAndAlter(t *testing.T)
 
 type panickingHandler struct{}
 
-func (h *panickingHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error) {
+func (h *panickingHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error) {
 	panic("intentional panic for testing recover")
 }
 
 func TestParser_RecoverFromPanic(t *testing.T) {
 	registry := NewHandlerRegistry()
 	// Map CreateStmt to our panicking handler
-	registry.Register(pg_nodes.CreateStmt{}, &panickingHandler{})
+	registry.Register(&pg_query.Node{Node: &pg_query.Node_CreateStmt{}}, &panickingHandler{})
 
 	p := NewParserWith(registry, nil)
 	_, err := p.ParseSQL("CREATE TABLE t1 (id int);")
