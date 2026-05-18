@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/fred29910/migra-go/internal/model"
-	pg_nodes "github.com/lfittl/pg_query_go/nodes"
+	pg_query "github.com/pganalyze/pg_query_go/v6"
 )
 
 // CreateSchemaHandler handles CREATE SCHEMA statements.
@@ -14,15 +14,15 @@ import (
 type CreateSchemaHandler struct{}
 
 // Handle converts a pg_query CreateSchemaStmt into schema mutations.
-func (h *CreateSchemaHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error) {
-	stmt, ok := node.(pg_nodes.CreateSchemaStmt)
-	if !ok {
-		return nil, fmt.Errorf("CreateSchemaHandler: expected pg_nodes.CreateSchemaStmt, got %T", node)
+func (h *CreateSchemaHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error) {
+	stmt := node.GetCreateSchemaStmt()
+	if stmt == nil {
+		return nil, fmt.Errorf("CreateSchemaHandler: expected CreateSchemaStmt, got %T", node)
 	}
-	if stmt.Schemaname == nil {
-		return nil, fmt.Errorf("CreateSchemaHandler: schema name is nil")
+	schemaName := stmt.Schemaname
+	if schemaName == "" {
+		return nil, fmt.Errorf("CreateSchemaHandler: schema name is empty")
 	}
-	schemaName := *stmt.Schemaname
 	return []SchemaMutation{CreateSchemaMutation{Schema: schemaName}}, nil
 }
 
