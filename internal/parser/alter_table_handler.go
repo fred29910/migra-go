@@ -5,30 +5,30 @@ import (
 	"os"
 
 	"github.com/fred29910/migra-go/internal/parser/parserutil"
-	pg_nodes "github.com/lfittl/pg_query_go/nodes"
+	pg_query "github.com/pganalyze/pg_query_go/v6"
 )
 
 // AlterTableHandler handles ALTER TABLE statements.
 type AlterTableHandler struct{}
 
 // Handle converts a pg_query AlterTableStmt into schema mutations.
-func (h *AlterTableHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error) {
-	stmt, ok := node.(pg_nodes.AlterTableStmt)
-	if !ok {
-		return nil, fmt.Errorf("AlterTableHandler: expected pg_nodes.AlterTableStmt, got %T", node)
+func (h *AlterTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error) {
+	stmt := node.GetAlterTableStmt()
+	if stmt == nil {
+		return nil, fmt.Errorf("AlterTableHandler: expected AlterTableStmt, got %T", node)
 	}
 	tableName, schemaName := parserutil.ParseRelation(stmt.Relation)
 
 	var mutations []SchemaMutation
-	for _, item := range stmt.Cmds.Items {
-		cmd, ok := item.(pg_nodes.AlterTableCmd)
-		if !ok {
+	for _, item := range stmt.Cmds {
+		cmd := item.GetAlterTableCmd()
+		if cmd == nil {
 			continue
 		}
 		switch cmd.Subtype {
-		case pg_nodes.AT_AddColumn:
+		case pg_query.AlterTableType_AT_AddColumn:
 			if cmd.Def != nil {
-				if colDef, ok := cmd.Def.(pg_nodes.ColumnDef); ok {
+				if colDef := cmd.Def.GetColumnDef(); colDef != nil {
 					col := parserutil.ParseColumnDef(colDef)
 					mutations = append(mutations, AddColumnMutation{
 						Schema: schemaName,
@@ -38,11 +38,8 @@ func (h *AlterTableHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error)
 				}
 			}
 
-		case pg_nodes.AT_DropColumn:
-			colName := ""
-			if cmd.Name != nil {
-				colName = *cmd.Name
-			}
+		case pg_query.AlterTableType_AT_DropColumn:
+			colName := cmd.Name
 			if colName == "" {
 				fmt.Fprintf(os.Stderr, "warning: DROP COLUMN missing column name\n")
 				continue
@@ -53,16 +50,13 @@ func (h *AlterTableHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error)
 				Column: colName,
 			})
 
-		case pg_nodes.AT_AlterColumnType:
-			colName := ""
-			if cmd.Name != nil {
-				colName = *cmd.Name
-			}
+		case pg_query.AlterTableType_AT_AlterColumnType:
+			colName := cmd.Name
 			if colName == "" || cmd.Def == nil {
 				fmt.Fprintf(os.Stderr, "warning: ALTER COLUMN TYPE missing column name or type\n")
 				continue
 			}
-			if colDef, ok := cmd.Def.(pg_nodes.ColumnDef); ok {
+			if colDef := cmd.Def.GetColumnDef(); colDef != nil {
 				col := parserutil.ParseColumnDef(colDef)
 				mutations = append(mutations, AlterColumnTypeMutation{
 					Schema: schemaName,
@@ -72,11 +66,8 @@ func (h *AlterTableHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error)
 				})
 			}
 
-		case pg_nodes.AT_SetNotNull:
-			colName := ""
-			if cmd.Name != nil {
-				colName = *cmd.Name
-			}
+		case pg_query.AlterTableType_AT_SetNotNull:
+			colName := cmd.Name
 			if colName == "" {
 				fmt.Fprintf(os.Stderr, "warning: SET NOT NULL missing column name\n")
 				continue
@@ -87,11 +78,8 @@ func (h *AlterTableHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error)
 				Column: colName,
 			})
 
-		case pg_nodes.AT_DropNotNull:
-			colName := ""
-			if cmd.Name != nil {
-				colName = *cmd.Name
-			}
+		case pg_query.AlterTableType_AT_DropNotNull:
+			colName := cmd.Name
 			if colName == "" {
 				fmt.Fprintf(os.Stderr, "warning: DROP NOT NULL missing column name\n")
 				continue
@@ -102,11 +90,8 @@ func (h *AlterTableHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error)
 				Column: colName,
 			})
 
-		case pg_nodes.AT_ColumnDefault:
-			colName := ""
-			if cmd.Name != nil {
-				colName = *cmd.Name
-			}
+		case pg_query.AlterTableType_AT_ColumnDefault:
+			colName := cmd.Name
 			if colName == "" {
 				fmt.Fprintf(os.Stderr, "warning: ALTER COLUMN DEFAULT missing column name\n")
 				continue
@@ -137,18 +122,6 @@ func (h *AlterTableHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error)
 }
 
 // extractDefaultExpr extracts default expression from a node
-func extractDefaultExpr(node pg_nodes.Node) string {
-	if d, ok := node.(interface{ Deparse() string }); ok {
-		var result string
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					result = fmt.Sprintf("%v", node)
-				}
-			}()
-			result = d.Deparse()
-		}()
-		return result
-	}
+func extractDefaultExpr(node *pg_query.Node) string {
 	return fmt.Sprintf("%v", node)
 }
