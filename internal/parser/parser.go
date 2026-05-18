@@ -78,7 +78,7 @@ func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
 	}
 
 	for _, rawStmt := range tree.Stmts {
-		if err := p.visitNode(rawStmt.Stmt); err != nil {
+		if err := p.visitNode(rawStmt.Stmt, int(rawStmt.StmtLocation)); err != nil {
 			p.errors = append(p.errors, err)
 		}
 	}
@@ -90,8 +90,9 @@ func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
 	return p.schema, nil
 }
 
-// visitNode dispatches node to the registered handler via HandlerRegistry.
-func (p *Parser) visitNode(stmt *pg_query.Node) (err error) {
+// visitNode dispatches the statement node to the registered handler via HandlerRegistry.
+// stmt is the inner statement (e.g., CreateStmt) extracted from a RawStmt wrapper.
+func (p *Parser) visitNode(stmt *pg_query.Node, pos int) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = &ParseError{
@@ -101,27 +102,16 @@ func (p *Parser) visitNode(stmt *pg_query.Node) (err error) {
 		}
 	}()
 
-	rawStmt := stmt.GetRawStmt()
-	if rawStmt == nil {
-		return &ParseError{
-			Message:  fmt.Sprintf("expected RawStmt, got: %T", stmt),
-			Position: -1,
-		}
-	}
-
-	actualStmt := rawStmt.Stmt
-	pos := int(rawStmt.StmtLocation)
-
-	handler, found := p.registry.Dispatch(actualStmt)
+	handler, found := p.registry.Dispatch(stmt)
 	if !found {
 		return &ParseError{
-			Message:   fmt.Sprintf("unsupported statement type: %T", actualStmt),
+			Message:   fmt.Sprintf("unsupported statement type: %T", stmt),
 			Position:  pos,
 			Statement: p.getStatementSnippet(pos),
 		}
 	}
 
-	mutations, err := handler.Handle(actualStmt)
+	mutations, err := handler.Handle(stmt)
 	if err != nil {
 		return &ParseError{
 			Message:   err.Error(),
