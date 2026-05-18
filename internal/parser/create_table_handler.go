@@ -6,7 +6,7 @@ import (
 
 	"github.com/fred29910/migra-go/internal/model"
 	"github.com/fred29910/migra-go/internal/parser/parserutil"
-	pg_nodes "github.com/lfittl/pg_query_go/nodes"
+	pg_query "github.com/pganalyze/pg_query_go/v6"
 )
 
 // CreateTableHandler handles CREATE TABLE statements.
@@ -26,10 +26,10 @@ func defaultConstraintName(table string, constraint model.Constraint) string {
 }
 
 // Handle converts a pg_query CreateStmt into schema mutations.
-func (h *CreateTableHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error) {
-	stmt, ok := node.(pg_nodes.CreateStmt)
-	if !ok {
-		return nil, fmt.Errorf("CreateTableHandler: expected pg_nodes.CreateStmt, got %T", node)
+func (h *CreateTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error) {
+	stmt := node.GetCreateStmt()
+	if stmt == nil {
+		return nil, fmt.Errorf("CreateTableHandler: expected CreateStmt, got %T", node)
 	}
 	tableName, schemaName := parserutil.ParseRelation(stmt.Relation)
 
@@ -37,13 +37,14 @@ func (h *CreateTableHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error
 	var primaryKey *model.PrimaryKey
 	var constraints []model.Constraint
 
-	for _, item := range stmt.TableElts.Items {
-		switch elt := item.(type) {
-		case pg_nodes.ColumnDef:
-			col := parserutil.ParseColumnDef(elt)
-			for _, conItem := range elt.Constraints.Items {
-				if c, ok := conItem.(pg_nodes.Constraint); ok {
-					if c.Contype == pg_nodes.CONSTR_PRIMARY {
+	for _, item := range stmt.TableElts {
+		switch elt := item.GetNode().(type) {
+		case *pg_query.Node_ColumnDef:
+			colDef := elt.ColumnDef
+			col := parserutil.ParseColumnDef(colDef)
+			for _, conItem := range colDef.Constraints {
+				if c := conItem.GetConstraint(); c != nil {
+					if c.Contype == pg_query.ConstrType_CONSTR_PRIMARY {
 						col.IsNullable = false
 						primaryKey = &model.PrimaryKey{
 							Name:    defaultConstraintName(tableName, model.Constraint{Name: "", Type: "primary_key"}),
@@ -58,13 +59,14 @@ func (h *CreateTableHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error
 				}
 			}
 			columns = append(columns, *col)
-		case pg_nodes.Constraint:
-			switch elt.Contype {
-			case pg_nodes.CONSTR_PRIMARY:
+		case *pg_query.Node_Constraint:
+			constraint := elt.Constraint
+			switch constraint.Contype {
+			case pg_query.ConstrType_CONSTR_PRIMARY:
 				var cols []string
-				for _, key := range elt.Keys.Items {
-					if s, ok := key.(pg_nodes.String); ok {
-						cols = append(cols, s.Str)
+				for _, key := range constraint.Keys {
+					if s := key.GetString_(); s != nil {
+						cols = append(cols, s.Sval)
 					}
 				}
 				primaryKey = &model.PrimaryKey{
@@ -76,26 +78,26 @@ func (h *CreateTableHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error
 					Type:    "primary_key",
 					Columns: cols,
 				})
-			case pg_nodes.CONSTR_FOREIGN:
+			case pg_query.ConstrType_CONSTR_FOREIGN:
 				var fkCols []string
-				for _, attr := range elt.FkAttrs.Items {
-					if s, ok := attr.(pg_nodes.String); ok {
-						fkCols = append(fkCols, s.Str)
+				for _, attr := range constraint.FkAttrs {
+					if s := attr.GetString_(); s != nil {
+						fkCols = append(fkCols, s.Sval)
 					}
 				}
 				var refCols []string
-				for _, attr := range elt.PkAttrs.Items {
-					if s, ok := attr.(pg_nodes.String); ok {
-						refCols = append(refCols, s.Str)
+				for _, attr := range constraint.PkAttrs {
+					if s := attr.GetString_(); s != nil {
+						refCols = append(refCols, s.Sval)
 					}
 				}
 				refSchema := "public"
-				if elt.Pktable != nil && elt.Pktable.Schemaname != nil {
-					refSchema = *elt.Pktable.Schemaname
+				if constraint.Pktable != nil && constraint.Pktable.Schemaname != "" {
+					refSchema = constraint.Pktable.Schemaname
 				}
 				refTable := ""
-				if elt.Pktable != nil && elt.Pktable.Relname != nil {
-					refTable = *elt.Pktable.Relname
+				if constraint.Pktable != nil {
+					refTable = constraint.Pktable.Relname
 				}
 				con := model.Constraint{
 					Name:       "",
