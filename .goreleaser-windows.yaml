@@ -1,0 +1,50 @@
+# .goreleaser-windows.yaml
+# GoReleaser 配置 — Windows 构建（windows/amd64）
+# 由 release.yml -> build-windows job 使用
+# 独立于 Linux/Darwin 构建，失败不阻塞 release
+
+version: 2
+
+project_name: migra
+
+env:
+  - CGO_ENABLED=1
+
+builds:
+  - binary: migra
+    main: ./cmd/migra
+    goos:
+      - windows
+    goarch:
+      - amd64
+    env:
+      - CGO_ENABLED=1
+    ldflags:
+      - -s -w
+      - -X github.com/fred29910/migra-go/internal/version.Version={{ .Tag }}
+      - -X github.com/fred29910/migra-go/internal/version.BuildTime={{ .Date }}
+      - -X github.com/fred29910/migra-go/internal/version.GitCommit={{ .ShortCommit }}
+    overrides:
+      - goos: windows
+        goarch: amd64
+        env:
+          - CC=x86_64-w64-mingw32-gcc
+          - CGO_ENABLED=1
+
+archives:
+  - id: default
+    format: zip
+    name_template: >-
+      {{ .ProjectName }}-
+      {{- .Os }}-
+      {{- .Arch }}
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "checksums-windows.txt"
+  algorithm: sha256
+
+# Windows 不生成 SBOM（由 linux job 统一生成）
+dist: dist
