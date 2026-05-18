@@ -1,6 +1,8 @@
 # .goreleaser.yaml
 # GoReleaser 配置 — 用于 ubuntu-latest runner（linux/amd64, linux/arm64, windows/amd64）
 
+version: 2
+
 project_name: migra
 
 env:
@@ -26,7 +28,6 @@ builds:
       - -X github.com/fred29910/migra-go/internal/version.Version={{ .Tag }}
       - -X github.com/fred29910/migra-go/internal/version.BuildTime={{ .Date }}
       - -X github.com/fred29910/migra-go/internal/version.GitCommit={{ .ShortCommit }}
-      - -X github.com/fred29910/migra-go/internal/version.GoVersion={{ .GoVersion }}
     overrides:
       - goos: linux
         goarch: arm64
@@ -40,7 +41,8 @@ builds:
           - CGO_ENABLED=1
 
 archives:
-  - format: tar.gz
+  - id: default
+    format: tar.gz
     format_overrides:
       - goos: windows
         format: zip

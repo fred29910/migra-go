@@ -1,11 +1,15 @@
 // Package version holds build-time injected version information.
 //
-// Variables Version, BuildTime, GitCommit, and GoVersion are set
-// at build time via -ldflags "-X". When built directly with
+// Variables Version, BuildTime, and GitCommit are set
+// at build time via -ldflags "-X". GoVersion is obtained
+// at runtime via runtime.Version(). When built directly with
 // 'go build' (without Makefile), they default to "dev"/"unknown".
 package version
 
-import "fmt"
+import (
+	"fmt"
+	"runtime"
+)
 
 var (
 	// Version is the semantic version or git describe output.
@@ -14,15 +18,18 @@ var (
 	BuildTime = "unknown"
 	// GitCommit is the short SHA of the git commit.
 	GitCommit = "unknown"
-	// GoVersion is the Go compiler version used to build.
-	GoVersion = "unknown"
 )
+
+// GoVersion returns the Go runtime version at execution time.
+func GoVersion() string {
+	return runtime.Version()
+}
 
 // Info returns a multi-line formatted version string.
 func Info() string {
 	return fmt.Sprintf(
 		"Version:    %s\nBuilt:      %s\nGit Commit: %s\nGo Version: %s",
-		Version, BuildTime, GitCommit, GoVersion,
+		Version, BuildTime, GitCommit, GoVersion(),
 	)
 }
 
