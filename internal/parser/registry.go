@@ -3,12 +3,12 @@ package parser
 import (
 	"reflect"
 
-	pg_nodes "github.com/lfittl/pg_query_go/nodes"
+	pg_query "github.com/pganalyze/pg_query_go/v6"
 )
 
 // Handler parses a single pg_query AST node into schema mutations.
 type Handler interface {
-	Handle(node pg_nodes.Node) ([]SchemaMutation, error)
+	Handle(node *pg_query.Node) ([]SchemaMutation, error)
 }
 
 // HandlerRegistry routes AST nodes to their handlers using reflect.Type lookup.
@@ -22,23 +22,28 @@ func NewHandlerRegistry() *HandlerRegistry {
 }
 
 // Register associates a handler with a specific AST node type.
-func (r *HandlerRegistry) Register(nodeType pg_nodes.Node, h Handler) {
-	r.handlers[reflect.TypeOf(nodeType)] = h
+// nodeType must have a non-nil .Node oneof field (e.g., &pg_query.Node{Node: &pg_query.Node_CreateStmt{}}).
+func (r *HandlerRegistry) Register(nodeType *pg_query.Node, h Handler) {
+	r.handlers[reflect.TypeOf(nodeType.Node)] = h
 }
 
 // Dispatch finds the handler for the given AST node.
-func (r *HandlerRegistry) Dispatch(node pg_nodes.Node) (Handler, bool) {
-	h, ok := r.handlers[reflect.TypeOf(node)]
+// It uses the protobuf oneof type (via GetNode()) as the lookup key.
+func (r *HandlerRegistry) Dispatch(node *pg_query.Node) (Handler, bool) {
+	if node == nil || node.GetNode() == nil {
+		return nil, false
+	}
+	h, ok := r.handlers[reflect.TypeOf(node.GetNode())]
 	return h, ok
 }
 
 // DefaultRegistry returns a registry with all built-in handlers.
 func DefaultRegistry() *HandlerRegistry {
 	r := NewHandlerRegistry()
-	r.Register(pg_nodes.CreateStmt{}, &CreateTableHandler{})
-	r.Register(pg_nodes.AlterTableStmt{}, &AlterTableHandler{})
-	r.Register(pg_nodes.CreateEnumStmt{}, &CreateEnumHandler{})
-	r.Register(pg_nodes.IndexStmt{}, &CreateIndexHandler{})
-	r.Register(pg_nodes.CreateSchemaStmt{}, &CreateSchemaHandler{})
+	r.Register(&pg_query.Node{Node: &pg_query.Node_CreateStmt{}}, &CreateTableHandler{})
+	r.Register(&pg_query.Node{Node: &pg_query.Node_AlterTableStmt{}}, &AlterTableHandler{})
+	r.Register(&pg_query.Node{Node: &pg_query.Node_CreateEnumStmt{}}, &CreateEnumHandler{})
+	r.Register(&pg_query.Node{Node: &pg_query.Node_IndexStmt{}}, &CreateIndexHandler{})
+	r.Register(&pg_query.Node{Node: &pg_query.Node_CreateSchemaStmt{}}, &CreateSchemaHandler{})
 	return r
 }
