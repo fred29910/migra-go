@@ -3,25 +3,25 @@ package parser
 import (
 	"fmt"
 
-	pg_nodes "github.com/lfittl/pg_query_go/nodes"
+	pg_query "github.com/pganalyze/pg_query_go/v6"
 )
 
 // CreateEnumHandler handles CREATE TYPE ... AS ENUM statements.
 type CreateEnumHandler struct{}
 
 // Handle converts a pg_query CreateEnumStmt into schema mutations.
-func (h *CreateEnumHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error) {
-	stmt, ok := node.(pg_nodes.CreateEnumStmt)
-	if !ok {
-		return nil, fmt.Errorf("CreateEnumHandler: expected pg_nodes.CreateEnumStmt, got %T", node)
+func (h *CreateEnumHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error) {
+	stmt := node.GetCreateEnumStmt()
+	if stmt == nil {
+		return nil, fmt.Errorf("CreateEnumHandler: expected CreateEnumStmt, got %T", node)
 	}
 	schemaName := "public"
 	typeName := ""
-	if len(stmt.TypeName.Items) > 0 {
-		parts := make([]string, 0, len(stmt.TypeName.Items))
-		for _, item := range stmt.TypeName.Items {
-			if s, ok := item.(pg_nodes.String); ok {
-				parts = append(parts, s.Str)
+	if len(stmt.TypeName) > 0 {
+		parts := make([]string, 0, len(stmt.TypeName))
+		for _, item := range stmt.TypeName {
+			if s := item.GetString_(); s != nil {
+				parts = append(parts, s.Sval)
 			}
 		}
 		if len(parts) == 1 {
@@ -34,10 +34,10 @@ func (h *CreateEnumHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error)
 	if typeName == "" {
 		return nil, fmt.Errorf("CreateEnumHandler: unable to extract type name from CreateEnumStmt")
 	}
-	labels := make([]string, 0, len(stmt.Vals.Items))
-	for _, item := range stmt.Vals.Items {
-		if s, ok := item.(pg_nodes.String); ok {
-			labels = append(labels, s.Str)
+	labels := make([]string, 0, len(stmt.Vals))
+	for _, item := range stmt.Vals {
+		if s := item.GetString_(); s != nil {
+			labels = append(labels, s.Sval)
 		}
 	}
 	return []SchemaMutation{CreateEnumTypeMutation{Schema: schemaName, Name: typeName, Labels: labels}}, nil
