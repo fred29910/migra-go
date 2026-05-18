@@ -9,12 +9,10 @@ func TestInfo_ContainsAllFields(t *testing.T) {
 	Version = "v0.2.0"
 	BuildTime = "2026-05-14T10:00:00Z"
 	GitCommit = "abc1234"
-	GoVersion = "go1.26.2"
 	defer func() {
 		Version = "dev"
 		BuildTime = "unknown"
 		GitCommit = "unknown"
-		GoVersion = "unknown"
 	}()
 
 	got := Info()
@@ -25,6 +23,10 @@ func TestInfo_ContainsAllFields(t *testing.T) {
 	}
 	if !strings.Contains(got, "v0.2.0") {
 		t.Errorf("Info() should contain version, got:\n%s", got)
+	}
+	// GoVersion is now obtained at runtime via runtime.Version()
+	if !strings.Contains(got, "go") {
+		t.Errorf("Info() should contain a Go version starting with 'go', got:\n%s", got)
 	}
 }
 
@@ -42,7 +44,6 @@ func TestDefaults(t *testing.T) {
 	Version = "dev"
 	BuildTime = "unknown"
 	GitCommit = "unknown"
-	GoVersion = "unknown"
 
 	got := Info()
 	if !strings.Contains(got, "dev") {
@@ -50,5 +51,12 @@ func TestDefaults(t *testing.T) {
 	}
 	if Short() != "dev" {
 		t.Errorf("Short() with defaults = %q, want %q", Short(), "dev")
+	}
+}
+
+func TestGoVersion_RuntimeVersion(t *testing.T) {
+	v := GoVersion()
+	if !strings.HasPrefix(v, "go") {
+		t.Errorf("GoVersion() = %q, want prefix 'go'", v)
 	}
 }
