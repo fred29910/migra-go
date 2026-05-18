@@ -1,5 +1,5 @@
 #!/bin/bash
-# 发布脚本 - 创建新版本标签
+# 发布脚本 - 创建新版本标签并推送，由 CI 自动构建发布
 
 set -e
 
@@ -28,7 +28,7 @@ fi
 
 # 运行测试
 echo "🧪 运行测试..."
-make test
+go test ./...
 
 # 更新 CHANGELOG.md (手动步骤提示)
 echo ""
@@ -48,10 +48,10 @@ git tag -a "$VERSION" -m "Release $VERSION"
 
 # 推送
 echo "📤 推送到远程..."
-git push origin develop
+git push origin "$(git branch --show-current)"
 git push origin "$VERSION"
 
 echo ""
 echo "✅ 发布 $VERSION 完成！"
-echo "   GitHub Actions 将自动构建并创建 Release"
+echo "   GitHub Actions 将自动构建多平台二进制并创建 Release"
 echo "   查看: https://github.com/fred29910/migra-go/actions"
