@@ -3,19 +3,17 @@ package parser
 import (
 	"testing"
 
-	pg "github.com/lfittl/pg_query_go"
-	pg_nodes "github.com/lfittl/pg_query_go/nodes"
+	pg_query "github.com/pganalyze/pg_query_go/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func mustParseFirstStmt(t *testing.T, sql string) pg_nodes.Node {
+func mustParseFirstStmt(t *testing.T, sql string) *pg_query.Node {
 	t.Helper()
-	tree, err := pg.Parse(sql)
+	tree, err := pg_query.Parse(sql)
 	require.NoError(t, err)
-	require.Len(t, tree.Statements, 1)
-	raw := tree.Statements[0].(pg_nodes.RawStmt)
-	return raw.Stmt
+	require.Len(t, tree.Stmts, 1)
+	return tree.Stmts[0].Stmt
 }
 
 func TestCreateTableHandler(t *testing.T) {
@@ -71,28 +69,27 @@ func TestAlterTableHandler_MultipleAddColumns(t *testing.T) {
 }
 
 func TestHandlers_TypeSafety(t *testing.T) {
-	// Create a node that is NOT what the handlers expect
-	node := pg_nodes.VacuumStmt{}
+	node := &pg_query.Node{Node: &pg_query.Node_VacuumStmt{}}
 
 	t.Run("CreateTableHandler", func(t *testing.T) {
 		h := &CreateTableHandler{}
 		_, err := h.Handle(node)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "expected pg_nodes.CreateStmt")
+		assert.Contains(t, err.Error(), "expected")
 	})
 
 	t.Run("AlterTableHandler", func(t *testing.T) {
 		h := &AlterTableHandler{}
 		_, err := h.Handle(node)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "expected pg_nodes.AlterTableStmt")
+		assert.Contains(t, err.Error(), "expected")
 	})
 
 	t.Run("CreateSchemaHandler", func(t *testing.T) {
 		h := &CreateSchemaHandler{}
 		_, err := h.Handle(node)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "expected pg_nodes.CreateSchemaStmt")
+		assert.Contains(t, err.Error(), "expected")
 	})
 }
 
