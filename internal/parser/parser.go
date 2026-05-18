@@ -8,8 +8,7 @@ import (
 	"fmt"
 
 	"github.com/fred29910/migra-go/internal/model"
-	pg "github.com/lfittl/pg_query_go"
-	pg_nodes "github.com/lfittl/pg_query_go/nodes"
+	pg_query "github.com/pganalyze/pg_query_go/v6"
 )
 
 // ParseError represents a parsing error with position information
@@ -73,15 +72,13 @@ func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
 	p.errors = p.errors[:0]
 	p.sql = sql
 
-	// Use pg_query_go to parse SQL into AST
-	tree, err := pg.Parse(sql)
+	tree, err := pg_query.Parse(sql)
 	if err != nil {
 		return nil, fmt.Errorf("pg_query parse failed: %w", err)
 	}
 
-	// Traverse AST statements
-	for _, stmt := range tree.Statements {
-		if err := p.visitNode(stmt); err != nil {
+	for _, rawStmt := range tree.Stmts {
+		if err := p.visitNode(rawStmt.Stmt); err != nil {
 			p.errors = append(p.errors, err)
 		}
 	}
@@ -94,8 +91,7 @@ func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
 }
 
 // visitNode dispatches node to the registered handler via HandlerRegistry.
-func (p *Parser) visitNode(stmt pg_nodes.Node) (err error) {
-	// Panic recovery to prevent entire process from crashing
+func (p *Parser) visitNode(stmt *pg_query.Node) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = &ParseError{
@@ -105,9 +101,8 @@ func (p *Parser) visitNode(stmt pg_nodes.Node) (err error) {
 		}
 	}()
 
-	// Statements from pg_query.Parse() are wrapped in RawStmt
-	rawStmt, ok := stmt.(pg_nodes.RawStmt)
-	if !ok {
+	rawStmt := stmt.GetRawStmt()
+	if rawStmt == nil {
 		return &ParseError{
 			Message:  fmt.Sprintf("expected RawStmt, got: %T", stmt),
 			Position: -1,
@@ -115,7 +110,7 @@ func (p *Parser) visitNode(stmt pg_nodes.Node) (err error) {
 	}
 
 	actualStmt := rawStmt.Stmt
-	pos := rawStmt.StmtLocation
+	pos := int(rawStmt.StmtLocation)
 
 	handler, found := p.registry.Dispatch(actualStmt)
 	if !found {
