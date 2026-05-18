@@ -5,34 +5,31 @@ import (
 
 	"github.com/fred29910/migra-go/internal/model"
 	"github.com/fred29910/migra-go/internal/parser/parserutil"
-	pg_nodes "github.com/lfittl/pg_query_go/nodes"
+	pg_query "github.com/pganalyze/pg_query_go/v6"
 )
 
 // CreateIndexHandler handles CREATE INDEX statements.
 type CreateIndexHandler struct{}
 
 // Handle converts a pg_query IndexStmt into schema mutations.
-func (h *CreateIndexHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error) {
-	stmt, ok := node.(pg_nodes.IndexStmt)
-	if !ok {
-		return nil, fmt.Errorf("CreateIndexHandler: expected pg_nodes.IndexStmt, got %T", node)
+func (h *CreateIndexHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error) {
+	stmt := node.GetIndexStmt()
+	if stmt == nil {
+		return nil, fmt.Errorf("CreateIndexHandler: expected IndexStmt, got %T", node)
 	}
 
 	// Parse table name
 	tableName, schemaName := parserutil.ParseRelation(stmt.Relation)
 
 	// Parse index name (generate default if empty)
-	indexName := ""
-	if stmt.Idxname != nil {
-		indexName = *stmt.Idxname
-	}
+	indexName := stmt.Idxname
 	if indexName == "" {
 		indexName = generateDefaultIndexName(tableName, stmt.IndexParams)
 	}
 
 	// Parse index elements
-	elements := make([]model.IndexElem, 0, len(stmt.IndexParams.Items))
-	for _, item := range stmt.IndexParams.Items {
+	elements := make([]model.IndexElem, 0, len(stmt.IndexParams))
+	for _, item := range stmt.IndexParams {
 		indexElem, err := parseIndexElem(item)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse index element: %w", err)
@@ -48,8 +45,8 @@ func (h *CreateIndexHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error
 
 	// Parse access method
 	method := "btree" // default
-	if stmt.AccessMethod != nil {
-		method = *stmt.AccessMethod
+	if stmt.AccessMethod != "" {
+		method = stmt.AccessMethod
 	}
 
 	index := model.Index{
@@ -72,17 +69,17 @@ func (h *CreateIndexHandler) Handle(node pg_nodes.Node) ([]SchemaMutation, error
 }
 
 // parseIndexElem parses a single IndexElem from pg_query node
-func parseIndexElem(node pg_nodes.Node) (model.IndexElem, error) {
-	elem, ok := node.(pg_nodes.IndexElem)
-	if !ok {
+func parseIndexElem(node *pg_query.Node) (model.IndexElem, error) {
+	elem := node.GetIndexElem()
+	if elem == nil {
 		return model.IndexElem{}, fmt.Errorf("expected IndexElem, got %T", node)
 	}
 
 	result := model.IndexElem{}
 
 	// Column name (simple column index)
-	if elem.Name != nil {
-		result.Name = *elem.Name
+	if elem.Name != "" {
+		result.Name = elem.Name
 	}
 
 	// Expression (expression index)
@@ -91,58 +88,45 @@ func parseIndexElem(node pg_nodes.Node) (model.IndexElem, error) {
 	}
 
 	// Index column name
-	if elem.Indexcolname != nil {
-		result.IndexColName = *elem.Indexcolname
+	if elem.Indexcolname != "" {
+		result.IndexColName = elem.Indexcolname
 	}
 
 	// Ordering
 	switch elem.Ordering {
-	case pg_nodes.SORTBY_DEFAULT:
+	case pg_query.SortByDir_SORTBY_DEFAULT:
 		result.Ordering = "default"
-	case pg_nodes.SORTBY_ASC:
+	case pg_query.SortByDir_SORTBY_ASC:
 		result.Ordering = "ASC"
-	case pg_nodes.SORTBY_DESC:
+	case pg_query.SortByDir_SORTBY_DESC:
 		result.Ordering = "DESC"
 	}
 
 	// Nulls ordering
 	switch elem.NullsOrdering {
-	case pg_nodes.SORTBY_NULLS_DEFAULT:
+	case pg_query.SortByNulls_SORTBY_NULLS_DEFAULT:
 		result.NullsOrdering = "default"
-	case pg_nodes.SORTBY_NULLS_FIRST:
+	case pg_query.SortByNulls_SORTBY_NULLS_FIRST:
 		result.NullsOrdering = "FIRST"
-	case pg_nodes.SORTBY_NULLS_LAST:
+	case pg_query.SortByNulls_SORTBY_NULLS_LAST:
 		result.NullsOrdering = "LAST"
 	}
 
 	return result, nil
 }
 
-// safeDeparse safely calls Deparse() method, recovering from panic
-func safeDeparse(node interface{}) string {
-	if d, ok := node.(interface{ Deparse() string }); ok {
-		var result string
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					// Deparse not implemented, use fmt as fallback
-					result = fmt.Sprintf("%v", node)
-				}
-			}()
-			result = d.Deparse()
-		}()
-		return result
-	}
+// safeDeparse safely converts a pg_query node to its string representation
+func safeDeparse(node *pg_query.Node) string {
 	return fmt.Sprintf("%v", node)
 }
 
 // generateDefaultIndexName generates a default index name
-func generateDefaultIndexName(tableName string, indexParams pg_nodes.List) string {
+func generateDefaultIndexName(tableName string, indexParams []*pg_query.Node) string {
 	// Simple heuristic: use first column name or "expr" for expression indexes
-	for _, item := range indexParams.Items {
-		if elem, ok := item.(pg_nodes.IndexElem); ok {
-			if elem.Name != nil {
-				return fmt.Sprintf("%s_%s_idx", tableName, *elem.Name)
+	for _, item := range indexParams {
+		if elem := item.GetIndexElem(); elem != nil {
+			if elem.Name != "" {
+				return fmt.Sprintf("%s_%s_idx", tableName, elem.Name)
 			}
 			if elem.Expr != nil {
 				return fmt.Sprintf("%s_expr_idx", tableName)
