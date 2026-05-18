@@ -5,44 +5,39 @@ import (
 	"strings"
 
 	"github.com/fred29910/migra-go/internal/model"
-	pg_nodes "github.com/lfittl/pg_query_go/nodes"
+	pg_query "github.com/pganalyze/pg_query_go/v6"
 )
 
 // ParseRelation extracts table/view name and schema from RangeVar.
-func ParseRelation(relation *pg_nodes.RangeVar) (tableName, schemaName string) {
+func ParseRelation(relation *pg_query.RangeVar) (tableName, schemaName string) {
 	if relation == nil {
 		return "", "public"
 	}
-	if relation.Relname != nil {
-		tableName = *relation.Relname
-	}
-	if relation.Schemaname != nil {
-		schemaName = *relation.Schemaname
-	} else {
+	tableName = relation.Relname
+	schemaName = relation.Schemaname
+	if schemaName == "" {
 		schemaName = "public"
 	}
 	return
 }
 
 // ParseColumnDef extracts a model.Column from pg_query ColumnDef node.
-func ParseColumnDef(elt pg_nodes.ColumnDef) *model.Column {
-	col := &model.Column{IsNullable: true}
-	if elt.Colname != nil {
-		col.Name = *elt.Colname
+func ParseColumnDef(colDef *pg_query.ColumnDef) *model.Column {
+	col := &model.Column{IsNullable: !colDef.IsNotNull}
+	if colDef.Colname != "" {
+		col.Name = colDef.Colname
 	}
-	if elt.TypeName != nil {
-		col.DataType = ParseTypeName(*elt.TypeName)
+	if colDef.TypeName != nil {
+		col.DataType = ParseTypeName(colDef.TypeName)
 	}
-	for _, item := range elt.Constraints.Items {
-		switch c := item.(type) {
-		case pg_nodes.Constraint:
+	for _, item := range colDef.Constraints {
+		if c := item.GetConstraint(); c != nil {
 			switch c.Contype {
-			case pg_nodes.CONSTR_NOTNULL:
+			case pg_query.ConstrType_CONSTR_NOTNULL:
 				col.IsNullable = false
-			case pg_nodes.CONSTR_DEFAULT:
+			case pg_query.ConstrType_CONSTR_DEFAULT:
 				if c.RawExpr != nil {
-					expr, ok := ParseExpression(c.RawExpr)
-					if ok {
+					if expr, ok := ParseExpression(c.RawExpr); ok {
 						col.DefaultExpr = &expr
 					}
 				}
@@ -53,25 +48,23 @@ func ParseColumnDef(elt pg_nodes.ColumnDef) *model.Column {
 }
 
 // ParseTypeName maps pg_query TypeName to a standard SQL type string.
-func ParseTypeName(typeName pg_nodes.TypeName) string {
+func ParseTypeName(typeName *pg_query.TypeName) string {
 	parts := make([]string, 0)
-	for _, item := range typeName.Names.Items {
-		if s, ok := item.(pg_nodes.String); ok {
-			if s.Str != "pg_catalog" {
-				parts = append(parts, s.Str)
+	for _, item := range typeName.Names {
+		if s := item.GetString_(); s != nil {
+			if s.Sval != "pg_catalog" {
+				parts = append(parts, s.Sval)
 			}
 		}
 	}
 	typeStr := strings.Join(parts, ".")
 	typeStr = MapTypeName(typeStr)
-	if len(typeName.Typmods.Items) > 0 {
+	if len(typeName.Typmods) > 0 {
 		mods := make([]string, 0)
-		for _, item := range typeName.Typmods.Items {
-			if a, ok := item.(pg_nodes.A_Const); ok {
-				if a.Val != nil {
-					if i, ok := a.Val.(pg_nodes.Integer); ok {
-						mods = append(mods, fmt.Sprintf("%d", i.Ival))
-					}
+		for _, item := range typeName.Typmods {
+			if a := item.GetAConst(); a != nil {
+				if ival := a.GetIval(); ival != nil {
+					mods = append(mods, fmt.Sprintf("%d", ival.Ival))
 				}
 			}
 		}
@@ -83,48 +76,33 @@ func ParseTypeName(typeName pg_nodes.TypeName) string {
 }
 
 // ParseExpression extracts expression as string from AST node.
-func ParseExpression(expr pg_nodes.Node) (string, bool) {
-	switch e := expr.(type) {
-	case pg_nodes.A_Const:
-		if e.Val != nil {
-			switch v := e.Val.(type) {
-			case pg_nodes.String:
-				return "'" + v.Str + "'", true
-			case pg_nodes.Integer:
-				return fmt.Sprintf("%d", v.Ival), true
-			case pg_nodes.Float:
-				return v.Str, true
+func ParseExpression(expr *pg_query.Node) (string, bool) {
+	switch e := expr.GetNode().(type) {
+	case *pg_query.Node_AConst:
+		a := e.AConst
+		if sval := a.GetSval(); sval != nil {
+			return "'" + sval.Sval + "'", true
+		}
+		if ival := a.GetIval(); ival != nil {
+			return fmt.Sprintf("%d", ival.Ival), true
+		}
+		if fval := a.GetFval(); fval != nil {
+			return fval.Fval, true
+		}
+	case *pg_query.Node_FuncCall:
+		parts := make([]string, 0, len(e.FuncCall.Funcname))
+		for _, item := range e.FuncCall.Funcname {
+			if s := item.GetString_(); s != nil {
+				parts = append(parts, s.Sval)
 			}
 		}
-	case pg_nodes.FuncCall:
-		parts := make([]string, 0, len(e.Funcname.Items))
-		for _, item := range e.Funcname.Items {
-			if s, ok := item.(pg_nodes.String); ok {
-				parts = append(parts, s.Str)
-			}
-		}
-		argStrs := make([]string, 0, len(e.Args.Items))
-		for _, item := range e.Args.Items {
+		argStrs := make([]string, 0, len(e.FuncCall.Args))
+		for _, item := range e.FuncCall.Args {
 			if s, ok := ParseExpression(item); ok {
 				argStrs = append(argStrs, s)
 			}
 		}
 		return strings.Join(parts, ".") + "(" + strings.Join(argStrs, ", ") + ")", true
-	}
-	if d, ok := expr.(interface{ Deparse() string }); ok {
-		var out string
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					out = ""
-				}
-			}()
-			out = d.Deparse()
-		}()
-		out = strings.TrimSpace(out)
-		if out != "" {
-			return out, true
-		}
 	}
 	return "", false
 }
