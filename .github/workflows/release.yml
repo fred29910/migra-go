@@ -10,7 +10,7 @@ jobs:
     name: Build (Linux)
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/goreleaser/goreleaser-cross:v1.26
+      image: ghcr.io/goreleaser/goreleaser-cross:v1.26.2-3
     permissions:
       contents: write
     steps:
@@ -33,6 +33,10 @@ jobs:
         run: |
           apt-get update -qq
           apt-get install -y -qq libc6-dev-arm64-cross
+
+      - name: Install syft (SBOM generator)
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -60,7 +64,7 @@ jobs:
     name: Build (Windows)
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/goreleaser/goreleaser-cross:v1.26
+      image: ghcr.io/goreleaser/goreleaser-cross:v1.26.2-3
     # Windows 构建为可选：失败不会影响 Linux/Darwin 发版
     continue-on-error: true
     permissions:
@@ -73,11 +77,13 @@ jobs:
       - name: Fix git safe.directory (container ownership mismatch)
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      # pg_query_go 的 C 代码需要 MinGW-w64 版本的 netdb.h
-      - name: Install MinGW C headers
+      # pg_query_go 的 C 代码需要 MinGW-w64 版本的 netdb.h 等头文件
+      # mingw-w64 包含完整工具链（x86_64-w64-mingw32-gcc + 所有头文件）
+      # 注意：mingw-w64-common 只包含通用配置，不包含编译器和头文件
+      - name: Install MinGW-w64 toolchain and headers
         run: |
           apt-get update -qq
-          apt-get install -y -qq mingw-w64-common
+          apt-get install -y -qq mingw-w64
 
       - name: Cache Go modules
         uses: actions/cache@v4
