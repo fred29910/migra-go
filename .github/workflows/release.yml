@@ -9,27 +9,33 @@ jobs:
   build-linux-windows:
     name: Build (Linux + Windows)
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/goreleaser/goreleaser-cross:v1.26
     permissions:
       contents: write
     steps:
+      # fetch-depth: 0 确保完整 git 历史，goreleaser 需要它来解析 tag
       - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
-          cache: true
+          fetch-depth: 0
 
-      - name: Install cross-compilation toolchains
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq gcc-aarch64-linux-gnu gcc-mingw-w64
+      # Go 和交叉编译工具链已内置在 goreleaser-cross 容器中
+      # 不再需要手动安装 gcc-aarch64-linux-gnu / gcc-mingw-w64
 
-      - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+      # 修复容器内 git 安全目录检查（CVE-2022-24765）：
+      # 容器内工作目录由 runner 用户挂载，导致 git 报 dubious ownership
+      - name: Fix git safe.directory (container ownership mismatch)
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
         with:
-          version: latest
-          install-only: true
+          path: |
+            /go/pkg/mod
+            /root/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
       - name: Run GoReleaser (skip publish)
         run: goreleaser release --clean --skip=publish
