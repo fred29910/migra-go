@@ -1,6 +1,6 @@
 # MIGRA-Go 架构文档
 
-> 最后更新：2026-05-14
+> 最后更新：2026-05-19
 
 ## 概述
 
@@ -39,7 +39,7 @@ MIGRA-Go 是一个用 Go 编写的 PostgreSQL Schema 差异比较工具。它采
 | 1 | Source | `internal/source/` | 路径/URL 字符串 | `*model.Schema` |
 | 2 | Parser | `internal/parser/` | SQL 文本 | `*model.Schema` |
 | 3 | Normalize | `internal/normalize/` | `*model.Schema` | 归一化的 `*model.Schema` |
-| 4 | Diff | `internal/diff/` | `source, target *model.Schema` | `[]Operation` |
+| 4 | Diff | `internal/diff/` | `source, target *model.Schema` | `[]Operation` (22 种) |
 | 5 | Plan + Render | `internal/plan/` + `internal/render/` | `[]Operation` | SQL / JSON |
 
 ---
@@ -48,15 +48,17 @@ MIGRA-Go 是一个用 Go 编写的 PostgreSQL Schema 差异比较工具。它采
 
 ```
 cmd/migra/          # CLI 入口（Cobra + Viper）— 参数解析、依赖注入
-  └── internal/app/       # 应用层服务 — 流水线编排
+  └── internal/           # 核心业务逻辑
+        ├── app/          # 应用层服务 — 流水线编排
+        ├── model/        # 中间数据模型 — Schema / Table / Column / ...
         ├── source/       # Schema 来源加载 — Loader 接口 + Registry
         ├── parser/       # SQL 解析 — pg_query_go AST → SchemaMutation
-        ├── model/        # 中间数据模型 — Schema / Table / Column / ...
         ├── normalize/    # 语义归一化 — 类型别名、表达式规范化
         ├── diff/         # 差异比较引擎
         ├── plan/         # 执行计划 — 三阶段 + DAG 拓扑排序
         ├── render/       # 渲染器 — SQL / JSON
         ├── introspect/   # 数据库内省 — 从 pg_catalog 读取 schema
+        ├── version/      # 构建时版本信息注入
         └── testutil/     # 测试工具
 ```
 
@@ -66,7 +68,7 @@ cmd/migra/          # CLI 入口（Cobra + Viper）— 参数解析、依赖注�
 
 ```
 cmd/migra/
-├── main.go               # 根命令、全局配置初始化
+├── main.go               # 根命令、全局配置初始化、version 标志
 ├── diff.go               # diff 子命令定义 + sourceRegistry 注册
 ├── diff_runner.go        # diff 参数解析 + 依赖注入工厂 (newDefaultDeps)
 ├── diff_test.go          # CLI 层测试
@@ -74,6 +76,7 @@ cmd/migra/
 ├── push.go               # push 子命令定义
 ├── push_runner.go        # push 交互执行逻辑（事务、确认、回滚、校验）
 ├── push_test.go          # push 命令测试
+├── version_test.go       # version 输出测试
 └── integration_test.go   # 端到端集成测试
 ```
 
@@ -95,6 +98,8 @@ cmd/migra/
   4. 事务提交
   5. 执行后校验（re-diff 确认一致）
 
+- **版本信息**：`--version` / `-v` 全局标志通过 `internal/version` 包读取构建时注入的版本、构建时间和 Git commit。
+
 ### 2.2 应用服务层 (`internal/app/`)
 
 `diff_service.go` 是整个流水线的编排者。
@@ -102,6 +107,21 @@ cmd/migra/
 ```go
 type DiffService interface {
     Run(ctx context.Context, cfg Config) (output string, warnings []string, err error)
+}
+```
+
+**Config 结构体**：
+
+```go
+type Config struct {
+    Source     string
+    Target     string
+    Schemas    []string
+    Format     string          // "sql" 或 "json"
+    OutputFile string
+    UnsafeDrop bool
+    Strict     bool
+    Timeout    time.Duration
 }
 ```
 
@@ -113,13 +133,13 @@ LoadSchema(source)  ──┐
 LoadSchema(target)  ──┘
 ```
 
-`ComputeDiff` (行 146-163) 是核心管线：
+`ComputeDiff` (行 176-197) 是核心管线：
 
 ```
-NormalizeSchema → Differ.Diff → FilterDestructiveOps → BuildExecutionPlan
+FilterNamespaces → NormalizeScheme → Differ.Diff → FilterDestructiveOps → BuildExecutionPlan
 ```
 
-`BuildExecutionPlan` (行 119-143) 将 operations 按三阶段分组，每个阶段内部做 DAG 拓扑排序。
+`BuildExecutionPlan` (行 149-173) 将 operations 按三阶段分组，每个阶段内部做 DAG 拓扑排序。
 
 ### 2.3 Source 层 (`internal/source/`)
 
@@ -170,22 +190,28 @@ Schema
       ├── Tables map[string]*Table
       │    ├── Columns []*Column
       │    │    ├── Name, DataType, IsNullable, DefaultExpr
-      │    │    └── IsIdentity, IdentityKind
+      │    │    ├── IsIdentity, IdentityKind        -- IDENTITY 列支持
+      │    │    └── Collation                       -- 排序规则
       │    ├── PrimaryKey *PrimaryKey
       │    │    └── Name, Columns []string
       │    ├── Indexes map[string]*Index
-      │    │    └── Elements []IndexElem (column/expression, collation, opclass, ordering)
+      │    │    ├── Elements []IndexElem (column/expression, collation, opclass, ordering)
+      │    │    ├── Method, WhereClause, Concurrent, IfNotExists
+      │    │    └── IsConstraint, Primary
       │    └── Constraints map[string]*Constraint
       │         ├── Type (CHECK, FOREIGN KEY, UNIQUE, PRIMARY KEY)
       │         ├── Definition, Columns, RefSchema, RefTable, RefColumns
-      │         └── HasInvalidRef, FKeyMatchType, FKeyUpdateRule, FKeyDeleteRule
+      │         ├── Expression, HasInvalidRef
+      │         ├── OnDelete, OnUpdate               -- FK 级联动作
+      │         └── FKeyMatchType, FKeyUpdateRule, FKeyDeleteRule
       └── Types map[string]*EnumType
            └── Name, Labels []string
 ```
 
 **关键类型：**
 
-- **ObjectKey** (`object_key.go`)：统一的对象标识符，包含 `Schema`、`Name`、`Kind`(Table/Column/Index/Constraint/Type) 和 `Signature`，用于 diff 和 plan 阶段的依赖追踪。
+- **ObjectKey** (`object_key.go`)：统一的对象标识符，包含 `Schema`、`Name`、`Kind`(Table/Column/Index/Constraint/Type/Schema) 和 `Signature`，用于 diff 和 plan 阶段的依赖追踪。
+- **FKActionCode** (`fk_action.go`)：单字符 FK 动作码（`a`/`r`/`c`/`n`/`d`）到 SQL 关键字（NO ACTION/RESTRICT/CASCADE/SET NULL/SET DEFAULT）的映射，同时供给 parser 和 introspect 使用。
 
 ### 2.5 解析器层 (`internal/parser/`)
 
@@ -209,7 +235,7 @@ pg_query.Parse(sql) → AST
 **Handler Registry** (`registry.go`)：
 
 - 使用 `reflect.Type` 将 AST 节点类型路由到对应的 `Handler` 实现
-- `DefaultRegistry()` 预注册了 4 种 DDL 的 Handler
+- `DefaultRegistry()` 预注册了 **6 种** DDL 的 Handler
 - 新增 DDL 支持只需：实现 Handler → 实现 Mutation → 注册到 Registry
 
 **已有的 Handler：**
@@ -218,8 +244,10 @@ pg_query.Parse(sql) → AST
 |---------|---------|----------|----------------|
 | `CreateTableHandler` | `CreateStmt` | `CREATE TABLE` | `CreateTableMutation` |
 | `AlterTableHandler` | `AlterTableStmt` | `ALTER TABLE ...` | `AddColumnMutation`, `DropColumnMutation`, `AlterColumnTypeMutation`, `SetNotNullMutation`, `DropNotNullMutation`, `SetDefaultMutation`, `DropDefaultMutation` |
-| `IndexHandler` | `IndexStmt` | `CREATE INDEX` | `CreateIndexMutation` |
-| `EnumHandler` | `CreateEnumStmt` | `CREATE TYPE ... AS ENUM` | `CreateEnumTypeMutation` |
+| `CreateIndexHandler` | `IndexStmt` | `CREATE INDEX` | `CreateIndexMutation` |
+| `CreateEnumHandler` | `CreateEnumStmt` | `CREATE TYPE ... AS ENUM` | `CreateEnumTypeMutation` |
+| `CreateSchemaHandler` | `CreateSchemaStmt` | `CREATE SCHEMA` | `CreateSchemaMutation` |
+| `RenameStmtHandler` | `RenameStmt` | `ALTER TABLE ... RENAME COLUMN` | `RenameColumnMutation` |
 
 **SchemaMutation 接口** (`mutation.go`)：
 
@@ -230,6 +258,25 @@ type SchemaMutation interface {
     Apply(schema *model.Schema) error
 }
 ```
+
+**所有 Mutation 类型（11 种）：**
+
+| MutationKind | Mutation 结构体 | 用途 |
+|-------------|----------------|------|
+| `MutKindCreateTable` | `CreateTableMutation` | 创建表 |
+| `MutKindAddColumn` | `AddColumnMutation` | 添加列 |
+| `MutKindCreateEnumType` | `CreateEnumTypeMutation` | 创建枚举 |
+| `MutKindCreateIndex` | `CreateIndexMutation` | 创建索引 |
+| `MutKindDropColumn` | `DropColumnMutation` | 删除列 |
+| `MutKindAlterColumnType` | `AlterColumnTypeMutation` | 修改列类型 |
+| `MutKindSetNotNull` | `SetNotNullMutation` | 设置非空 |
+| `MutKindDropNotNull` | `DropNotNullMutation` | 取消非空 |
+| `MutKindSetDefault` | `SetDefaultMutation` | 设置默认值 |
+| `MutKindDropDefault` | `DropDefaultMutation` | 取消默认值 |
+| `MutKindCreateSchema` | `CreateSchemaMutation` | 创建 Schema |
+| `MutKindRenameColumn` | `RenameColumnMutation` | 重命名列 |
+
+**注意**：CREATE SCHEMA 的子语句（`SchemaElts` 中的 CREATE TABLE 等）不在此处处理，因为 pg_query_go 已将子句作为独立的顶层 AST 节点返回。
 
 **错误处理：**
 - 每个 `visitNode` 有独立的 `defer recover()`，防止单个语句崩溃影响整个解析
@@ -250,6 +297,8 @@ type SchemaMutation interface {
 | 约束定义规范化 | 小写化 + 合并空白 | 统一约束文本 |
 | Index Elem 填充 | `Columns` → `Elements` 转换 | 统一 DB 内省与文件解析的表述 |
 
+**注意**：`character(n)` / `char(n)` 的同义映射目前未覆盖，SQL 文件中使用 `CHARACTER(10)` 而 DB 内省返回 `char(10)` 时会产生误报 diff。
+
 ### 2.7 差异比较引擎 (`internal/diff/`)
 
 **Differ** 逐层比较两个 `model.Schema`，生成 `Operation` 列表。
@@ -268,17 +317,26 @@ Diff
       ├── diffNamespace
       │    ├── diffTables
       │    │    ├── 检测新增/删除的表
-      │    │    ├── diffTableColumns (比较列类型、可为空、默认值)
+      │    │    ├── diffTableColumns (4 阶段管线)
+      │    │    │    ├── Phase 1: 重名列启发式检测 (isColumnRenameCandidate)
+      │    │    │    ├── Phase 2: 新增列 (排除已匹配的重命名)
+      │    │    │    ├── Phase 3: 删除列 (排除已匹配的重命名)
+      │    │    │    └── Phase 4: diffColumn 逐属性比较
+      │    │    │         ├── 数据类型 → AlterColumnTypeOp
+      │    │    │         ├── 可空性   → SetNotNullOp / DropNotNullOp
+      │    │    │         ├── 默认值   → SetDefaultOp / DropDefaultOp
+      │    │    │         ├── 排序规则 → AlterColumnCollationOp
+      │    │    │         └── 标识列   → SetIdentityOp / DropIdentityOp
       │    │    ├── diffTableIndexes (比较索引定义、唯一性、表达式)
       │    │    └── diffTableConstraints (比较约束语义，避免 DROP+ADD 循环)
       │    └── diffTypes
       │         ├── 检测新增/删除的枚举
       │         └── diffEnumType (仅支持追加 label，不支持中间插入/删除)
       └── 删除检测（遍历 source 中不在 target 的 namespace/table/type）
-
+           └── namespace 删除仅输出警告，不生成 DROP SCHEMA
 ```
 
-**Operation 类型（16 种）：**
+**Operation 类型（22 种）：**
 
 | Kind | 业务含义 | 是否破坏性 |
 |------|---------|-----------|
@@ -286,27 +344,35 @@ Diff
 | `drop_table` | 删除表 | ✅ |
 | `add_column` | 添加列 | ❌ |
 | `drop_column` | 删除列 | ✅ |
-| `alter_column_type` | 修改列类型 | ❌ |
+| `alter_column_type` | 修改列类型 | ✅ |
 | `set_not_null` / `drop_not_null` | 设置/取消非空 | ❌ |
 | `set_default` / `drop_default` | 设置/取消默认值 | ❌ |
-| `add_index` / `drop_index` | 添加/删除索引 | ❌ / ✅ |
+| `add_index` / `drop_index` | 添加/删除索引 | ❌ / ❌ |
 | `add_constraint` / `drop_constraint` | 添加/删除约束 | ❌ / ✅ |
 | `add_enum_type` / `drop_enum_type` | 添加/删除枚举类型 | ❌ / ✅ |
 | `add_enum_label` | 枚举追加值 | ❌ |
+| `alter_column_collation` | 修改列排序规则 | ❌ |
+| `create_schema` / `drop_schema` | 创建/删除 schema | ❌ / ✅ |
+| `set_identity` / `drop_identity` | 设置/删除标识列 | ❌ / ✅ |
+| `rename_column` | 重命名列 | ❌ |
 
 **diffContext** (`context.go`) 跟踪单次 diff 的状态，收集 ops 和 warnings。
 
-**约束比较策略**：`diffTableConstraints` 使用 `sameConstraintContent` 和 `sameConstraintSemantics` 两级比较，避免因 `pg_get_constraintdef` 输出格式差异导致的误报。
+**重命名列启发式检测** (`diff_tables.go:162-189`)：当某列在 source 中存在且在 target 中消失，同时另一列在 target 中出现，如果两列的 `DataType`、`IsNullable`、`DefaultExpr`、`Collation` 均匹配，则判定为重命名并生成 `RenameColumnOp` 而不是 `DropColumnOp + AddColumnOp`。该启发式可能存在误报，未来可通过 SQL 注释提示或 ordinal_position 邻近性优化。
+
+**约束比较策略**：`sameConstraintContent` 比较结构化字段（Type、Columns、Refs、Expression、OnDelete、OnUpdate），排除派生字段 Definition。`sameConstraintSemantics` 作为第二道防线，在 content 比较失败时检查语义等价性，避免不必要的 DROP+ADD 循环。
 
 ### 2.8 执行计划 (`internal/plan/`)
 
 **三阶段模型：**
 
-| 阶段 | 内容 | 说明 |
-|------|------|------|
-| `StagePreDeploy` | 创建操作 | 安全，可先执行 |
-| `StageDeploy` | 修改操作 | 中间阶段 |
-| `StagePostDeploy` | 删除操作 | 危险，需 `--unsafe-drop` |
+| 阶段 | 包含的操作 | 说明 |
+|------|-----------|------|
+| `StagePreDeploy` | `add_table`, `add_column`, `add_index`, `add_constraint`, `add_enum_type` | 创建操作，安全可先执行 |
+| `StageDeploy` | `alter_column_type`, `set_not_null`, `drop_not_null`, `set_default`, `drop_default`, `add_enum_label`, `rename_column` | 修改操作，中间阶段 |
+| `StagePostDeploy` | `drop_table`, `drop_column`, `drop_index`, `drop_constraint`, `drop_enum_type` | 删除操作，需 `--unsafe-drop` |
+
+**注意**：`create_schema`、`drop_schema`、`alter_column_collation`、`set_identity`、`drop_identity` 等操作未在 `assignStage` 中显式匹配，当前因默认 `return StageDeploy` 归入 Deploy 阶段。
 
 **DAG 拓扑排序** (`dag.go`)：
 
@@ -332,8 +398,37 @@ Planner.Plan(ops)
 `Renderer` 将 `[]Operation` 转换为 SQL 或 JSON。
 
 - **SQL 格式**：每个操作渲染为一条 SQL 语句，带 `-- op: <kind> risk:<level>` 注释
-- **JSON 格式**：通过 `encoding/json` 序列化操作列表
+- **JSON 格式**：通过 `encoding/json` 序列化操作列表（kind, object_key, destructive, sql）
 - 列名/表名使用 `quoteIdentifier` 进行安全引用
+
+**渲染支持的操作（按渲染方法划分）：**
+
+| 方法 | 对应 Operation | 示例输出 |
+|------|---------------|---------|
+| `renderAddTable` | `AddTableOp` | `CREATE TABLE ... (columns, PK, constraints)` |
+| `renderDropTable` | `DropTableOp` | `DROP TABLE IF EXISTS ...` |
+| `renderAddColumn` | `AddColumnOp` | `ALTER TABLE ... ADD COLUMN ...` |
+| `renderAlterColumnType` | `AlterColumnTypeOp` | `ALTER TABLE ... ALTER COLUMN ... TYPE ...` |
+| `renderSetNotNull` | `SetNotNullOp` | `ALTER TABLE ... ALTER COLUMN ... SET NOT NULL` |
+| `renderDropNotNull` | `DropNotNullOp` | `ALTER TABLE ... ALTER COLUMN ... DROP NOT NULL` |
+| `renderCreateIndex` | `CreateIndexOp` | `CREATE [UNIQUE] INDEX ... ON ... (...)` |
+| `renderDropIndex` | `DropIndexOp` | `DROP INDEX IF EXISTS ...` |
+| `renderAddEnumType` | `AddEnumTypeOp` | `CREATE TYPE ... AS ENUM (...)` |
+| `renderDropEnumType` | `DropEnumTypeOp` | `DROP TYPE IF EXISTS ...` |
+| `renderCreateSchema` | `CreateSchemaOp` | `CREATE SCHEMA IF NOT EXISTS ...` |
+| `renderDropSchema` | `DropSchemaOp` | `DROP SCHEMA IF EXISTS ...` |
+| `renderAlterColumnCollation` | `AlterColumnCollationOp` | `ALTER TABLE ... ALTER COLUMN ... SET DATA TYPE ... COLLATE ...` |
+| 内置渲染 | `SetIdentityOp` | `ALTER TABLE ... ALTER COLUMN ... SET GENERATED ALWAYS/BY DEFAULT` |
+| 内置渲染 | `DropIdentityOp` | `ALTER TABLE ... ALTER COLUMN ... DROP IDENTITY` |
+| 内置渲染 | `RenameColumnOp` | `ALTER TABLE ... RENAME COLUMN ... TO ...` |
+| 内置渲染 | `DropColumnOp` | `ALTER TABLE ... DROP COLUMN IF EXISTS ...` |
+| 内置渲染 | `AddConstraintOp` | `ALTER TABLE ... ADD CONSTRAINT ... ...` |
+| 内置渲染 | `DropConstraintOp` | `ALTER TABLE ... DROP CONSTRAINT IF EXISTS ...` |
+| 内置渲染 | `SetDefaultOp` | `ALTER TABLE ... ALTER COLUMN ... SET DEFAULT ...` |
+| 内置渲染 | `DropDefaultOp` | `ALTER TABLE ... ALTER COLUMN ... DROP DEFAULT` |
+| 内置渲染 | `AddEnumLabelOp` | `ALTER TYPE ... ADD VALUE ...` |
+
+**CONCURRENTLY 拦截**：push 命令中，`CREATE INDEX CONCURRENTLY`、`DROP INDEX CONCURRENTLY`、`REINDEX INDEX CONCURRENTLY` 等非事务性 DDL 会被检测并阻止在事务内执行。
 
 ### 2.10 数据库内省 (`internal/introspect/`)
 
@@ -345,16 +440,34 @@ Planner.Plan(ops)
 LoadFromDB(connStr)
   └── LoadFromDBWithConn(conn)
        └── for each schemaName:
-            ├── loadTables()       → pg_catalog 查询表/列/默认值
+            ├── loadTables()       → information_schema 查询表/列/默认值/标识列/排序规则
             ├── loadConstraints()  → pg_catalog 查询主键、唯一、检查约束
-            ├── loadForeignKeys()  → pg_catalog 查询外键约束
-            ├── loadIndexes()      → pg_catalog 查询索引（表达式、WHERE 条件）
+            ├── loadForeignKeys()  → pg_catalog 查询外键约束（含 confupdtype/confdeltype）
+            ├── loadIndexes()      → pg_catalog 查询索引（列、唯一性、方法）
             └── loadEnumTypes()    → pg_catalog 查询枚举类型和 labels
 ```
 
 每个加载子步骤独立按 schemaName + tableName 写入 `model.Namespace` 中的对应对象。
 
-### 2.11 测试工具 (`internal/testutil/`)
+**内省表查询** (`tables.go:14-29`) 除基本的列描述外，还查询：
+- `is_identity` / `identity_generation` — IDENTITY 列属性
+- `collation_name` — 列排序规则
+
+**外键级联动作** (`constraints.go:93-166`)：查询 `pg_constraint.confupdtype` 和 `confdeltype`，通过 `model.FKActionCode()` 将单字符码转换为 SQL 关键字。
+
+### 2.11 版本信息 (`internal/version/`)
+
+```go
+var (
+    Version   = "dev"      // 语义版本或 git describe 输出
+    BuildTime = "unknown"   // RFC3339 格式的 UTC 构建时间
+    GitCommit = "unknown"   // Git short SHA
+)
+```
+
+通过 `-ldflags "-X"` 在构建时注入，`make build` 自动设置。
+
+### 2.12 测试工具 (`internal/testutil/`)
 
 提供 schema 构建和比较的辅助函数：
 
@@ -376,6 +489,7 @@ cmd/migra/main.go  (Cobra root + Viper config)
   ├── cmd/migra/push.go     → source.Registry
   │                          → app.ComputeDiff
   │                          → pgx 事务管理
+  │                          → render.Renderer
   │
   └── cmd/migra/diff_runner.go → app.RunnerDeps (DI)
         │
@@ -389,10 +503,11 @@ cmd/migra/main.go  (Cobra root + Viper config)
               │
               ├── internal/normalize/  (CanonicalizeSchema → in-place normalization)
               │
-              ├── internal/diff/   (Differ → []Operation)
+              ├── internal/diff/   (Differ → []Operation, 22 kinds)
               │     ├── differ.go
               │     ├── diff_tables.go, diff_columns.go
-              │     ├── operation.go (16 kinds)
+              │     ├── rename_column_op.go
+              │     ├── operation.go (22 kinds)
               │     └── context.go
               │
               ├── internal/plan/   (Planner → topo sort)
@@ -439,6 +554,12 @@ cmd/migra/main.go  (Cobra root + Viper config)
 - Strict 模式由调用方传入的 `opt.Strict` 控制，默认 `false`（与 `--strict` CLI 标志绑定）
 - 合并后一次性解析意味着：单个文件失败 = 整个目录加载失败（不再支持逐文件容错）
 
+### 4.6 重命名列启发式检测
+
+- 通过比较 DataType、IsNullable、DefaultExpr、Collation 来推断列重命名
+- 生成 `RenameColumnOp` 而非破坏性的 `DropColumnOp + AddColumnOp`
+- 启发式方法可能存在误报，未来可通过 SQL 注释提示显式声明来增强
+
 ---
 
 ## 5. 数据流示例
@@ -462,19 +583,22 @@ cmd/migra/main.go  (Cobra root + Viper config)
    │                 └── WalkDir → 解析 schema.sql → 合并 → *model.Schema (target)
    │
    ├── ComputeDiff(source, target, cfg)
+   │     ├── FilterNamespaces (仅保留 --schema 指定的命名空间)
    │     ├── NormalizeSchemas (规范化双方 schema)
    │     ├── Differ.Diff(source, target)
    │     │     ├── diffSchemas → diffTables
    │     │     │     ├── posts → 相同，跳过
    │     │     │     ├── users → ADD COLUMN age
-   │     │     │     └── comments → 新增表 → AddTableOp
+   │     │     │     │         → 列属性 diff (nullable, default, collation, identity)
+   │     │     │     ├── comments → 新增表 → AddTableOp
+   │     │     │     └── 重名列启发式检测 (如适用)
    │     │     └── diffTypes → user_role → ADD VALUE 'guest'
    │     ├── FilterDestructiveOps (无破坏性操作，全部保留)
    │     └── BuildExecutionPlan
-   │           └── TopoSort → 确定执行顺序
+   │           └── 三阶段分组 → TopoSort → 确定执行顺序
    │
    └── RenderOutput(ops, "sql")
-         └── Renderer.RenderAll → SQL 字符串
+         └── Renderer.RenderAll → SQL 字符串（带 -- op: kind risk:level 注释）
 ```
 
 ---
@@ -488,7 +612,8 @@ cmd/migra/main.go  (Cobra root + Viper config)
 3. 将 Handler 注册到 `DefaultRegistry()`
 4. 在 `internal/render/` 中添加对应的渲染逻辑（如需要反向生成 SQL）
 5. 在 `internal/diff/operation.go` 中添加对应的 Operation Kind（如需要差异检测）
-6. 编写单元测试
+6. 在 `internal/plan/plan.go` 的 `assignStage` 中添加阶段分配
+7. 编写单元测试
 
 ### 新增一个 Source 类型
 
@@ -507,13 +632,20 @@ cmd/migra/main.go  (Cobra root + Viper config)
 │   ├── model/               数据模型
 │   ├── source/              Schema 来源加载
 │   ├── parser/              SQL 解析
-│   ├── normalize/         语义归一化
+│   │   └── parserutil/      解析器辅助函数
+│   ├── normalize/           语义归一化
 │   ├── diff/                差异比较
 │   ├── plan/                执行计划
 │   ├── render/              渲染输出
 │   ├── introspect/          数据库内省
+│   ├── version/            构建时版本信息
 │   └── testutil/            测试工具
+├── cmd/                     CLI 入口
 ├── docs/                    文档
+├── examples/                示例配置
 ├── testdata/                测试数据
-└── .github/workflows/       CI/CD
+├── scripts/                 构建脚本
+├── .github/workflows/       CI/CD
+├── .goreleaser.yaml         跨平台构建配置
+└── Makefile                 常用命令集合
 ```
