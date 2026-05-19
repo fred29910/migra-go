@@ -105,6 +105,71 @@ func TestRenderAddConstraint_UsesStructuredConstraint(t *testing.T) {
 	}
 }
 
+func TestRenderAddTable_WithCollation(t *testing.T) {
+	table := model.NewTable("public", "users")
+	table.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: false})
+	table.AddColumn(&model.Column{Name: "name", DataType: "text", IsNullable: true, Collation: "en_US.UTF-8"})
+	table.AddColumn(&model.Column{Name: "label", DataType: "varchar(50)", IsNullable: false, Collation: "de_DE"})
+	table.PrimaryKey = &model.PrimaryKey{Name: "users_pkey", Columns: []string{"id"}}
+
+	sql := NewRenderer().Render(diff.NewAddTableOp("public", "users", table))
+	for _, want := range []string{
+		`"name" text COLLATE "en_US.UTF-8"`,
+		`"label" varchar(50) COLLATE "de_DE" NOT NULL`,
+		`"id" integer NOT NULL`,
+	} {
+		if !strings.Contains(sql, want) {
+			t.Errorf("expected SQL to contain %q, got:\n%s", want, sql)
+		}
+	}
+}
+
+func TestRenderAddColumn_WithCollation(t *testing.T) {
+	col := &model.Column{Name: "full_name", DataType: "text", IsNullable: true, Collation: "en_US.UTF-8"}
+	op := diff.NewAddColumnOp("public", "users", col)
+
+	sql := NewRenderer().Render(op)
+	want := `ALTER TABLE "public"."users" ADD COLUMN "full_name" text COLLATE "en_US.UTF-8";`
+	if !strings.Contains(sql, want) {
+		t.Errorf("expected SQL to contain %q, got:\n%s", want, sql)
+	}
+
+	// Also test without collation (no regression)
+	col2 := &model.Column{Name: "age", DataType: "integer", IsNullable: false}
+	op2 := diff.NewAddColumnOp("public", "users", col2)
+	sql2 := NewRenderer().Render(op2)
+	if strings.Contains(sql2, "COLLATE") {
+		t.Errorf("expected no COLLATE for default collation, got:\n%s", sql2)
+	}
+}
+
+func TestRenderAddTable_WithCollationDefaultNotNull(t *testing.T) {
+	defaultExpr := "current_timestamp"
+	table := model.NewTable("public", "logs")
+	table.AddColumn(&model.Column{
+		Name:       "ts",
+		DataType:   "timestamptz",
+		IsNullable: false,
+		DefaultExpr: &defaultExpr,
+	})
+	table.AddColumn(&model.Column{
+		Name:       "message",
+		DataType:   "text",
+		IsNullable: false,
+		Collation:  "en_US.UTF-8",
+	})
+
+	sql := NewRenderer().Render(diff.NewAddTableOp("public", "logs", table))
+	for _, want := range []string{
+		`"message" text COLLATE "en_US.UTF-8" NOT NULL`,
+		`"ts" timestamptz NOT NULL DEFAULT current_timestamp`,
+	} {
+		if !strings.Contains(sql, want) {
+			t.Errorf("expected SQL to contain %q, got:\n%s", want, sql)
+		}
+	}
+}
+
 func TestRenderCreateIndex_Quoted(t *testing.T) {
 	r := NewRenderer()
 	op := &diff.CreateIndexOp{
