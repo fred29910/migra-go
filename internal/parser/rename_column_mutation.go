@@ -19,13 +19,19 @@ func (m RenameColumnMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.NewName, model.KindColumn)
 }
 func (m RenameColumnMutation) Apply(schema *model.Schema) error {
-	ns := schema.GetNamespace(m.Schema)
-	if ns == nil {
-		return fmt.Errorf("schema %s not found", m.Schema)
-	}
+	ns := schema.GetOrCreateNamespace(m.Schema)
 	table, exists := ns.Tables[m.Table]
 	if !exists {
-		return fmt.Errorf("table %s.%s not found", m.Schema, m.Table)
+		// ALTER TABLE RENAME COLUMN may appear before CREATE TABLE;
+		// create an empty placeholder table.
+		table = model.NewTable(m.Schema, m.Table)
+		table.IsPlaceholder = true
+		ns.Tables[m.Table] = table
+		return nil
+	}
+	if table.IsPlaceholder {
+		// Nothing meaningful to rename on a placeholder.
+		return nil
 	}
 	col := table.ColumnByName[m.OldName]
 	if col == nil {

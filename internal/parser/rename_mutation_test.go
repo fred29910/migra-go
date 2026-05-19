@@ -50,12 +50,15 @@ func TestRenameColumnMutation_Apply_RenamesColumn(t *testing.T) {
 }
 
 func TestRenameColumnMutation_Apply_TableNotFound(t *testing.T) {
+	// Missing table creates a placeholder (no error).
 	schema := model.NewSchema()
 	schema.GetOrCreateNamespace("public")
 	mut := RenameColumnMutation{Schema: "public", Table: "nonexistent", OldName: "x", NewName: "y"}
 	err := mut.Apply(schema)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not found")
+	require.NoError(t, err)
+	table := schema.GetNamespace("public").Tables["nonexistent"]
+	require.NotNil(t, table)
+	assert.True(t, table.IsPlaceholder)
 }
 
 func TestRenameColumnMutation_Apply_ColumnNotFound(t *testing.T) {
@@ -83,8 +86,15 @@ func TestRenameColumnMutation_Apply_NameCollision(t *testing.T) {
 }
 
 func TestRenameColumnMutation_Apply_NilNamespace(t *testing.T) {
+	// GetOrCreateNamespace auto-creates the schema and missing table
+	// creates a placeholder — no error expected.
 	schema := model.NewSchema()
 	mut := RenameColumnMutation{Schema: "public", Table: "users", OldName: "x", NewName: "y"}
 	err := mut.Apply(schema)
-	require.Error(t, err)
+	require.NoError(t, err)
+	ns := schema.GetNamespace("public")
+	require.NotNil(t, ns)
+	table := ns.Tables["users"]
+	require.NotNil(t, table)
+	assert.True(t, table.IsPlaceholder)
 }
