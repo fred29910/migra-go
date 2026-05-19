@@ -196,6 +196,60 @@ func TestRenderAddTable_WithCollationDefaultNotNull(t *testing.T) {
 	}
 }
 
+func TestRenderForeignKeyCascade(t *testing.T) {
+	t.Run("CASCADE ON DELETE", func(t *testing.T) {
+		c := &model.Constraint{
+			Name:       "fk_user_id",
+			Type:       "foreign_key",
+			Columns:    []string{"user_id"},
+			RefSchema:  "public",
+			RefTable:   "users",
+			RefColumns: []string{"id"},
+			OnDelete:   "CASCADE",
+		}
+		sql := renderConstraintDefinition(c)
+		if !strings.Contains(sql, `ON DELETE CASCADE`) {
+			t.Fatalf("expected ON DELETE CASCADE in %q", sql)
+		}
+	})
+
+	t.Run("SET NULL ON UPDATE", func(t *testing.T) {
+		c := &model.Constraint{
+			Name:       "fk_user_id",
+			Type:       "foreign_key",
+			Columns:    []string{"user_id"},
+			RefSchema:  "public",
+			RefTable:   "users",
+			RefColumns: []string{"id"},
+			OnUpdate:   "SET NULL",
+		}
+		sql := renderConstraintDefinition(c)
+		if !strings.Contains(sql, `ON UPDATE SET NULL`) {
+			t.Fatalf("expected ON UPDATE SET NULL in %q", sql)
+		}
+	})
+
+	t.Run("Both CASCADE and SET NULL", func(t *testing.T) {
+		c := &model.Constraint{
+			Name:       "fk_user_id",
+			Type:       "foreign_key",
+			Columns:    []string{"user_id"},
+			RefSchema:  "public",
+			RefTable:   "users",
+			RefColumns: []string{"id"},
+			OnDelete:   "CASCADE",
+			OnUpdate:   "SET NULL",
+		}
+		sql := renderConstraintDefinition(c)
+		if !strings.Contains(sql, `ON DELETE CASCADE`) {
+			t.Fatalf("expected ON DELETE CASCADE in %q", sql)
+		}
+		if !strings.Contains(sql, `ON UPDATE SET NULL`) {
+			t.Fatalf("expected ON UPDATE SET NULL in %q", sql)
+		}
+	})
+}
+
 func TestRenderCreateIndex_Quoted(t *testing.T) {
 	r := NewRenderer()
 	op := &diff.CreateIndexOp{
