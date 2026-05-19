@@ -143,6 +143,30 @@ func TestRenderAddColumn_WithCollation(t *testing.T) {
 	}
 }
 
+func TestRenderAlterColumnCollation(t *testing.T) {
+	r := NewRenderer()
+
+	t.Run("add collation", func(t *testing.T) {
+		op := diff.NewAlterColumnCollationOp("public", "users", "name", "text", "", "en_US.UTF-8")
+		sql := r.Render(op)
+		want := `ALTER TABLE "public"."users" ALTER COLUMN "name" SET DATA TYPE text COLLATE "en_US.UTF-8";`
+		if !strings.Contains(sql, want) {
+			t.Errorf("expected SQL to contain %q, got:\n%s", want, sql)
+		}
+	})
+
+	t.Run("remove collation", func(t *testing.T) {
+		op := diff.NewAlterColumnCollationOp("public", "users", "name", "text", "en_US.UTF-8", "")
+		sql := r.Render(op)
+		if strings.Contains(sql, "COLLATE") {
+			t.Errorf("expected no COLLATE when removing collation, got:\n%s", sql)
+		}
+		if !strings.Contains(sql, "SET DATA TYPE text") {
+			t.Errorf("expected SET DATA TYPE, got:\n%s", sql)
+		}
+	})
+}
+
 func TestRenderAddTable_WithCollationDefaultNotNull(t *testing.T) {
 	defaultExpr := "current_timestamp"
 	table := model.NewTable("public", "logs")
