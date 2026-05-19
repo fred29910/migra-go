@@ -23,6 +23,8 @@ const (
 	KindSetDefault           Kind = "set_default"
 	KindDropDefault          Kind = "drop_default"
 	KindAlterColumnCollation Kind = "alter_column_collation"
+	KindCreateSchema         Kind = "create_schema"
+	KindDropSchema           Kind = "drop_schema"
 )
 
 // Operation is the interface for all diff operations
@@ -524,5 +526,45 @@ func NewDropConstraintOp(schema, table, name string) *DropConstraintOp {
 }
 
 func (op *DropConstraintOp) IsDestructive() bool {
+	return true
+}
+
+// CreateSchemaOp represents creating a new schema (namespace)
+type CreateSchemaOp struct {
+	baseOperation
+	Schema string
+}
+
+func NewCreateSchemaOp(schema string) *CreateSchemaOp {
+	return &CreateSchemaOp{
+		baseOperation: baseOperation{
+			kind:      KindCreateSchema,
+			objectKey: model.NewObjectKey(schema, "", model.KindSchema),
+		},
+		Schema: schema,
+	}
+}
+
+func (op *CreateSchemaOp) IsDestructive() bool {
+	return false
+}
+
+// DropSchemaOp represents dropping a schema (namespace)
+type DropSchemaOp struct {
+	baseOperation
+	Schema string
+}
+
+func NewDropSchemaOp(schema string) *DropSchemaOp {
+	return &DropSchemaOp{
+		baseOperation: baseOperation{
+			kind:      KindDropSchema,
+			objectKey: model.NewObjectKey(schema, "", model.KindSchema),
+		},
+		Schema: schema,
+	}
+}
+
+func (op *DropSchemaOp) IsDestructive() bool {
 	return true
 }
