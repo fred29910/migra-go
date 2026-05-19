@@ -47,6 +47,18 @@ testdata/
     │       ├── 02_auth.sql       ←      auth.roles（增 description）
     │       └── snapshot.sql      ←      合并快照
     │
+    ├── rename_example/           ← RENAME COLUMN 基础场景
+    │   ├── v1/                   ←   版本 v1：users(username)
+    │   │   └── schema.sql        ←      users + posts 表
+    │   └── v2/                   ←   版本 v2：users(login_name)
+    │       └── schema.sql        ←      username 重命名为 login_name
+    │
+    ├── rename_complex/           ← RENAME COLUMN 组合变更场景
+    │   ├── v1/                   ←   版本 v1：含 age 列 + username 索引
+    │   │   └── schema.sql        ←      users(username, age) + idx_users_username
+    │   └── v2/                   ←   版本 v2：重命名 + 删列 + 新增 + 改索引
+    │       └── schema.sql        ←      users(login_name, phone) + idx_users_login_name
+    │
     └── edge/                     ← DirectoryLoader 边界情况测试数据
         ├── tables/users.sql      ←   正常 SQL 文件（可被加载）
         ├── .hidden.sql           ←   隐藏文件（应被跳过）
@@ -72,6 +84,8 @@ testdata/
 | `diff/v3/schema.sql` | 未直接引用 | 删除/修改场景：删列、删表、改索引名、改枚举 |
 | `diff/nested/` → `diff/nested_target/` | 未直接引用 | 嵌套子目录 diff |
 | `diff/multi_schema/v1/` → `diff/multi_schema/v2/` | 未直接引用 | 多 schema（public + auth）diff |
+| `diff/rename_example/v1/` → `diff/rename_example/v2/` | `cmd/migra/integration_test.go:TestRenameColumnDiff` | RENAME COLUMN 基础场景 |
+| `diff/rename_complex/v1/` → `diff/rename_complex/v2/` | `cmd/migra/integration_test.go:TestRenameColumnComplexDiff` | RENAME COLUMN + 删列 + 新增组合 |
 | `diff/edge/{.hidden.sql,readme.txt,empty/...}` | 未直接引用（DirLoader 测试用 `t.TempDir()` 动态创建数据） | DirectoryLoader 边界条件 |
 | `alter_operations.sql` | 未直接引用 | ALTER TABLE 全操作集解析 |
 | `complex_ddl.sql` | 未直接引用 | 复合约束/高级类型解析 |
@@ -631,7 +645,47 @@ ALTER TABLE "public"."users" ADD COLUMN "email" varchar(255);
 - ✅ 跨 schema 外键（profiles.user_id → users.id）
 - ✅ `--schema` 标志筛选生效
 
-#### 场景 8：边界条件验证
+#### 场景 8：RENAME COLUMN 基础场景
+
+```bash
+./migra diff testdata/diff/rename_example/v1/schema.sql testdata/diff/rename_example/v2/schema.sql
+```
+
+**预期输出**：
+```sql
+-- op: rename_column risk:low
+ALTER TABLE "public"."users" RENAME COLUMN "username" TO "login_name";
+```
+
+**验证点**：
+- ✅ 检测到列重命名而非 DROP + ADD
+- ✅ 输出 risk:low 标签
+- ✅ SQL 语法正确
+
+#### 场景 9：RENAME COLUMN 组合变更场景
+
+```bash
+./migra diff testdata/diff/rename_complex/v1/schema.sql testdata/diff/rename_complex/v2/schema.sql
+```
+
+**预期输出**：
+```sql
+-- op: add_column risk:low
+ALTER TABLE "public"."users" ADD COLUMN "phone" varchar(20);
+-- op: add_index risk:low
+CREATE UNIQUE INDEX "idx_users_login_name" ON "public"."users" ("login_name");
+-- op: rename_column risk:low
+ALTER TABLE "public"."users" RENAME COLUMN "username" TO "login_name";
+-- op: add_enum_label risk:low
+ALTER TYPE "public"."user_role" ADD VALUE 'guest';
+```
+
+**验证点**：
+- ✅ 重命名与其他变更（ADD/DROP）共存时正确检测
+- ✅ 索引名随之更新（idx_users_username → idx_users_login_name）
+- ✅ 不会产生误报的 DROP COLUMN + ADD COLUMN
+
+#### 场景 10：边界条件验证
 
 ```bash
 # 隐藏文件/目录应被跳过（不会导致错误）
@@ -729,6 +783,12 @@ make build
 # 多 schema
 ./migra diff --schema public --schema auth testdata/diff/multi_schema/v1/ testdata/diff/multi_schema/v2/
 
+# RENAME COLUMN 基础
+./migra diff testdata/diff/rename_example/v1/schema.sql testdata/diff/rename_example/v2/schema.sql
+
+# RENAME COLUMN 组合变更
+./migra diff testdata/diff/rename_complex/v1/schema.sql testdata/diff/rename_complex/v2/schema.sql
+
 # 输出到文件
 ./migra diff -o /tmp/result.sql testdata/example_source.sql testdata/example_target.sql
 
@@ -750,4 +810,6 @@ make build
 | `diff/v2/schema.sql` → `diff/v3/schema.sql` (unsafe) | DROP + ADD + ALTER 全量 | DROP 操作正确输出 |
 | `diff/nested/` → `diff/nested_target/` | ADD COLUMN email, ADD CONSTRAINT fk | 嵌套子目录递归扫描 |
 | `diff/multi_schema/v1/` → `diff/multi_schema/v2/` | ADD TABLE profiles, ADD COLUMN email/description | 多 schema 命名空间支持 |
+| `diff/rename_example/v1/` → `diff/rename_example/v2/` | RENAME COLUMN username TO login_name | RENAME COLUMN 基础检测 |
+| `diff/rename_complex/v1/` → `diff/rename_complex/v2/` | RENAME COLUMN + ADD COLUMN phone + ADD INDEX + ADD ENUM | 重命名与其他变更组合 |
 | `diff/edge/tables/` → `diff/edge/tables/` | 无变更 | 隐藏文件被跳过（加载正常） |
