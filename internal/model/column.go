@@ -8,4 +8,5 @@ type Column struct {
 	DefaultExpr  *string
 	IsIdentity   bool
 	IdentityKind string // "ALWAYS" or "BY DEFAULT"
+	Collation    string // collation name, empty = default collation
 }
