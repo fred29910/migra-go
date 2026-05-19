@@ -137,6 +137,12 @@ func (r *Renderer) Render(op diff.Operation) string {
 			quoteQualifiedIdentifier(v.Schema, v.Table),
 			quoteIdentifier(v.Column),
 		)
+	case *diff.RenameColumnOp:
+		return fmt.Sprintf("-- op: rename_column risk:low\nALTER TABLE %s RENAME COLUMN %s TO %s;",
+			quoteQualifiedIdentifier(v.Schema, v.Table),
+			quoteIdentifier(v.OldName),
+			quoteIdentifier(v.NewName),
+		)
 	case *diff.DropColumnOp:
 		return fmt.Sprintf("-- op: drop_column risk:high\nALTER TABLE %s DROP COLUMN IF EXISTS %s;",
 			quoteQualifiedIdentifier(v.Schema, v.Table),
