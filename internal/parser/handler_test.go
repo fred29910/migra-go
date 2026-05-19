@@ -106,6 +106,80 @@ func TestCreateSchemaHandler(t *testing.T) {
 	assert.Equal(t, "auth", mut.Schema)
 }
 
+func TestCreateTableHandler_WithCollation(t *testing.T) {
+	node := mustParseFirstStmt(t, `CREATE TABLE users (name text COLLATE "en_US.UTF-8")`)
+	h := &CreateTableHandler{}
+
+	mutations, err := h.Handle(node)
+	require.NoError(t, err)
+	require.Len(t, mutations, 1)
+
+	mut, ok := mutations[0].(CreateTableMutation)
+	require.True(t, ok)
+	require.Len(t, mut.Columns, 1)
+	assert.Equal(t, "name", mut.Columns[0].Name)
+	assert.Equal(t, "text", mut.Columns[0].DataType)
+	assert.Equal(t, "en_US.UTF-8", mut.Columns[0].Collation)
+}
+
+func TestCreateTableHandler_WithCollationAndNotNull(t *testing.T) {
+	node := mustParseFirstStmt(t, `CREATE TABLE t (s text COLLATE "de_DE" NOT NULL)`)
+	h := &CreateTableHandler{}
+
+	mutations, err := h.Handle(node)
+	require.NoError(t, err)
+	require.Len(t, mutations, 1)
+
+	mut, ok := mutations[0].(CreateTableMutation)
+	require.True(t, ok)
+	require.Len(t, mut.Columns, 1)
+	assert.Equal(t, "s", mut.Columns[0].Name)
+	assert.Equal(t, "de_DE", mut.Columns[0].Collation)
+	assert.False(t, mut.Columns[0].IsNullable)
+}
+
+func TestCreateTableHandler_WithoutCollation(t *testing.T) {
+	node := mustParseFirstStmt(t, `CREATE TABLE users (name text)`)
+	h := &CreateTableHandler{}
+
+	mutations, err := h.Handle(node)
+	require.NoError(t, err)
+	require.Len(t, mutations, 1)
+
+	mut, ok := mutations[0].(CreateTableMutation)
+	require.True(t, ok)
+	require.Len(t, mut.Columns, 1)
+	assert.Equal(t, "name", mut.Columns[0].Name)
+	assert.Equal(t, "", mut.Columns[0].Collation, "expected empty collation for default")
+}
+
+func TestAlterTableHandler_AddColumnWithCollation(t *testing.T) {
+	node := mustParseFirstStmt(t, `ALTER TABLE users ADD COLUMN full_name text COLLATE "en_US.UTF-8"`)
+	h := &AlterTableHandler{}
+
+	mutations, err := h.Handle(node)
+	require.NoError(t, err)
+	require.Len(t, mutations, 1)
+
+	mut, ok := mutations[0].(AddColumnMutation)
+	require.True(t, ok)
+	assert.Equal(t, "full_name", mut.Column.Name)
+	assert.Equal(t, "en_US.UTF-8", mut.Column.Collation)
+}
+
+func TestAlterTableHandler_AddColumnWithoutCollation(t *testing.T) {
+	node := mustParseFirstStmt(t, `ALTER TABLE users ADD COLUMN bio text`)
+	h := &AlterTableHandler{}
+
+	mutations, err := h.Handle(node)
+	require.NoError(t, err)
+	require.Len(t, mutations, 1)
+
+	mut, ok := mutations[0].(AddColumnMutation)
+	require.True(t, ok)
+	assert.Equal(t, "", mut.Column.Collation, "expected empty collation for default")
+}
+
 func TestCreateSchemaHandler_IfNotExists(t *testing.T) {
 	node := mustParseFirstStmt(t, "CREATE SCHEMA IF NOT EXISTS auth")
 	h := &CreateSchemaHandler{}
