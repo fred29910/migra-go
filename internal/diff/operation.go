@@ -20,8 +20,9 @@ const (
 	KindAddEnumType     Kind = "add_enum_type"
 	KindDropEnumType    Kind = "drop_enum_type"
 	KindAddEnumLabel    Kind = "add_enum_label"
-	KindSetDefault      Kind = "set_default"
-	KindDropDefault     Kind = "drop_default"
+	KindSetDefault           Kind = "set_default"
+	KindDropDefault          Kind = "drop_default"
+	KindAlterColumnCollation Kind = "alter_column_collation"
 )
 
 // Operation is the interface for all diff operations
