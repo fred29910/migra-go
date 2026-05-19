@@ -20,6 +20,8 @@ func loadTables(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mode
 		c.is_nullable,
 		c.column_default,
 		c.ordinal_position,
+		c.is_identity,
+		c.identity_generation,
 		COALESCE(c.collation_name, '') AS collation_name
 	FROM information_schema.tables t
 	JOIN information_schema.columns c ON t.table_name = c.table_name AND t.table_schema = c.table_schema
@@ -40,12 +42,14 @@ func loadTables(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mode
 		isNullable    string
 		colDefault    sql.NullString
 		ordinalPos    int
-		collationName string
+		collationName      string
+		isIdentity         string
+		identityGeneration sql.NullString
 	)
 
 	currentTable := ""
 	for rows.Next() {
-		err := rows.Scan(&tableName, &colName, &dataType, &charMaxLen, &isNullable, &colDefault, &ordinalPos, &collationName)
+		err := rows.Scan(&tableName, &colName, &dataType, &charMaxLen, &isNullable, &colDefault, &ordinalPos, &isIdentity, &identityGeneration, &collationName)
 		if err != nil {
 			return fmt.Errorf("scan table row: %w", err)
 		}
@@ -71,6 +75,12 @@ func loadTables(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mode
 		if colDefault.Valid {
 			defaultStr := colDefault.String
 			col.DefaultExpr = &defaultStr
+		}
+		if isIdentity == "YES" {
+			col.IsIdentity = true
+			if identityGeneration.Valid {
+				col.IdentityKind = identityGeneration.String
+			}
 		}
 		table.AddColumn(col)
 	}
