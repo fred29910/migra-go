@@ -82,6 +82,26 @@ func loadConstraints(ctx context.Context, conn *pgx.Conn, schemaName string, ns 
 	return nil
 }
 
+// pgConstraintAction maps pg_constraint single-char codes to SQL keywords
+// Codes from pg_constraint.confupdtype/confdeltype:
+// "a" = NO ACTION, "r" = RESTRICT, "c" = CASCADE, "n" = SET NULL, "d" = SET DEFAULT
+func pgConstraintAction(code string) string {
+	switch code {
+	case "a":
+		return "NO ACTION"
+	case "r":
+		return "RESTRICT"
+	case "c":
+		return "CASCADE"
+	case "n":
+		return "SET NULL"
+	case "d":
+		return "SET DEFAULT"
+	default:
+		return ""
+	}
+}
+
 // loadForeignKeys loads foreign key constraints from pg_constraint
 func loadForeignKeys(ctx context.Context, conn *pgx.Conn, schemaName string, ns *model.Namespace) error {
 	query := `
@@ -92,7 +112,9 @@ func loadForeignKeys(ctx context.Context, conn *pgx.Conn, schemaName string, ns 
 		pg_get_constraintdef(c.oid) AS definition,
 		rt.relname AS ref_table,
 		rn.nspname AS ref_schema,
-		array_agg(ra.attname ORDER BY rk.ordinality) AS ref_column_names
+		array_agg(ra.attname ORDER BY rk.ordinality) AS ref_column_names,
+		c.confupdtype,
+		c.confdeltype
 	FROM pg_constraint c
 	JOIN pg_class t ON t.oid = c.conrelid
 	JOIN pg_namespace n ON n.oid = t.relnamespace
@@ -119,10 +141,12 @@ func loadForeignKeys(ctx context.Context, conn *pgx.Conn, schemaName string, ns 
 		refTable       string
 		refSchema      string
 		refColumnNames []string
+		confUpdType    string
+		confDelType    string
 	)
 
 	for rows.Next() {
-		err := rows.Scan(&conName, &tableName, &columnNames, &definition, &refTable, &refSchema, &refColumnNames)
+		err := rows.Scan(&conName, &tableName, &columnNames, &definition, &refTable, &refSchema, &refColumnNames, &confUpdType, &confDelType)
 		if err != nil {
 			return fmt.Errorf("scan foreign key row: %w", err)
 		}
@@ -141,6 +165,8 @@ func loadForeignKeys(ctx context.Context, conn *pgx.Conn, schemaName string, ns 
 			RefSchema:  refSchema,
 			RefTable:   refTable,
 			RefColumns: refColumnNames,
+			OnDelete:   pgConstraintAction(confDelType),
+			OnUpdate:   pgConstraintAction(confUpdType),
 		}
 
 		table.Constraints[conName] = constraint
