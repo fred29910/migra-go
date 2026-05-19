@@ -443,6 +443,42 @@ func (op *DropDefaultOp) DependsOn() []model.ObjectKey {
 	}
 }
 
+// AlterColumnCollationOp represents changing a column's collation
+type AlterColumnCollationOp struct {
+	baseOperation
+	Schema        string
+	Table         string
+	Column        string
+	DataType      string // the column's data type (needed for SET DATA TYPE ... COLLATE)
+	FromCollation string
+	ToCollation   string
+}
+
+func NewAlterColumnCollationOp(schema, table, column, dataType, fromCollation, toCollation string) *AlterColumnCollationOp {
+	return &AlterColumnCollationOp{
+		baseOperation: baseOperation{
+			kind:      KindAlterColumnCollation,
+			objectKey: model.NewObjectKey(schema, table+"."+column, model.KindColumn),
+		},
+		Schema:        schema,
+		Table:         table,
+		Column:        column,
+		DataType:      dataType,
+		FromCollation: fromCollation,
+		ToCollation:   toCollation,
+	}
+}
+
+func (op *AlterColumnCollationOp) IsDestructive() bool {
+	return false
+}
+
+func (op *AlterColumnCollationOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
+	}
+}
+
 type AddConstraintOp struct {
 	baseOperation
 	Schema     string
