@@ -45,5 +45,6 @@ func DefaultRegistry() *HandlerRegistry {
 	r.Register(&pg_query.Node{Node: &pg_query.Node_CreateEnumStmt{}}, &CreateEnumHandler{})
 	r.Register(&pg_query.Node{Node: &pg_query.Node_IndexStmt{}}, &CreateIndexHandler{})
 	r.Register(&pg_query.Node{Node: &pg_query.Node_CreateSchemaStmt{}}, &CreateSchemaHandler{})
+	r.Register(&pg_query.Node{Node: &pg_query.Node_RenameStmt{}}, &RenameStmtHandler{})
 	return r
 }
