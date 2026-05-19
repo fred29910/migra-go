@@ -45,6 +45,7 @@ func (c *diffContext) diffSchemas(source, target *model.Schema) {
 			c.diffNamespace(sourceNs, targetNs)
 		} else {
 			// Entire namespace needs to be created
+			c.addOp(NewCreateSchemaOp(name))
 			c.diffNamespace(nil, targetNs)
 		}
 	}
