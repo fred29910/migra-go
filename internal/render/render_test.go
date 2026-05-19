@@ -75,8 +75,8 @@ func TestRenderNewOperations(t *testing.T) {
 		`ALTER TABLE "public"."users" ALTER COLUMN "created_at" SET DEFAULT now();`: diff.NewSetDefaultOp("public", "users", "created_at", "now()"),
 		`ALTER TABLE "public"."users" ALTER COLUMN "created_at" DROP DEFAULT;`:      diff.NewDropDefaultOp("public", "users", "created_at"),
 		`ALTER TABLE "public"."users" DROP COLUMN IF EXISTS "old_col";`:             diff.NewDropColumnOp("public", "users", "old_col"),
-		`CREATE SCHEMA IF NOT EXISTS "auth";`:                                      diff.NewCreateSchemaOp("auth"),
-		`DROP SCHEMA IF EXISTS "old_schema";`:                                      diff.NewDropSchemaOp("old_schema"),
+		`CREATE SCHEMA IF NOT EXISTS "auth";`:                                       diff.NewCreateSchemaOp("auth"),
+		`DROP SCHEMA IF EXISTS "old_schema";`:                                       diff.NewDropSchemaOp("old_schema"),
 	}
 	for want, op := range cases {
 		if got := r.Render(op); !strings.Contains(got, want) {
@@ -173,9 +173,9 @@ func TestRenderAddTable_WithCollationDefaultNotNull(t *testing.T) {
 	defaultExpr := "current_timestamp"
 	table := model.NewTable("public", "logs")
 	table.AddColumn(&model.Column{
-		Name:       "ts",
-		DataType:   "timestamptz",
-		IsNullable: false,
+		Name:        "ts",
+		DataType:    "timestamptz",
+		IsNullable:  false,
 		DefaultExpr: &defaultExpr,
 	})
 	table.AddColumn(&model.Column{
