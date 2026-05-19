@@ -82,24 +82,11 @@ func loadConstraints(ctx context.Context, conn *pgx.Conn, schemaName string, ns 
 	return nil
 }
 
-// pgConstraintAction maps pg_constraint single-char codes to SQL keywords
-// Codes from pg_constraint.confupdtype/confdeltype:
-// "a" = NO ACTION, "r" = RESTRICT, "c" = CASCADE, "n" = SET NULL, "d" = SET DEFAULT
+// pgConstraintAction delegates to the shared FK action code mapping in the model package.
+// The same single-character codes appear in pg_constraint.confupdtype/confdeltype
+// and are used by pg_query for CREATE TABLE parsing.
 func pgConstraintAction(code string) string {
-	switch code {
-	case "a":
-		return "NO ACTION"
-	case "r":
-		return "RESTRICT"
-	case "c":
-		return "CASCADE"
-	case "n":
-		return "SET NULL"
-	case "d":
-		return "SET DEFAULT"
-	default:
-		return ""
-	}
+	return model.FKActionCode(code)
 }
 
 // loadForeignKeys loads foreign key constraints from pg_constraint
