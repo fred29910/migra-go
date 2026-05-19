@@ -19,7 +19,8 @@ func loadTables(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mode
 		c.character_maximum_length,
 		c.is_nullable,
 		c.column_default,
-		c.ordinal_position
+		c.ordinal_position,
+		COALESCE(c.collation_name, '') AS collation_name
 	FROM information_schema.tables t
 	JOIN information_schema.columns c ON t.table_name = c.table_name AND t.table_schema = c.table_schema
 	WHERE t.table_schema = $1 AND t.table_type = 'BASE TABLE'
@@ -32,18 +33,19 @@ func loadTables(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mode
 	defer rows.Close()
 
 	var (
-		tableName  string
-		colName    string
-		dataType   string
-		charMaxLen sql.NullInt64
-		isNullable string
-		colDefault sql.NullString
-		ordinalPos int
+		tableName     string
+		colName       string
+		dataType      string
+		charMaxLen    sql.NullInt64
+		isNullable    string
+		colDefault    sql.NullString
+		ordinalPos    int
+		collationName string
 	)
 
 	currentTable := ""
 	for rows.Next() {
-		err := rows.Scan(&tableName, &colName, &dataType, &charMaxLen, &isNullable, &colDefault, &ordinalPos)
+		err := rows.Scan(&tableName, &colName, &dataType, &charMaxLen, &isNullable, &colDefault, &ordinalPos, &collationName)
 		if err != nil {
 			return fmt.Errorf("scan table row: %w", err)
 		}
@@ -64,6 +66,7 @@ func loadTables(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mode
 			Name:       colName,
 			DataType:   dataType,
 			IsNullable: isNullable == "YES",
+			Collation:  collationName,
 		}
 		if colDefault.Valid {
 			defaultStr := colDefault.String
