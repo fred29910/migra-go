@@ -32,6 +32,7 @@ func TestOperationInterfaceHasDependsOn(t *testing.T) {
 		NewDropSchemaOp("old_schema"),
 		NewSetIdentityOp("public", "users", "id", "ALWAYS"),
 		NewDropIdentityOp("public", "users", "id"),
+		NewRenameColumnOp("public", "users", "old_name", "new_name"),
 	}
 	for _, op := range ops {
 		deps := op.DependsOn() // 编译时检查此方法存在
@@ -46,7 +47,7 @@ func TestOperationInterfaceHasDependsOn(t *testing.T) {
 			if deps[0] != expectedTableDep {
 				t.Errorf("%T.DependsOn()[0] = %v, want %v", op, deps[0], expectedTableDep)
 			}
-		case *AddColumnOp, *AlterColumnTypeOp, *SetNotNullOp, *DropNotNullOp, *CreateIndexOp, *SetDefaultOp, *DropDefaultOp, *DropColumnOp, *SetIdentityOp, *DropIdentityOp:
+		case *AddColumnOp, *AlterColumnTypeOp, *SetNotNullOp, *DropNotNullOp, *CreateIndexOp, *SetDefaultOp, *DropDefaultOp, *DropColumnOp, *SetIdentityOp, *DropIdentityOp, *RenameColumnOp:
 			// These operations should have exactly one dependency: their table
 			if len(deps) != 1 {
 				t.Errorf("%T.DependsOn() should return 1 dependency, got %d", op, len(deps))

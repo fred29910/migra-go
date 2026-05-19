@@ -27,6 +27,7 @@ const (
 	KindDropSchema           Kind = "drop_schema"
 	KindSetIdentity          Kind = "set_identity"
 	KindDropIdentity         Kind = "drop_identity"
+	KindRenameColumn         Kind = "rename_column"
 )
 
 // Operation is the interface for all diff operations
