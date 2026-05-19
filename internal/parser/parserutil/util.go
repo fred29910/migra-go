@@ -41,6 +41,15 @@ func ParseColumnDef(colDef *pg_query.ColumnDef) *model.Column {
 						col.DefaultExpr = &expr
 					}
 				}
+			case pg_query.ConstrType_CONSTR_IDENTITY:
+				switch c.GeneratedWhen {
+				case "a":
+					col.IsIdentity = true
+					col.IdentityKind = "ALWAYS"
+				case "d":
+					col.IsIdentity = true
+					col.IdentityKind = "BY DEFAULT"
+				}
 			}
 		}
 	}
