@@ -161,7 +161,17 @@ func sameConstraintSemantics(a, b *model.Constraint) bool {
 
 // isColumnRenameCandidate checks if a source column and target column match
 // the heuristic for being the same column that was renamed.
-// Conditions: same DataType, same IsNullable, same DefaultExpr.
+// This is a best-effort heuristic: it compares structural properties that
+// typically stay the same after a rename. Matches on DataType, IsNullable,
+// DefaultExpr, and Collation.
+//
+// NOTE: This heuristic CAN produce false positives — for example, if a user
+// drops a column with properties X and adds a new column with the same
+// properties (but different semantics), it will be detected as a rename.
+// Future iterations could reduce false positives by:
+//   - allowing users to explicitly declare renames via SQL comment hints
+//   - considering ordinal_position proximity
+//   - using pg_attribute.attnum stability across introspect snapshots
 func isColumnRenameCandidate(src, tgt *model.Column) bool {
 	if src.DataType != tgt.DataType {
 		return false
@@ -169,7 +179,13 @@ func isColumnRenameCandidate(src, tgt *model.Column) bool {
 	if src.IsNullable != tgt.IsNullable {
 		return false
 	}
-	return sameDefault(src.DefaultExpr, tgt.DefaultExpr)
+	if !sameDefault(src.DefaultExpr, tgt.DefaultExpr) {
+		return false
+	}
+	if src.Collation != tgt.Collation {
+		return false
+	}
+	return true
 }
 
 // diffTableColumns compares columns between two tables

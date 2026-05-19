@@ -25,23 +25,11 @@ func defaultConstraintName(table string, constraint model.Constraint) string {
 	return table + "_constraint"
 }
 
-// fkActionCode maps pg_query FK action codes to SQL keywords
-// Codes: "a"=NO ACTION, "r"=RESTRICT, "c"=CASCADE, "n"=SET NULL, "d"=SET DEFAULT
+// fkActionCode delegates to the shared FK action code mapping in the model package.
+// The same single-character codes are used by pg_query (for CREATE TABLE parsing)
+// and pg_constraint (for database introspection).
 func fkActionCode(code string) string {
-	switch code {
-	case "a":
-		return "NO ACTION"
-	case "r":
-		return "RESTRICT"
-	case "c":
-		return "CASCADE"
-	case "n":
-		return "SET NULL"
-	case "d":
-		return "SET DEFAULT"
-	default:
-		return ""
-	}
+	return model.FKActionCode(code)
 }
 
 // Handle converts a pg_query CreateStmt into schema mutations.

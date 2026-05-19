@@ -325,6 +325,11 @@ func (r *Renderer) renderDropSchema(op *diff.DropSchemaOp) string {
 }
 
 func (r *Renderer) renderAlterColumnCollation(op *diff.AlterColumnCollationOp) string {
+	// PostgreSQL requires SET DATA TYPE even when only the collation changes —
+	// there is no standalone ALTER COLUMN ... COLLATE syntax. The COLLATE clause
+	// is an optional modifier within SET DATA TYPE. Using the column's current
+	// data type (from the op) means the type itself is unchanged but PostgreSQL
+	// will still validate the column data against it.
 	sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET DATA TYPE %s",
 		quoteQualifiedIdentifier(op.Schema, op.Table),
 		quoteIdentifier(op.Column),
