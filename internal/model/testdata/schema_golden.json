@@ -13,7 +13,8 @@
               "IsNullable": false,
               "DefaultExpr": null,
               "IsIdentity": false,
-              "IdentityKind": ""
+              "IdentityKind": "",
+              "Collation": ""
             },
             {
               "Name": "username",
@@ -21,7 +22,8 @@
               "IsNullable": false,
               "DefaultExpr": null,
               "IsIdentity": false,
-              "IdentityKind": ""
+              "IdentityKind": "",
+              "Collation": ""
             },
             {
               "Name": "created_at",
@@ -29,7 +31,8 @@
               "IsNullable": true,
               "DefaultExpr": "now()",
               "IsIdentity": false,
-              "IdentityKind": ""
+              "IdentityKind": "",
+              "Collation": ""
             }
           ],
           "PrimaryKey": {
