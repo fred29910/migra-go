@@ -336,11 +336,18 @@ func renderConstraintDefinition(c *model.Constraint) string {
 	case "primary_key":
 		return fmt.Sprintf("PRIMARY KEY (%s)", quoteIdentifierList(c.Columns))
 	case "foreign_key":
-		return fmt.Sprintf("FOREIGN KEY (%s) REFERENCES %s (%s)",
+		sql := fmt.Sprintf("FOREIGN KEY (%s) REFERENCES %s (%s)",
 			quoteIdentifierList(c.Columns),
 			quoteQualifiedIdentifier(c.RefSchema, c.RefTable),
 			quoteIdentifierList(c.RefColumns),
 		)
+		if c.OnDelete != "" {
+			sql += fmt.Sprintf(" ON DELETE %s", c.OnDelete)
+		}
+		if c.OnUpdate != "" {
+			sql += fmt.Sprintf(" ON UPDATE %s", c.OnUpdate)
+		}
+		return sql
 	case "check":
 		if c.Expression != "" {
 			return fmt.Sprintf("CHECK (%s)", c.Expression)
