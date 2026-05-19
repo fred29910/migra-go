@@ -1,8 +1,8 @@
 # PostgreSQL DDL 特性支持矩阵
 
 > **项目**: migra-go — 基于 `pg_query_go` 的 PostgreSQL  schema diff 工具  
-> **最后更新**: 2026-05-15  
-> **Legend**: ✅ 完全支持 | ⚠️ 部分支持 | ❌ 暂不支持
+> **最后更新**: 2026-05-18  
+> **Legend**: ✅ 完全支持 | ⚠️ 部分支持 (含多种情况: a) pg_query 可解析但下游不处理; b) 部分子特性支持; c) 能检测但不生成修复 DDL) | ❌ 暂不支持
 
 ---
 
@@ -11,7 +11,7 @@
 | 特性 | 解析 (Parser) | Diff 引擎 | 渲染 (Renderer) | 数据库自省 (Introspect) | 状态 |
 |------|:---:|:---:|:---:|:---:|------|
 | `CREATE TABLE` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `CREATE TABLE IF NOT EXISTS` | ✅ | ✅ | ✅ | — | ✅ |
+| `CREATE TABLE IF NOT EXISTS` | ✅ | ✅ | ⚠️ (不输出 IF NOT EXISTS, 见限制 #4) | — | ✅ |
 | `DROP TABLE` | — | ✅ (源端检测) | ✅ `DROP TABLE IF EXISTS` | — | ✅ |
 | `DROP TABLE IF EXISTS` | — | ✅ | ✅ | — | ✅ |
 | `ALTER TABLE ... ADD COLUMN` | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -46,7 +46,7 @@
 | `DEFAULT` 表达式 | ✅ (含函数调用) | ✅ | ✅ | ✅ | ✅ |
 | 列级 `CHECK` 约束 | ✅ (作为表约束解析) | ✅ | ✅ | ✅ | ✅ |
 | `PRIMARY KEY` (行内) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `IDENTITY` 列 (`GENERATED ALWAYS/BY DEFAULT AS IDENTITY`) | ⚠️ model.Column 有字段但自省未查询 | ⚠️ | ⚠️ | ❌ | ⚠️ |
+| `IDENTITY` 列 (`GENERATED ALWAYS/BY DEFAULT AS IDENTITY`) | ⚠️ (model 有字段, 渲染未实现, 见限制 #11) | ⚠️ | ⚠️ | ❌ | ⚠️ |
 | 列排序规则 (`COLLATE`) | ⚠️ pg_query 解析但 model 未存储 | ❌ | ❌ | ❌ | ⚠️ |
 | 存储参数 (`STORAGE`) | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `GENERATED ALWAYS AS` (计算列) | ❌ | ❌ | ❌ | ❌ | ❌ |
@@ -70,7 +70,7 @@
 | `ALTER TABLE ... DROP CONSTRAINT` | — | ✅ (源端检测) | ✅ | — | ✅ |
 | 约束命名 (`CONSTRAINT name`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 自动生成约束名 (`_pkey`, `_fkey`) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `ON DELETE` / `ON UPDATE` 级联 | ⚠️ pg_query 解析但 model 未完整存储 | ❌ | ❌ | ❌ | ⚠️ |
+| `ON DELETE` / `ON UPDATE` 级联 | ✅ (pg_query 解析, 但 model 未完整存储, 见限制 #2) | ❌ | ❌ | ❌ | ⚠️ |
 | `DEFERRABLE` / `INITIALLY DEFERRED` | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `EXCLUDE` 约束 | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `ASSERTION` | ❌ | ❌ | ❌ | ❌ | ❌ |
@@ -85,7 +85,7 @@
 | `CREATE UNIQUE INDEX` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `DROP INDEX` | — | ✅ (源端检测) | ✅ `DROP INDEX IF EXISTS` | — | ✅ |
 | `DROP INDEX IF EXISTS` | — | ✅ | ✅ | — | ✅ |
-| 索引方法 (`USING btree/hash/gin/gist/brin`) | ✅ | ✅ | ✅ | ✅ (btree/hash/gin) | ✅ |
+| 索引方法 (`USING btree/hash/gin/gist/brin`) | ✅ | ✅ | ✅ | ✅ (btree/hash/gin/gist/brin, 无需过滤) | ✅ |
 | 表达式索引 (`ON tbl (lower(col))`) | ✅ | ✅ | ✅ | ❌ | ⚠️ |
 | 部分索引 (`WHERE` 子句) | ✅ | ✅ | ✅ | ❌ | ⚠️ |
 | 操作符类 (`text_pattern_ops`, 等) | ✅ | ✅ | ✅ | ❌ | ⚠️ |
@@ -124,8 +124,8 @@
 | 多 Schema 支持 (`public`, `auth`, 等) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Schema 限定表引用 (`schema.table`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Schema 限定枚举引用 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `CREATE SCHEMA` | ❌ | ❌ | ❌ | — | ❌ |
-| `DROP SCHEMA` | ❌ | ❌ | ❌ | — | ❌ |
+| `CREATE SCHEMA` | ✅ | ✅ (生成 CreateSchemaOp) | ✅ (IF NOT EXISTS) | — | ✅ |
+| `DROP SCHEMA` | — | ⚠️ (可检测但不生成 DDL, 见限制 #6) | ✅ (IF EXISTS, 框架已就绪) | — | ⚠️ |
 | `ALTER SCHEMA ... RENAME` | ❌ | ❌ | ❌ | — | ❌ |
 | Schema 迁移 (跨 schema 移动对象) | ❌ | ❌ | ❌ | — | ❌ |
 
@@ -201,7 +201,7 @@
 
 3. **数据库自省的索引信息有限**: DBLoader 仅查询 `pg_index` + `pg_am` 获取索引名、表、列、唯一性和方法，不包含 `WHERE` 子句、操作符类、排序规则、并发标志。
 
-4. **`IF NOT EXISTS` on `CREATE TABLE`**: 解析器支持但渲染器不输出 `IF NOT EXISTS` 子句 (表创建始终直接生成 `CREATE TABLE`)。
+4. **`IF NOT EXISTS` on `CREATE TABLE`**: 解析器支持 `CREATE TABLE IF NOT EXISTS` 并正确提取表结构，但渲染器不输出 `IF NOT EXISTS` 子句（表创建始终直接生成 `CREATE TABLE`）。在 diff 工具语义下这是符合预期的——因为目标数据库中尚无该表，`IF NOT EXISTS` 对正确性无影响；仅当用户期望保留原始 DDL 文本时才被视为信息丢失。
 
 5. **枚举标签删除/重命名**: Diff 引擎仅支持追加检测 (`append-only`)，非追加变更输出警告但不生成修复操作。
 
@@ -214,3 +214,7 @@
 9. **分区表**: `PARTITION BY RANGE/LIST/HASH` 子句被 pg_query 解析但 diff/renderer 不处理。
 
 10. **存储参数**: `WITH (fillfactor=70)` 等存储参数被 pg_query 解析但 diff/renderer 不处理。
+
+11. **`IDENTITY` 列渲染**: `model.Column` 有 `IsIdentity` / `IdentityKind` 字段，解析器已正确解析 `GENERATED ALWAYS/BY DEFAULT AS IDENTITY`，但渲染器在 `renderAddTable` / `renderAddColumn` 中未输出 IDENTITY 子句；自省层也未查询 `is_identity` / `identity_generation` 列。
+
+12. **`character(n)` / `char(n)` 同义映射缺失**: PostgreSQL 中 `CHARACTER(n)` 与 `CHAR(n)` 等价，但 `normalize.go` 的类型别名映射仅覆盖 `character varying → varchar`，未包含 `character → char`。当 SQL 文件使用 `CHARACTER(10)` 而数据库自省返回 `char(10)` 时，会产生误报 diff。
