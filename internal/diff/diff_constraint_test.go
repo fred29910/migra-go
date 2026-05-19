@@ -103,3 +103,115 @@ func TestDiffTableConstraints_NilColumnsMismatch(t *testing.T) {
 	assert.True(t, sameConstraintContent(sqlConstraint, dbConstraintFixed),
 		"sameConstraintContent should return true when Columns match")
 }
+
+// TestSameConstraintContent_OnDeleteMismatch verifies that FK constraints
+// with different OnDelete values are detected as different content.
+func TestSameConstraintContent_OnDeleteMismatch(t *testing.T) {
+	a := &model.Constraint{
+		Name:      "fk_cascade",
+		Type:      "foreign_key",
+		Columns:   []string{"user_id"},
+		RefSchema: "public",
+		RefTable:  "users",
+		RefColumns: []string{"id"},
+		OnDelete:  "CASCADE",
+		OnUpdate:  "NO ACTION",
+	}
+	b := &model.Constraint{
+		Name:      "fk_cascade",
+		Type:      "foreign_key",
+		Columns:   []string{"user_id"},
+		RefSchema: "public",
+		RefTable:  "users",
+		RefColumns: []string{"id"},
+		OnDelete:  "SET NULL",
+		OnUpdate:  "NO ACTION",
+	}
+
+	assert.False(t, sameConstraintContent(a, b),
+		"sameConstraintContent should return false when OnDelete differs")
+}
+
+// TestSameConstraintSemantics_OnDeleteMismatch verifies that FK constraints
+// with different OnDelete/OnUpdate are detected as semantically different.
+func TestSameConstraintSemantics_OnDeleteMismatch(t *testing.T) {
+	a := &model.Constraint{
+		Name:      "fk_cascade",
+		Type:      "foreign_key",
+		Columns:   []string{"user_id"},
+		RefSchema: "public",
+		RefTable:  "users",
+		RefColumns: []string{"id"},
+		OnDelete:  "CASCADE",
+		OnUpdate:  "NO ACTION",
+	}
+	b := &model.Constraint{
+		Name:      "fk_cascade",
+		Type:      "foreign_key",
+		Columns:   []string{"user_id"},
+		RefSchema: "public",
+		RefTable:  "users",
+		RefColumns: []string{"id"},
+		OnDelete:  "SET NULL",
+		OnUpdate:  "NO ACTION",
+	}
+
+	assert.False(t, sameConstraintSemantics(a, b),
+		"sameConstraintSemantics should return false when OnDelete differs")
+}
+
+// TestSameConstraintSemantics_OnUpdateMismatch verifies that FK constraints
+// with different OnUpdate values are detected as semantically different.
+func TestSameConstraintSemantics_OnUpdateMismatch(t *testing.T) {
+	a := &model.Constraint{
+		Name:      "fk_cascade",
+		Type:      "foreign_key",
+		Columns:   []string{"user_id"},
+		RefSchema: "public",
+		RefTable:  "users",
+		RefColumns: []string{"id"},
+		OnDelete:  "CASCADE",
+		OnUpdate:  "NO ACTION",
+	}
+	b := &model.Constraint{
+		Name:      "fk_cascade",
+		Type:      "foreign_key",
+		Columns:   []string{"user_id"},
+		RefSchema: "public",
+		RefTable:  "users",
+		RefColumns: []string{"id"},
+		OnDelete:  "CASCADE",
+		OnUpdate:  "SET NULL",
+	}
+
+	assert.False(t, sameConstraintSemantics(a, b),
+		"sameConstraintSemantics should return false when OnUpdate differs")
+}
+
+// TestSameConstraintSemantics_OnDeleteSame verifies that FK constraints
+// with the same OnDelete/OnUpdate are semantically identical.
+func TestSameConstraintSemantics_OnDeleteSame(t *testing.T) {
+	a := &model.Constraint{
+		Name:      "fk_cascade",
+		Type:      "foreign_key",
+		Columns:   []string{"user_id"},
+		RefSchema: "public",
+		RefTable:  "users",
+		RefColumns: []string{"id"},
+		OnDelete:  "CASCADE",
+		OnUpdate:  "NO ACTION",
+	}
+	b := &model.Constraint{
+		Name:      "fk_cascade",
+		Type:      "foreign_key",
+		Columns:   []string{"user_id"},
+		RefSchema: "public",
+		RefTable:  "users",
+		RefColumns: []string{"id"},
+		OnDelete:  "CASCADE",
+		OnUpdate:  "NO ACTION",
+	}
+
+	assert.True(t, sameConstraintSemantics(a, b),
+		"sameConstraintSemantics should return true when OnDelete/OnUpdate are the same")
+}
