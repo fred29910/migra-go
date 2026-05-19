@@ -26,6 +26,8 @@ func TestOperationInterfaceHasDependsOn(t *testing.T) {
 		NewSetDefaultOp("public", "users", "email", "now()"),
 		NewDropDefaultOp("public", "users", "email"),
 		NewDropColumnOp("public", "users", "old_col"),
+		NewCreateSchemaOp("auth"),
+		NewDropSchemaOp("old_schema"),
 	}
 	for _, op := range ops {
 		deps := op.DependsOn() // 编译时检查此方法存在
