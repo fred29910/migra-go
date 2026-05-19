@@ -121,7 +121,9 @@ func sameConstraintContent(a, b *model.Constraint) bool {
 		a.RefSchema == b.RefSchema &&
 		a.RefTable == b.RefTable &&
 		reflect.DeepEqual(a.RefColumns, b.RefColumns) &&
-		a.Expression == b.Expression
+		a.Expression == b.Expression &&
+		a.OnDelete == b.OnDelete &&
+		a.OnUpdate == b.OnUpdate
 }
 
 // sameConstraintSemantics checks if two constraints have the same semantic meaning
@@ -144,6 +146,9 @@ func sameConstraintSemantics(a, b *model.Constraint) bool {
 			return false
 		}
 		if !reflect.DeepEqual(a.RefColumns, b.RefColumns) {
+			return false
+		}
+		if a.OnDelete != b.OnDelete || a.OnUpdate != b.OnUpdate {
 			return false
 		}
 	}
