@@ -37,6 +37,15 @@ func (c *diffContext) diffColumn(schema, table string, source, target *model.Col
 		}
 		c.addOp(NewAlterColumnCollationOp(schema, table, source.Name, dataType, source.Collation, target.Collation))
 	}
+
+	// Check for identity change
+	if source.IsIdentity != target.IsIdentity || source.IdentityKind != target.IdentityKind {
+		if target.IsIdentity {
+			c.addOp(NewSetIdentityOp(schema, table, source.Name, target.IdentityKind))
+		} else {
+			c.addOp(NewDropIdentityOp(schema, table, source.Name))
+		}
+	}
 }
 
 // sameDefault checks if two default expressions are the same
