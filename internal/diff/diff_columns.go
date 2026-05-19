@@ -28,6 +28,15 @@ func (c *diffContext) diffColumn(schema, table string, source, target *model.Col
 			c.addOp(NewSetDefaultOp(schema, table, source.Name, *target.DefaultExpr))
 		}
 	}
+
+	// Check for collation change
+	if source.Collation != target.Collation {
+		dataType := target.DataType
+		if dataType == "" {
+			dataType = source.DataType
+		}
+		c.addOp(NewAlterColumnCollationOp(schema, table, source.Name, dataType, source.Collation, target.Collation))
+	}
 }
 
 // sameDefault checks if two default expressions are the same
