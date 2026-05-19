@@ -336,6 +336,60 @@ func TestDirectoryVsFile_Diff(t *testing.T) {
 	}
 }
 
+func TestRenameColumnDiff(t *testing.T) {
+	out, warns, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+		Source:     "../../testdata/diff/rename_example/v1/schema.sql",
+		Target:     "../../testdata/diff/rename_example/v2/schema.sql",
+		Schemas:    []string{"public"},
+		Format:     "sql",
+		Timeout:    defaultDiffTimeout,
+		UnsafeDrop: false,
+	})
+	if err != nil {
+		t.Fatalf("diff service failed: %v", err)
+	}
+
+	for _, want := range []string{
+		`RENAME COLUMN "username" TO "login_name"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got:\n%s", want, out)
+		}
+	}
+
+	if len(warns) > 0 {
+		t.Fatalf("unexpected warnings: %v", warns)
+	}
+}
+
+func TestRenameColumnComplexDiff(t *testing.T) {
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+		Source:     "../../testdata/diff/rename_complex/v1/schema.sql",
+		Target:     "../../testdata/diff/rename_complex/v2/schema.sql",
+		Schemas:    []string{"public"},
+		Format:     "sql",
+		Timeout:    defaultDiffTimeout,
+		UnsafeDrop: false,
+	})
+	if err != nil {
+		t.Fatalf("diff service failed: %v", err)
+	}
+
+	for _, want := range []string{
+		`RENAME COLUMN "username" TO "login_name"`,
+		`ADD COLUMN "phone"`,
+		`ADD VALUE 'guest'`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got:\n%s", want, out)
+		}
+	}
+
+	if strings.Contains(out, `DROP COLUMN`) || strings.Contains(out, `ADD COLUMN "login_name"`) {
+		t.Fatalf("should detect rename, not drop+add:\n%s", out)
+	}
+}
+
 func TestMultiSchemaDiff(t *testing.T) {
 	sourceDir := t.TempDir()
 
