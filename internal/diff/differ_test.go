@@ -13,8 +13,8 @@ func TestDiffer_DiffNoSharedState(t *testing.T) {
 	tgt.GetOrCreateNamespace("public")
 	for i := 0; i < 20; i++ {
 		ops, _ := d.Diff(src, tgt)
-		if len(ops) != 0 {
-			t.Fatalf("expected 0 ops, got %d", len(ops))
+		if len(ops) != 1 || ops[0].Kind() != KindCreateSchema {
+			t.Fatalf("expected 1 CreateSchemaOp, got %d ops: %#v", len(ops), ops)
 		}
 	}
 }
@@ -190,5 +190,64 @@ func TestDiffer_NoCollationDifferenceWhenSame(t *testing.T) {
 		if op.Kind() == KindAlterColumnCollation {
 			t.Fatal("expected NO AlterColumnCollationOp when collation is the same")
 		}
+	}
+}
+
+func TestDiffer_CreateSchemaOp(t *testing.T) {
+	source := model.NewSchema()
+	source.GetOrCreateNamespace("public")
+	sourceNs := source.GetOrCreateNamespace("public")
+	sourceNs.Tables["users"] = model.NewTable("public", "users")
+
+	target := model.NewSchema()
+	target.GetOrCreateNamespace("public")
+	targetNs := target.GetOrCreateNamespace("public")
+	targetNs.Tables["users"] = model.NewTable("public", "users")
+	// target also has "auth" schema (doesn't exist in source)
+	target.GetOrCreateNamespace("auth")
+	authNs := target.GetOrCreateNamespace("auth")
+	authNs.Tables["roles"] = model.NewTable("auth", "roles")
+
+	ops, warnings := NewDiffer().Diff(source, target)
+
+	for _, w := range warnings {
+		t.Logf("warning: %s", w)
+	}
+
+	var foundCreateSchema bool
+	for _, op := range ops {
+		if op.Kind() == KindCreateSchema {
+			foundCreateSchema = true
+			createOp, ok := op.(*CreateSchemaOp)
+			if !ok {
+				t.Fatal("expected *CreateSchemaOp type")
+			}
+			if createOp.Schema != "auth" {
+				t.Fatalf("expected schema 'auth', got %q", createOp.Schema)
+			}
+			if createOp.IsDestructive() {
+				t.Fatal("CreateSchemaOp should not be destructive")
+			}
+			if createOp.ObjectKey().Kind != model.KindSchema {
+				t.Fatalf("expected ObjectKey KindSchema, got %v", createOp.ObjectKey().Kind)
+			}
+		}
+	}
+	if !foundCreateSchema {
+		t.Fatal("expected CreateSchemaOp in diff output, but none found")
+	}
+
+	// Verify that tables inside the new schema are also emitted
+	var foundAddAuthRoles bool
+	for _, op := range ops {
+		if op.Kind() == KindAddTable {
+			addTable, ok := op.(*AddTableOp)
+			if ok && addTable.Table.Schema == "auth" && addTable.Table.Name == "roles" {
+				foundAddAuthRoles = true
+			}
+		}
+	}
+	if !foundAddAuthRoles {
+		t.Fatal("expected AddTableOp for auth.roles")
 	}
 }
