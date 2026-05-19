@@ -25,6 +25,8 @@ const (
 	KindAlterColumnCollation Kind = "alter_column_collation"
 	KindCreateSchema         Kind = "create_schema"
 	KindDropSchema           Kind = "drop_schema"
+	KindSetIdentity          Kind = "set_identity"
+	KindDropIdentity         Kind = "drop_identity"
 )
 
 // Operation is the interface for all diff operations
@@ -440,6 +442,68 @@ func (op *DropDefaultOp) IsDestructive() bool {
 }
 
 func (op *DropDefaultOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
+	}
+}
+
+// SetIdentityOp represents setting/changing a column's identity generation type
+type SetIdentityOp struct {
+	baseOperation
+	Schema       string
+	Table        string
+	Column       string
+	IdentityKind string // "ALWAYS" or "BY DEFAULT"
+}
+
+func NewSetIdentityOp(schema, table, column, identityKind string) *SetIdentityOp {
+	return &SetIdentityOp{
+		baseOperation: baseOperation{
+			kind:      KindSetIdentity,
+			objectKey: model.NewObjectKey(schema, table+"."+column, model.KindColumn),
+		},
+		Schema:       schema,
+		Table:        table,
+		Column:       column,
+		IdentityKind: identityKind,
+	}
+}
+
+func (op *SetIdentityOp) IsDestructive() bool {
+	return false
+}
+
+func (op *SetIdentityOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{
+		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
+	}
+}
+
+// DropIdentityOp represents dropping a column's identity property
+type DropIdentityOp struct {
+	baseOperation
+	Schema string
+	Table  string
+	Column string
+}
+
+func NewDropIdentityOp(schema, table, column string) *DropIdentityOp {
+	return &DropIdentityOp{
+		baseOperation: baseOperation{
+			kind:      KindDropIdentity,
+			objectKey: model.NewObjectKey(schema, table+"."+column, model.KindColumn),
+		},
+		Schema: schema,
+		Table:  table,
+		Column: column,
+	}
+}
+
+func (op *DropIdentityOp) IsDestructive() bool {
+	return true
+}
+
+func (op *DropIdentityOp) DependsOn() []model.ObjectKey {
 	return []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
 	}

@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/fred29910/migra-go/internal/model"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOperationInterfaceHasDependsOn(t *testing.T) {
@@ -28,6 +30,8 @@ func TestOperationInterfaceHasDependsOn(t *testing.T) {
 		NewDropColumnOp("public", "users", "old_col"),
 		NewCreateSchemaOp("auth"),
 		NewDropSchemaOp("old_schema"),
+		NewSetIdentityOp("public", "users", "id", "ALWAYS"),
+		NewDropIdentityOp("public", "users", "id"),
 	}
 	for _, op := range ops {
 		deps := op.DependsOn() // 编译时检查此方法存在
@@ -42,7 +46,7 @@ func TestOperationInterfaceHasDependsOn(t *testing.T) {
 			if deps[0] != expectedTableDep {
 				t.Errorf("%T.DependsOn()[0] = %v, want %v", op, deps[0], expectedTableDep)
 			}
-		case *AddColumnOp, *AlterColumnTypeOp, *SetNotNullOp, *DropNotNullOp, *CreateIndexOp, *SetDefaultOp, *DropDefaultOp, *DropColumnOp:
+		case *AddColumnOp, *AlterColumnTypeOp, *SetNotNullOp, *DropNotNullOp, *CreateIndexOp, *SetDefaultOp, *DropDefaultOp, *DropColumnOp, *SetIdentityOp, *DropIdentityOp:
 			// These operations should have exactly one dependency: their table
 			if len(deps) != 1 {
 				t.Errorf("%T.DependsOn() should return 1 dependency, got %d", op, len(deps))
@@ -102,4 +106,27 @@ func TestNewOperationsMetadata(t *testing.T) {
 	if len(dropDefault.DependsOn()) != 1 || dropDefault.DependsOn()[0].Kind != model.KindTable {
 		t.Fatalf("expected drop default table dependency, got %#v", dropDefault.DependsOn())
 	}
+}
+
+func TestSetIdentityOp(t *testing.T) {
+	op := NewSetIdentityOp("public", "users", "id", "ALWAYS")
+	assert.Equal(t, KindSetIdentity, op.Kind())
+	assert.Equal(t, "public", op.Schema)
+	assert.Equal(t, "users", op.Table)
+	assert.Equal(t, "id", op.Column)
+	assert.Equal(t, "ALWAYS", op.IdentityKind)
+	assert.False(t, op.IsDestructive())
+	deps := op.DependsOn()
+	require.Len(t, deps, 1)
+	assert.Equal(t, "public", deps[0].Schema)
+	assert.Equal(t, "users", deps[0].Name)
+}
+
+func TestDropIdentityOp(t *testing.T) {
+	op := NewDropIdentityOp("public", "users", "id")
+	assert.Equal(t, KindDropIdentity, op.Kind())
+	assert.Equal(t, "public", op.Schema)
+	assert.Equal(t, "users", op.Table)
+	assert.Equal(t, "id", op.Column)
+	assert.True(t, op.IsDestructive())
 }
