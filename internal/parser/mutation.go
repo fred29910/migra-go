@@ -21,6 +21,7 @@ const (
 	MutKindSetDefault      MutationKind = "set_default"
 	MutKindDropDefault     MutationKind = "drop_default"
 	MutKindCreateSchema    MutationKind = "create_schema"
+	MutKindRenameColumn   MutationKind = "rename_column"
 )
 
 // SchemaMutation is a self-describing and self-applying schema change.
