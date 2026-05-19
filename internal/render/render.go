@@ -126,6 +126,17 @@ func (r *Renderer) Render(op diff.Operation) string {
 		return r.renderCreateSchema(v)
 	case *diff.DropSchemaOp:
 		return r.renderDropSchema(v)
+	case *diff.SetIdentityOp:
+		return fmt.Sprintf("-- op: set_identity risk:low\nALTER TABLE %s ALTER COLUMN %s SET GENERATED %s;",
+			quoteQualifiedIdentifier(v.Schema, v.Table),
+			quoteIdentifier(v.Column),
+			v.IdentityKind,
+		)
+	case *diff.DropIdentityOp:
+		return fmt.Sprintf("-- op: drop_identity risk:medium\nALTER TABLE %s ALTER COLUMN %s DROP IDENTITY;",
+			quoteQualifiedIdentifier(v.Schema, v.Table),
+			quoteIdentifier(v.Column),
+		)
 	case *diff.DropColumnOp:
 		return fmt.Sprintf("-- op: drop_column risk:high\nALTER TABLE %s DROP COLUMN IF EXISTS %s;",
 			quoteQualifiedIdentifier(v.Schema, v.Table),
