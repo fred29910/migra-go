@@ -44,6 +44,7 @@ func ParseColumnDef(colDef *pg_query.ColumnDef) *model.Column {
 			}
 		}
 	}
+	col.Collation = ExtractCollation(colDef)
 	return col
 }
 
@@ -115,6 +116,21 @@ var typeNameMapping = map[string]string{
 	"serial":      "integer",
 	"bigserial":   "bigint",
 	"smallserial": "smallint",
+}
+
+// ExtractCollation extracts the collation name from a ColumnDef's CollClause.
+// Returns empty string if no collation is specified.
+func ExtractCollation(colDef *pg_query.ColumnDef) string {
+	if colDef.CollClause == nil {
+		return ""
+	}
+	parts := make([]string, 0, len(colDef.CollClause.Collname))
+	for _, item := range colDef.CollClause.Collname {
+		if s := item.GetString_(); s != nil {
+			parts = append(parts, s.Sval)
+		}
+	}
+	return strings.Join(parts, ".")
 }
 
 // MapTypeName maps PostgreSQL internal type names to standard SQL names.
