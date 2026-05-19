@@ -115,7 +115,13 @@ func (h *AlterTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error
 			}
 
 		default:
-			fmt.Fprintf(os.Stderr, "warning: unsupported ALTER TABLE subcommand: %v\n", cmd.Subtype)
+			// NOTE: Some ALTER TABLE subcommands (e.g., RENAME COLUMN) are parsed by
+			// pg_query_go as top-level RenameStmt nodes, not as AlterTableCmd subtypes.
+			// If you encounter an unhandled subtype here, check whether the statement
+			// type is handled by a dedicated handler (e.g., RenameStmtHandler) or if
+			// a new handler needs to be registered in registry.go.
+			fmt.Fprintf(os.Stderr, "warning: unsupported ALTER TABLE subcommand (subtype=%v). "+
+				"This may be handled by a different top-level statement handler.\n", cmd.Subtype)
 		}
 	}
 	return mutations, nil

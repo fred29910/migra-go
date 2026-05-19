@@ -66,6 +66,20 @@ func TestOperationInterfaceHasDependsOn(t *testing.T) {
 			if deps[0] != expectedDep {
 				t.Errorf("%T.DependsOn()[0] = %v, want %v", op, deps[0], expectedDep)
 			}
+		case *CreateSchemaOp:
+			if deps != nil {
+				t.Errorf("%T.DependsOn() should return nil, got %v", op, deps)
+			}
+			if op.Kind() != KindCreateSchema {
+				t.Errorf("%T.Kind() = %v, want %v", op, op.Kind(), KindCreateSchema)
+			}
+		case *DropSchemaOp:
+			if deps != nil {
+				t.Errorf("%T.DependsOn() should return nil, got %v", op, deps)
+			}
+			if op.Kind() != KindDropSchema {
+				t.Errorf("%T.Kind() = %v, want %v", op, op.Kind(), KindDropSchema)
+			}
 		default:
 			// These operations should have no dependencies
 			if deps != nil {
