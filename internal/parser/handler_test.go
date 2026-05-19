@@ -3,6 +3,7 @@ package parser
 import (
 	"testing"
 
+	"github.com/fred29910/migra-go/internal/model"
 	pg_query "github.com/pganalyze/pg_query_go/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -178,6 +179,31 @@ func TestAlterTableHandler_AddColumnWithoutCollation(t *testing.T) {
 	mut, ok := mutations[0].(AddColumnMutation)
 	require.True(t, ok)
 	assert.Equal(t, "", mut.Column.Collation, "expected empty collation for default")
+}
+
+func TestCreateTableHandler_ForeignKeyCascade(t *testing.T) {
+	sql := `CREATE TABLE orders (
+        id integer PRIMARY KEY,
+        user_id integer REFERENCES users(id) ON DELETE CASCADE ON UPDATE SET NULL
+    )`
+	node := mustParseFirstStmt(t, sql)
+	handler := &CreateTableHandler{}
+	mutations, err := handler.Handle(node)
+	require.NoError(t, err)
+	require.Len(t, mutations, 1)
+	ctMut := mutations[0].(CreateTableMutation)
+	require.Len(t, ctMut.Constraints, 2)
+
+	var fkConstraint *model.Constraint
+	for _, c := range ctMut.Constraints {
+		if c.Type == "foreign_key" {
+			fkConstraint = &c
+			break
+		}
+	}
+	require.NotNil(t, fkConstraint)
+	assert.Equal(t, "CASCADE", fkConstraint.OnDelete)
+	assert.Equal(t, "SET NULL", fkConstraint.OnUpdate)
 }
 
 func TestCreateSchemaHandler_IfNotExists(t *testing.T) {

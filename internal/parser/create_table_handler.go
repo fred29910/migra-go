@@ -25,6 +25,25 @@ func defaultConstraintName(table string, constraint model.Constraint) string {
 	return table + "_constraint"
 }
 
+// fkActionCode maps pg_query FK action codes to SQL keywords
+// Codes: "a"=NO ACTION, "r"=RESTRICT, "c"=CASCADE, "n"=SET NULL, "d"=SET DEFAULT
+func fkActionCode(code string) string {
+	switch code {
+	case "a":
+		return "NO ACTION"
+	case "r":
+		return "RESTRICT"
+	case "c":
+		return "CASCADE"
+	case "n":
+		return "SET NULL"
+	case "d":
+		return "SET DEFAULT"
+	default:
+		return ""
+	}
+}
+
 // Handle converts a pg_query CreateStmt into schema mutations.
 func (h *CreateTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error) {
 	stmt := node.GetCreateStmt()
@@ -44,7 +63,8 @@ func (h *CreateTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, erro
 			col := parserutil.ParseColumnDef(colDef)
 			for _, conItem := range colDef.Constraints {
 				if c := conItem.GetConstraint(); c != nil {
-					if c.Contype == pg_query.ConstrType_CONSTR_PRIMARY {
+					switch c.Contype {
+					case pg_query.ConstrType_CONSTR_PRIMARY:
 						col.IsNullable = false
 						primaryKey = &model.PrimaryKey{
 							Name:    defaultConstraintName(tableName, model.Constraint{Name: "", Type: "primary_key"}),
@@ -55,6 +75,33 @@ func (h *CreateTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, erro
 							Type:    "primary_key",
 							Columns: []string{col.Name},
 						})
+					case pg_query.ConstrType_CONSTR_FOREIGN:
+						var refCols []string
+						for _, attr := range c.PkAttrs {
+							if s := attr.GetString_(); s != nil {
+								refCols = append(refCols, s.Sval)
+							}
+						}
+						refSchema := "public"
+						if c.Pktable != nil && c.Pktable.Schemaname != "" {
+							refSchema = c.Pktable.Schemaname
+						}
+						refTable := ""
+						if c.Pktable != nil {
+							refTable = c.Pktable.Relname
+						}
+						con := model.Constraint{
+							Name:       "",
+							Type:       "foreign_key",
+							Columns:    []string{col.Name},
+							RefSchema:  refSchema,
+							RefTable:   refTable,
+							RefColumns: refCols,
+							OnDelete:   fkActionCode(c.FkDelAction),
+							OnUpdate:   fkActionCode(c.FkUpdAction),
+						}
+						con.Name = defaultConstraintName(tableName, con)
+						constraints = append(constraints, con)
 					}
 				}
 			}
@@ -106,6 +153,8 @@ func (h *CreateTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, erro
 					RefSchema:  refSchema,
 					RefTable:   refTable,
 					RefColumns: refCols,
+					OnDelete:   fkActionCode(constraint.FkDelAction),
+					OnUpdate:   fkActionCode(constraint.FkUpdAction),
 				}
 				con.Name = defaultConstraintName(tableName, con)
 				constraints = append(constraints, con)
