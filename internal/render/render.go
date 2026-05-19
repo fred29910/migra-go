@@ -142,6 +142,9 @@ func (r *Renderer) renderAddTable(op *diff.AddTableOp) string {
 
 	for _, col := range table.Columns {
 		colDef := fmt.Sprintf("    %s %s", quoteIdentifier(col.Name), col.DataType)
+		if col.Collation != "" {
+			colDef += fmt.Sprintf(" COLLATE %s", quoteIdentifier(col.Collation))
+		}
 		if !col.IsNullable {
 			colDef += " NOT NULL"
 		}
@@ -198,6 +201,9 @@ func (r *Renderer) renderAddColumn(op *diff.AddColumnOp) string {
 	sql := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s",
 		quoteQualifiedIdentifier(op.Schema, op.Table), quoteIdentifier(col.Name), col.DataType)
 
+	if col.Collation != "" {
+		sql += fmt.Sprintf(" COLLATE %s", quoteIdentifier(col.Collation))
+	}
 	if !col.IsNullable {
 		sql += " NOT NULL"
 	}
