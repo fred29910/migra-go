@@ -44,6 +44,8 @@ type Constraint struct {
 	RefTable   string
 	RefColumns []string
 	Expression string
+	OnDelete   string
+	OnUpdate   string
 }
 
 // NewTable creates a new table with initialized maps
