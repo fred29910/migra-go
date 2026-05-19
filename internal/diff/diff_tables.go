@@ -159,13 +159,64 @@ func sameConstraintSemantics(a, b *model.Constraint) bool {
 	return true
 }
 
+// isColumnRenameCandidate checks if a source column and target column match
+// the heuristic for being the same column that was renamed.
+// Conditions: same DataType, same IsNullable, same DefaultExpr.
+func isColumnRenameCandidate(src, tgt *model.Column) bool {
+	if src.DataType != tgt.DataType {
+		return false
+	}
+	if src.IsNullable != tgt.IsNullable {
+		return false
+	}
+	return sameDefault(src.DefaultExpr, tgt.DefaultExpr)
+}
+
 // diffTableColumns compares columns between two tables
 func (c *diffContext) diffTableColumns(schema string, source, target *model.Table) {
-	// Use ColumnByName index for quick lookup (avoid building temporary maps)
-	// Find columns to add (in target but not in source) - sorted for deterministic output
-	addColNames := make([]string, 0, len(target.ColumnByName))
+	// Phase 1: Detect column renames via heuristic matching.
+	// For columns that appear "dropped" in source and "added" in target,
+	// check if they match on data type, nullable, and default expression.
+	// If matched, emit RenameColumnOp instead of DropColumnOp + AddColumnOp.
+	sourceOnlyNames := make([]string, 0)
+	for name := range source.ColumnByName {
+		if _, exists := target.ColumnByName[name]; !exists {
+			sourceOnlyNames = append(sourceOnlyNames, name)
+		}
+	}
+	sort.Strings(sourceOnlyNames)
+
+	targetOnlyNames := make([]string, 0)
 	for name := range target.ColumnByName {
 		if _, exists := source.ColumnByName[name]; !exists {
+			targetOnlyNames = append(targetOnlyNames, name)
+		}
+	}
+	sort.Strings(targetOnlyNames)
+
+	renamedSource := make(map[string]bool)
+	renamedTarget := make(map[string]bool)
+
+	for _, srcName := range sourceOnlyNames {
+		srcCol := source.ColumnByName[srcName]
+		for _, tgtName := range targetOnlyNames {
+			if renamedTarget[tgtName] {
+				continue
+			}
+			tgtCol := target.ColumnByName[tgtName]
+			if isColumnRenameCandidate(srcCol, tgtCol) {
+				c.addOp(NewRenameColumnOp(schema, target.Name, srcName, tgtName))
+				renamedSource[srcName] = true
+				renamedTarget[tgtName] = true
+				break
+			}
+		}
+	}
+
+	// Phase 2: Add columns that are truly new (not rename targets)
+	addColNames := make([]string, 0, len(targetOnlyNames))
+	for _, name := range targetOnlyNames {
+		if !renamedTarget[name] {
 			addColNames = append(addColNames, name)
 		}
 	}
@@ -175,14 +226,14 @@ func (c *diffContext) diffTableColumns(schema string, source, target *model.Tabl
 		c.addOp(NewAddColumnOp(schema, target.Name, col))
 	}
 
-	// Find columns to drop (in source but not in target)
+	// Phase 3: Drop columns that are truly removed (not rename sources)
 	for name := range source.ColumnByName {
-		if _, exists := target.ColumnByName[name]; !exists {
+		if _, exists := target.ColumnByName[name]; !exists && !renamedSource[name] {
 			c.addOp(NewDropColumnOp(schema, source.Name, name))
 		}
 	}
 
-	// Compare columns that exist in both - iterate in target column order for consistency
+	// Phase 4: Compare columns that exist in both (unchanged)
 	for _, targetCol := range target.Columns {
 		if sourceCol, exists := source.ColumnByName[targetCol.Name]; exists {
 			c.diffColumn(schema, target.Name, sourceCol, targetCol)
