@@ -251,3 +251,128 @@ func TestDiffer_CreateSchemaOp(t *testing.T) {
 		t.Fatal("expected AddTableOp for auth.roles")
 	}
 }
+
+func TestDiffer_DetectsIdentityKindChange(t *testing.T) {
+	source := model.NewSchema()
+	sourceNs := source.GetOrCreateNamespace("public")
+	sourceTable := model.NewTable("public", "users")
+	sourceTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: true, IsIdentity: true, IdentityKind: "ALWAYS"})
+	sourceNs.Tables["users"] = sourceTable
+
+	target := model.NewSchema()
+	targetNs := target.GetOrCreateNamespace("public")
+	targetTable := model.NewTable("public", "users")
+	targetTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: true, IsIdentity: true, IdentityKind: "BY DEFAULT"})
+	targetNs.Tables["users"] = targetTable
+
+	ops, warnings := NewDiffer().Diff(source, target)
+	if len(warnings) != 0 {
+		t.Fatalf("unexpected warnings: %#v", warnings)
+	}
+
+	found := false
+	for _, op := range ops {
+		if op.Kind() == KindSetIdentity {
+			found = true
+			idOp, ok := op.(*SetIdentityOp)
+			if !ok {
+				t.Fatal("expected SetIdentityOp type")
+			}
+			if idOp.Column != "id" {
+				t.Errorf("expected column 'id', got %q", idOp.Column)
+			}
+			if idOp.IdentityKind != "BY DEFAULT" {
+				t.Errorf("expected IdentityKind 'BY DEFAULT', got %q", idOp.IdentityKind)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected SetIdentityOp in diff output, but not found")
+	}
+}
+
+func TestDiffer_DetectsIdentityDrop(t *testing.T) {
+	source := model.NewSchema()
+	sourceNs := source.GetOrCreateNamespace("public")
+	sourceTable := model.NewTable("public", "users")
+	sourceTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: true, IsIdentity: true, IdentityKind: "ALWAYS"})
+	sourceNs.Tables["users"] = sourceTable
+
+	target := model.NewSchema()
+	targetNs := target.GetOrCreateNamespace("public")
+	targetTable := model.NewTable("public", "users")
+	targetTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: true, IsIdentity: false})
+	targetNs.Tables["users"] = targetTable
+
+	ops, warnings := NewDiffer().Diff(source, target)
+	if len(warnings) != 0 {
+		t.Fatalf("unexpected warnings: %#v", warnings)
+	}
+
+	found := false
+	for _, op := range ops {
+		if op.Kind() == KindDropIdentity {
+			found = true
+			dropOp, ok := op.(*DropIdentityOp)
+			if !ok {
+				t.Fatal("expected DropIdentityOp type")
+			}
+			if dropOp.Column != "id" {
+				t.Errorf("expected column 'id', got %q", dropOp.Column)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected DropIdentityOp in diff output, but not found")
+	}
+}
+
+func TestDiffer_NoIdentityDifferenceWhenSame(t *testing.T) {
+	source := model.NewSchema()
+	sourceNs := source.GetOrCreateNamespace("public")
+	sourceTable := model.NewTable("public", "users")
+	sourceTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: true, IsIdentity: true, IdentityKind: "ALWAYS"})
+	sourceNs.Tables["users"] = sourceTable
+
+	target := model.NewSchema()
+	targetNs := target.GetOrCreateNamespace("public")
+	targetTable := model.NewTable("public", "users")
+	targetTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: true, IsIdentity: true, IdentityKind: "ALWAYS"})
+	targetNs.Tables["users"] = targetTable
+
+	ops, warnings := NewDiffer().Diff(source, target)
+	if len(warnings) != 0 {
+		t.Fatalf("unexpected warnings: %#v", warnings)
+	}
+
+	for _, op := range ops {
+		if op.Kind() == KindSetIdentity || op.Kind() == KindDropIdentity {
+			t.Fatal("expected NO identity ops when identity is the same")
+		}
+	}
+}
+
+func TestDiffer_NoIdentityDifferenceWhenBothFalse(t *testing.T) {
+	source := model.NewSchema()
+	sourceNs := source.GetOrCreateNamespace("public")
+	sourceTable := model.NewTable("public", "users")
+	sourceTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: true, IsIdentity: false})
+	sourceNs.Tables["users"] = sourceTable
+
+	target := model.NewSchema()
+	targetNs := target.GetOrCreateNamespace("public")
+	targetTable := model.NewTable("public", "users")
+	targetTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: true, IsIdentity: false})
+	targetNs.Tables["users"] = targetTable
+
+	ops, warnings := NewDiffer().Diff(source, target)
+	if len(warnings) != 0 {
+		t.Fatalf("unexpected warnings: %#v", warnings)
+	}
+
+	for _, op := range ops {
+		if op.Kind() == KindSetIdentity || op.Kind() == KindDropIdentity {
+			t.Fatal("expected NO identity ops when identity is false in both")
+		}
+	}
+}
