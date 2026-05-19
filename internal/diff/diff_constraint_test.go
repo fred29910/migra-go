@@ -108,24 +108,24 @@ func TestDiffTableConstraints_NilColumnsMismatch(t *testing.T) {
 // with different OnDelete values are detected as different content.
 func TestSameConstraintContent_OnDeleteMismatch(t *testing.T) {
 	a := &model.Constraint{
-		Name:      "fk_cascade",
-		Type:      "foreign_key",
-		Columns:   []string{"user_id"},
-		RefSchema: "public",
-		RefTable:  "users",
+		Name:       "fk_cascade",
+		Type:       "foreign_key",
+		Columns:    []string{"user_id"},
+		RefSchema:  "public",
+		RefTable:   "users",
 		RefColumns: []string{"id"},
-		OnDelete:  "CASCADE",
-		OnUpdate:  "NO ACTION",
+		OnDelete:   "CASCADE",
+		OnUpdate:   "NO ACTION",
 	}
 	b := &model.Constraint{
-		Name:      "fk_cascade",
-		Type:      "foreign_key",
-		Columns:   []string{"user_id"},
-		RefSchema: "public",
-		RefTable:  "users",
+		Name:       "fk_cascade",
+		Type:       "foreign_key",
+		Columns:    []string{"user_id"},
+		RefSchema:  "public",
+		RefTable:   "users",
 		RefColumns: []string{"id"},
-		OnDelete:  "SET NULL",
-		OnUpdate:  "NO ACTION",
+		OnDelete:   "SET NULL",
+		OnUpdate:   "NO ACTION",
 	}
 
 	assert.False(t, sameConstraintContent(a, b),
@@ -136,24 +136,24 @@ func TestSameConstraintContent_OnDeleteMismatch(t *testing.T) {
 // with different OnDelete/OnUpdate are detected as semantically different.
 func TestSameConstraintSemantics_OnDeleteMismatch(t *testing.T) {
 	a := &model.Constraint{
-		Name:      "fk_cascade",
-		Type:      "foreign_key",
-		Columns:   []string{"user_id"},
-		RefSchema: "public",
-		RefTable:  "users",
+		Name:       "fk_cascade",
+		Type:       "foreign_key",
+		Columns:    []string{"user_id"},
+		RefSchema:  "public",
+		RefTable:   "users",
 		RefColumns: []string{"id"},
-		OnDelete:  "CASCADE",
-		OnUpdate:  "NO ACTION",
+		OnDelete:   "CASCADE",
+		OnUpdate:   "NO ACTION",
 	}
 	b := &model.Constraint{
-		Name:      "fk_cascade",
-		Type:      "foreign_key",
-		Columns:   []string{"user_id"},
-		RefSchema: "public",
-		RefTable:  "users",
+		Name:       "fk_cascade",
+		Type:       "foreign_key",
+		Columns:    []string{"user_id"},
+		RefSchema:  "public",
+		RefTable:   "users",
 		RefColumns: []string{"id"},
-		OnDelete:  "SET NULL",
-		OnUpdate:  "NO ACTION",
+		OnDelete:   "SET NULL",
+		OnUpdate:   "NO ACTION",
 	}
 
 	assert.False(t, sameConstraintSemantics(a, b),
@@ -164,24 +164,24 @@ func TestSameConstraintSemantics_OnDeleteMismatch(t *testing.T) {
 // with different OnUpdate values are detected as semantically different.
 func TestSameConstraintSemantics_OnUpdateMismatch(t *testing.T) {
 	a := &model.Constraint{
-		Name:      "fk_cascade",
-		Type:      "foreign_key",
-		Columns:   []string{"user_id"},
-		RefSchema: "public",
-		RefTable:  "users",
+		Name:       "fk_cascade",
+		Type:       "foreign_key",
+		Columns:    []string{"user_id"},
+		RefSchema:  "public",
+		RefTable:   "users",
 		RefColumns: []string{"id"},
-		OnDelete:  "CASCADE",
-		OnUpdate:  "NO ACTION",
+		OnDelete:   "CASCADE",
+		OnUpdate:   "NO ACTION",
 	}
 	b := &model.Constraint{
-		Name:      "fk_cascade",
-		Type:      "foreign_key",
-		Columns:   []string{"user_id"},
-		RefSchema: "public",
-		RefTable:  "users",
+		Name:       "fk_cascade",
+		Type:       "foreign_key",
+		Columns:    []string{"user_id"},
+		RefSchema:  "public",
+		RefTable:   "users",
 		RefColumns: []string{"id"},
-		OnDelete:  "CASCADE",
-		OnUpdate:  "SET NULL",
+		OnDelete:   "CASCADE",
+		OnUpdate:   "SET NULL",
 	}
 
 	assert.False(t, sameConstraintSemantics(a, b),
@@ -192,24 +192,24 @@ func TestSameConstraintSemantics_OnUpdateMismatch(t *testing.T) {
 // with the same OnDelete/OnUpdate are semantically identical.
 func TestSameConstraintSemantics_OnDeleteSame(t *testing.T) {
 	a := &model.Constraint{
-		Name:      "fk_cascade",
-		Type:      "foreign_key",
-		Columns:   []string{"user_id"},
-		RefSchema: "public",
-		RefTable:  "users",
+		Name:       "fk_cascade",
+		Type:       "foreign_key",
+		Columns:    []string{"user_id"},
+		RefSchema:  "public",
+		RefTable:   "users",
 		RefColumns: []string{"id"},
-		OnDelete:  "CASCADE",
-		OnUpdate:  "NO ACTION",
+		OnDelete:   "CASCADE",
+		OnUpdate:   "NO ACTION",
 	}
 	b := &model.Constraint{
-		Name:      "fk_cascade",
-		Type:      "foreign_key",
-		Columns:   []string{"user_id"},
-		RefSchema: "public",
-		RefTable:  "users",
+		Name:       "fk_cascade",
+		Type:       "foreign_key",
+		Columns:    []string{"user_id"},
+		RefSchema:  "public",
+		RefTable:   "users",
 		RefColumns: []string{"id"},
-		OnDelete:  "CASCADE",
-		OnUpdate:  "NO ACTION",
+		OnDelete:   "CASCADE",
+		OnUpdate:   "NO ACTION",
 	}
 
 	assert.True(t, sameConstraintSemantics(a, b),
