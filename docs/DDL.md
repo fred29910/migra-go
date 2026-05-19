@@ -17,7 +17,7 @@
 | `ALTER TABLE ... ADD COLUMN` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ALTER TABLE ... DROP COLUMN` | ✅ | ✅ | ✅ `DROP COLUMN IF EXISTS` | ✅ | ✅ |
 | `ALTER TABLE ... ALTER COLUMN TYPE` | ✅ (含 `USING`) | ✅ | ✅ | ✅ | ✅ |
-| `ALTER TABLE ... RENAME COLUMN` | ⚠️ pg_query 解析但不处理 | ❌ | ❌ | — | ⚠️ |
+| `ALTER TABLE ... RENAME COLUMN` | ✅ (RenameStmtHandler) | ✅ (启发式检测) | ✅ `RENAME COLUMN ... TO ...` | — | ✅ |
 | `ALTER TABLE ... SET (storage_param)` | ⚠️ pg_query 解析但不处理 | ❌ | ❌ | — | ⚠️ |
 | 表继承 (`INHERITS`) | ⚠️ pg_query 解析但不处理 | ❌ | ❌ | — | ⚠️ |
 | 分区表 (`PARTITION BY`) | ⚠️ pg_query 解析但不处理 | ❌ | ❌ | — | ⚠️ |
@@ -47,7 +47,7 @@
 | 列级 `CHECK` 约束 | ✅ (作为表约束解析) | ✅ | ✅ | ✅ | ✅ |
 | `PRIMARY KEY` (行内) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `IDENTITY` 列 (`GENERATED ALWAYS/BY DEFAULT AS IDENTITY`) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 列排序规则 (`COLLATE`) | ⚠️ pg_query 解析但 model 未存储 | ❌ | ❌ | ❌ | ⚠️ |
+| 列排序规则 (`COLLATE`) | ⚠️ pg_query 解析但未充分提取 | ✅ (AlterColumnCollationOp) | ✅ (SET DATA TYPE ... COLLATE) | ✅ (查询 collation_name) | ⚠️ |
 | 存储参数 (`STORAGE`) | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `GENERATED ALWAYS AS` (计算列) | ❌ | ❌ | ❌ | ❌ | ❌ |
 
@@ -64,13 +64,13 @@
 | `FOREIGN KEY` (单列) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `FOREIGN KEY` (复合键) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `FOREIGN KEY` 跨 schema 引用 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `FOREIGN KEY` `ON DELETE` / `ON UPDATE` | ✅ (含级联动作) | ✅ (`sameConstraintContent` 比较 OnDelete/OnUpdate) | ✅ (`ON DELETE CASCADE` 等) | ✅ (查询 confupdtype/confdeltype) | ✅ |
 | `CHECK` 约束 (表级) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `CHECK` 约束 (行内) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ALTER TABLE ... ADD CONSTRAINT` | ✅ | ✅ | ✅ | — | ✅ |
 | `ALTER TABLE ... DROP CONSTRAINT` | — | ✅ (源端检测) | ✅ | — | ✅ |
 | 约束命名 (`CONSTRAINT name`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 自动生成约束名 (`_pkey`, `_fkey`) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `ON DELETE` / `ON UPDATE` 级联 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `DEFERRABLE` / `INITIALLY DEFERRED` | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `EXCLUDE` 约束 | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `ASSERTION` | ❌ | ❌ | ❌ | ❌ | ❌ |
@@ -85,7 +85,7 @@
 | `CREATE UNIQUE INDEX` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `DROP INDEX` | — | ✅ (源端检测) | ✅ `DROP INDEX IF EXISTS` | — | ✅ |
 | `DROP INDEX IF EXISTS` | — | ✅ | ✅ | — | ✅ |
-| 索引方法 (`USING btree/hash/gin/gist/brin`) | ✅ | ✅ | ✅ | ✅ (btree/hash/gin/gist/brin, 无需过滤) | ✅ |
+| 索引方法 (`USING btree/hash/gin/gist/brin`) | ✅ | ✅ | ✅ | ✅ (btree/hash/gin/gist/brin) | ✅ |
 | 表达式索引 (`ON tbl (lower(col))`) | ✅ | ✅ | ✅ | ❌ | ⚠️ |
 | 部分索引 (`WHERE` 子句) | ✅ | ✅ | ✅ | ❌ | ⚠️ |
 | 操作符类 (`text_pattern_ops`, 等) | ✅ | ✅ | ✅ | ❌ | ⚠️ |
@@ -124,7 +124,7 @@
 | 多 Schema 支持 (`public`, `auth`, 等) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Schema 限定表引用 (`schema.table`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Schema 限定枚举引用 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `CREATE SCHEMA` | ✅ | ✅ (生成 CreateSchemaOp) | ✅ (IF NOT EXISTS) | — | ✅ |
+| `CREATE SCHEMA` | ✅ (CreateSchemaHandler) | ✅ (生成 CreateSchemaOp) | ✅ (IF NOT EXISTS) | — | ✅ |
 | `DROP SCHEMA` | — | ⚠️ (可检测但不生成 DDL, 见限制 #6) | ✅ (IF EXISTS, 框架已就绪) | — | ⚠️ |
 | `ALTER SCHEMA ... RENAME` | ❌ | ❌ | ❌ | — | ❌ |
 | Schema 迁移 (跨 schema 移动对象) | ❌ | ❌ | ❌ | — | ❌ |
@@ -183,38 +183,44 @@
 | 阶段 | 包含操作 | 状态 |
 |------|---------|------|
 | **Pre-deploy** (创建) | `ADD TABLE`, `ADD COLUMN`, `ADD INDEX`, `ADD CONSTRAINT`, `ADD ENUM TYPE` | ✅ |
-| **Deploy** (修改) | `ALTER COLUMN TYPE`, `SET/DROP NOT NULL`, `SET/DROP DEFAULT`, `SET GENERATED`, `ADD ENUM LABEL` | ✅ |
-| **Post-deploy** (删除, 需 `--unsafe-drop`) | `DROP TABLE`, `DROP COLUMN`, `DROP INDEX`, `DROP CONSTRAINT`, `DROP ENUM TYPE`, `DROP IDENTITY` | ✅ |
+| **Deploy** (修改) | `ALTER COLUMN TYPE`, `SET/DROP NOT NULL`, `SET/DROP DEFAULT`, `SET/DROP IDENTITY`, `ADD ENUM LABEL`, `RENAME COLUMN`, `ALTER COLUMN COLLATION`, `CREATE/DROP SCHEMA` | ✅ |
+| **Post-deploy** (删除, 需 `--unsafe-drop`) | `DROP TABLE`, `DROP COLUMN`, `DROP INDEX`, `DROP CONSTRAINT`, `DROP ENUM TYPE` | ✅ |
 
 依赖排序使用 **Kahn 拓扑排序** 算法，确保:
 - 外键引用的表先于引用它的表创建
 - 删除操作先于创建操作执行 (同约束名)
 - 列的添加先于索引创建
 
+> **注意**: `CREATE SCHEMA` (应归 Pre-deploy) 和 `DROP SCHEMA` (应归 Post-deploy) 因未在 `assignStage()` 中显式匹配，当前落入默认的 Deploy 阶段。`alter_column_collation`, `set_identity`, `drop_identity` 同理落入 Deploy 阶段。
+
 ---
 
 ## 10. 已知限制与注意事项
 
-1. **`Rename Column` / `Rename Table`**: pg_query 解析为 `ALTER TABLE RENAME COLUMN`，但 diff 引擎和渲染器未实现对应的 Mutation/Operation。
+1. **`IF NOT EXISTS` on `CREATE TABLE`**: 解析器支持 `CREATE TABLE IF NOT EXISTS` 并正确提取表结构，但渲染器不输出 `IF NOT EXISTS` 子句（表创建始终直接生成 `CREATE TABLE`）。在 diff 工具语义下这是符合预期的——因为目标数据库中尚无该表，`IF NOT EXISTS` 对正确性无影响；仅当用户期望保留原始 DDL 文本时才被视为信息丢失。
 
-2. **`ON DELETE CASCADE` / `ON UPDATE CASCADE`**: ~~外键约束的引用操作在 model.Constraint 中未存储，渲染时丢失。~~ ✅ 已在 2026-05-19 版本中完整实现：Parser 提取 FkDelAction/FkUpdAction，Introspect 查询 confupdtype/confdeltype，Renderer 输出 ON DELETE/ON UPDATE 子句，Diff 引擎比较引用操作的一致性。
+2. **枚举标签删除/重命名**: Diff 引擎仅支持追加检测 (`append-only`)，非追加变更输出警告但不生成修复操作。
 
-3. **数据库自省的索引信息有限**: DBLoader 仅查询 `pg_index` + `pg_am` 获取索引名、表、列、唯一性和方法，不包含 `WHERE` 子句、操作符类、排序规则、并发标志。
+3. **Schema 删除**: 检测到源端存在但目标端缺失的 Schema 时输出警告，不生成 `DROP SCHEMA` 语句。
 
-4. **`IF NOT EXISTS` on `CREATE TABLE`**: 解析器支持 `CREATE TABLE IF NOT EXISTS` 并正确提取表结构，但渲染器不输出 `IF NOT EXISTS` 子句（表创建始终直接生成 `CREATE TABLE`）。在 diff 工具语义下这是符合预期的——因为目标数据库中尚无该表，`IF NOT EXISTS` 对正确性无影响；仅当用户期望保留原始 DDL 文本时才被视为信息丢失。
+4. **`UNSAFE DROP` 机制**: 默认情况下所有 `DROP` 操作被过滤并替换为警告，需显式传递 `--unsafe-drop` 标志。
 
-5. **枚举标签删除/重命名**: Diff 引擎仅支持追加检测 (`append-only`)，非追加变更输出警告但不生成修复操作。
+5. **`IDENTITY` 列支持**: 完整支持（解析 → 内省 → Diff → 渲染）。可正确处理 `GENERATED ALWAYS AS IDENTITY` / `GENERATED BY DEFAULT AS IDENTITY` 的创建、变更和删除。注意：a) `SET GENERATED` 对非 identity 列需使用 `ADD GENERATED ... AS IDENTITY` 语法，当前统一使用 `SetIdentityOp` 未区分两种场景；b) `IDENTITY` 列不支持与 `DEFAULT` 子句共存（PostgreSQL 限制，未做校验）。
 
-6. **Schema 删除**: 检测到源端存在但目标端缺失的 Schema 时输出警告，不生成 `DROP SCHEMA` 语句。
+6. **`character(n)` / `char(n)` 同义映射缺失**: PostgreSQL 中 `CHARACTER(n)` 与 `CHAR(n)` 等价，但 `normalize.go` 的类型别名映射仅覆盖 `character varying → varchar`，未包含 `character → char`。当 SQL 文件使用 `CHARACTER(10)` 而数据库自省返回 `char(10)` 时，会产生误报 diff。
 
-7. **`UNSAFE DROP` 机制**: 默认情况下所有 `DROP` 操作被过滤并替换为警告，需显式传递 `--unsafe-drop` 标志。
+7. **列排序规则 (`COLLATE`)**: Column 模型已包含 `Collation` 字段，数据库内省准确查询 `collation_name`，Diff 引擎能检测排序规则变更并生成 `AlterColumnCollationOp`，渲染器能输出 `SET DATA TYPE ... COLLATE ...` SQL。但 SQL 文件解析路径中，`CREATE TABLE` / `ALTER TABLE` 的 `COLLATE` 子句可能未被提取到 Column 中 (取决于 pg_query_go AST 的解析覆盖)，导致文件解析路径下的排序规则比较可能不完整。
 
-8. **`ONLY` 子句 (表继承)**: `CREATE TABLE ... INHERITS (...)` 被 pg_query 解析但 diff/renderer 不处理继承关系。
+8. **重命名列启发式检测的限制**: Diff 引擎通过比较 `DataType`、`IsNullable`、`DefaultExpr`、`Collation` 来推断列重命名。此启发式方法可能产生误报——例如用户删除了具有属性 X 的列并新增了具有相同属性的列（但语义不同）。未来可通过 SQL 注释声明 (`-- @rename from_col to_col`) 来显式声明重命名，消除误报。
 
-9. **分区表**: `PARTITION BY RANGE/LIST/HASH` 子句被 pg_query 解析但 diff/renderer 不处理。
+9. **执行计划阶段不完整**: `create_schema`、`drop_schema`、`set_identity`、`drop_identity`、`alter_column_collation` 等操作类型未在 `assignStage()` 中显式分配阶段，当前全部归入 `StageDeploy`（通过默认分支）。后续应完善阶段分配——`create_schema` 先于 Pre-deploy 阶段执行、`drop_schema` 和 `drop_identity` 归入 Post-deploy 阶段。
 
-10. **存储参数**: `WITH (fillfactor=70)` 等存储参数被 pg_query 解析但 diff/renderer 不处理。
+10. **`ONLY` 子句 (表继承)**: `CREATE TABLE ... INHERITS (...)` 被 pg_query 解析但 diff/renderer 不处理继承关系。
 
-11. **`IDENTITY` 列支持**: 完整支持（解析 → 内省 → Diff → 渲染）。可正确处理 `GENERATED ALWAYS AS IDENTITY` / `GENERATED BY DEFAULT AS IDENTITY` 的创建、变更和删除。注意：a) `SET GENERATED` 对非 identity 列需使用 `ADD GENERATED ... AS IDENTITY` 语法，当前统一使用 `SetIdentityOp` 未区分两种场景；b) `IDENTITY` 列不支持与 `DEFAULT` 子句共存（PostgreSQL 限制，未做校验）。
+11. **分区表**: `PARTITION BY RANGE/LIST/HASH` 子句被 pg_query 解析但 diff/renderer 不处理。
 
-12. **`character(n)` / `char(n)` 同义映射缺失**: PostgreSQL 中 `CHARACTER(n)` 与 `CHAR(n)` 等价，但 `normalize.go` 的类型别名映射仅覆盖 `character varying → varchar`，未包含 `character → char`。当 SQL 文件使用 `CHARACTER(10)` 而数据库自省返回 `char(10)` 时，会产生误报 diff。
+12. **存储参数**: `WITH (fillfactor=70)` 等存储参数被 pg_query 解析但 diff/renderer 不处理。
+
+13. **数据库自省的索引信息有限**: DBLoader 仅查询 `pg_index` + `pg_am` 获取索引名、表、列、唯一性和方法，不包含 `WHERE` 子句、操作符类、排序规则、并发标志。
+
+14. **`Rename Column` 启发式检测**: 见限制 #8。仅当列属性完全匹配时才判定为重命名，否则回退为 `DROP COLUMN + ADD COLUMN`。
