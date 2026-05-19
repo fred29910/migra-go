@@ -75,6 +75,8 @@ func TestRenderNewOperations(t *testing.T) {
 		`ALTER TABLE "public"."users" ALTER COLUMN "created_at" SET DEFAULT now();`: diff.NewSetDefaultOp("public", "users", "created_at", "now()"),
 		`ALTER TABLE "public"."users" ALTER COLUMN "created_at" DROP DEFAULT;`:      diff.NewDropDefaultOp("public", "users", "created_at"),
 		`ALTER TABLE "public"."users" DROP COLUMN IF EXISTS "old_col";`:             diff.NewDropColumnOp("public", "users", "old_col"),
+		`CREATE SCHEMA IF NOT EXISTS "auth";`:                                      diff.NewCreateSchemaOp("auth"),
+		`DROP SCHEMA IF EXISTS "old_schema";`:                                      diff.NewDropSchemaOp("old_schema"),
 	}
 	for want, op := range cases {
 		if got := r.Render(op); !strings.Contains(got, want) {
@@ -209,4 +211,26 @@ func TestRenderCreateIndex_Quoted(t *testing.T) {
 	if sql != expected {
 		t.Errorf("got %q, want %q", sql, expected)
 	}
+}
+
+func TestRenderCreateSchema(t *testing.T) {
+	r := NewRenderer()
+
+	t.Run("CreateSchemaOp", func(t *testing.T) {
+		op := diff.NewCreateSchemaOp("auth")
+		sql := r.Render(op)
+		want := "-- op: create_schema risk:low\nCREATE SCHEMA IF NOT EXISTS \"auth\";"
+		if sql != want {
+			t.Errorf("got %q, want %q", sql, want)
+		}
+	})
+
+	t.Run("DropSchemaOp", func(t *testing.T) {
+		op := diff.NewDropSchemaOp("old_schema")
+		sql := r.Render(op)
+		want := "-- op: drop_schema risk:high\nDROP SCHEMA IF EXISTS \"old_schema\";"
+		if sql != want {
+			t.Errorf("got %q, want %q", sql, want)
+		}
+	})
 }

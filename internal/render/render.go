@@ -122,6 +122,10 @@ func (r *Renderer) Render(op diff.Operation) string {
 		)
 	case *diff.AlterColumnCollationOp:
 		return r.renderAlterColumnCollation(v)
+	case *diff.CreateSchemaOp:
+		return r.renderCreateSchema(v)
+	case *diff.DropSchemaOp:
+		return r.renderDropSchema(v)
 	case *diff.DropColumnOp:
 		return fmt.Sprintf("-- op: drop_column risk:high\nALTER TABLE %s DROP COLUMN IF EXISTS %s;",
 			quoteQualifiedIdentifier(v.Schema, v.Table),
@@ -274,6 +278,16 @@ func (r *Renderer) renderAddEnumType(op *diff.AddEnumTypeOp) string {
 	sql := fmt.Sprintf("CREATE TYPE %s AS ENUM (%s)",
 		quoteQualifiedIdentifier(op.Schema, op.Type.Name), strings.Join(labels, ", "))
 	return fmt.Sprintf("-- op: add_enum_type risk:low\n%s;", sql)
+}
+
+func (r *Renderer) renderCreateSchema(op *diff.CreateSchemaOp) string {
+	return fmt.Sprintf("-- op: create_schema risk:low\nCREATE SCHEMA IF NOT EXISTS %s;",
+		quoteIdentifier(op.Schema))
+}
+
+func (r *Renderer) renderDropSchema(op *diff.DropSchemaOp) string {
+	return fmt.Sprintf("-- op: drop_schema risk:high\nDROP SCHEMA IF EXISTS %s;",
+		quoteIdentifier(op.Schema))
 }
 
 func (r *Renderer) renderAlterColumnCollation(op *diff.AlterColumnCollationOp) string {
