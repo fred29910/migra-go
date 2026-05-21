@@ -27,6 +27,7 @@ const (
 	KindDropSchema           Kind = "drop_schema"
 	KindSetIdentity          Kind = "set_identity"
 	KindDropIdentity         Kind = "drop_identity"
+	KindAddIdentity          Kind = "add_identity"
 	KindRenameColumn         Kind = "rename_column"
 )
 
@@ -508,6 +509,34 @@ func (op *DropIdentityOp) DependsOn() []model.ObjectKey {
 	return []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
 	}
+}
+
+// AddIdentityOp represents adding identity property to a column
+type AddIdentityOp struct {
+	baseOperation
+	Schema       string
+	Table        string
+	Column       string
+	IdentityKind string
+}
+
+func NewAddIdentityOp(schema, table, column, identityKind string) *AddIdentityOp {
+	return &AddIdentityOp{
+		baseOperation: baseOperation{
+			kind:      KindAddIdentity,
+			objectKey: model.NewObjectKey(schema, table+"."+column, model.KindColumn),
+		},
+		Schema:       schema,
+		Table:        table,
+		Column:       column,
+		IdentityKind: identityKind,
+	}
+}
+
+func (op *AddIdentityOp) IsDestructive() bool { return false }
+
+func (op *AddIdentityOp) DependsOn() []model.ObjectKey {
+	return []model.ObjectKey{model.NewObjectKey(op.Schema, op.Table, model.KindTable)}
 }
 
 // AlterColumnCollationOp represents changing a column's collation

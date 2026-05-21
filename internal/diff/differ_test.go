@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fred29910/migra-go/internal/model"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDiffer_DiffNoSharedState(t *testing.T) {
@@ -350,6 +351,27 @@ func TestDiffer_NoIdentityDifferenceWhenSame(t *testing.T) {
 			t.Fatal("expected NO identity ops when identity is the same")
 		}
 	}
+}
+
+func TestDiffer_IdentityAddUsesAddIdentityOp(t *testing.T) {
+	source := model.NewSchema()
+	sourceTable := model.NewTable("public", "users")
+	sourceTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: false})
+	source.GetOrCreateNamespace("public").Tables["users"] = sourceTable
+
+	target := model.NewSchema()
+	targetTable := model.NewTable("public", "users")
+	targetTable.AddColumn(&model.Column{
+		Name: "id", DataType: "integer", IsNullable: false,
+		IsIdentity: true, IdentityKind: "ALWAYS",
+	})
+	target.GetOrCreateNamespace("public").Tables["users"] = targetTable
+
+	ops, warnings := NewDiffer().Diff(source, target)
+	require.Empty(t, warnings)
+	require.Len(t, ops, 1)
+	_, ok := ops[0].(*AddIdentityOp)
+	require.True(t, ok, "non-identity to identity must use AddIdentityOp")
 }
 
 func TestDiffer_NoIdentityDifferenceWhenBothFalse(t *testing.T) {
