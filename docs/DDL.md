@@ -86,17 +86,17 @@
 | `DROP INDEX` | — | ✅ (源端检测) | ✅ `DROP INDEX IF EXISTS` | — | ✅ |
 | `DROP INDEX IF EXISTS` | — | ✅ | ✅ | — | ✅ |
 | 索引方法 (`USING btree/hash/gin/gist/brin`) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 表达式索引 (`ON tbl (lower(col))`) | ✅ (DeparseNode 反解析) | ✅ | ✅ | ❌ | ⚠️ |
+| 表达式索引 | ✅ | ✅ | ✅ | ✅ (pg_get_indexdef element) | ✅ |
 | 部分索引 (`WHERE` 子句) | ✅ | ✅ | ✅ | ✅ (pg_get_expr) | ✅ |
-| 操作符类 (`text_pattern_ops`, 等) | ✅ | ✅ | ✅ | ❌ | ⚠️ |
-| 排序规则 (`ASC`/`DESC`, `NULLS FIRST/LAST`) | ✅ | ✅ | ✅ | ❌ | ⚠️ |
+| 操作符类 | ✅ | ✅ | ✅ | ✅ (pg_get_indexdef element) | ✅ |
+| 排序规则 | ✅ | ✅ | ✅ | ✅ (pg_get_indexdef element) | ✅ |
 | `CONCURRENTLY` | ✅ | ✅ | ✅ | ❌ | ⚠️ |
 | `IF NOT EXISTS` | ✅ | ✅ | ✅ | — | ✅ |
 | 索引列命名 (`INDEX col_name_idx`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ALTER INDEX ... RENAME` | ❌ | ❌ | ❌ | — | ❌ |
 | `REINDEX INDEX` | ❌ | ❌ | ❌ | — | ❌ |
 
-> **注意**: 数据库自省 (DBLoader) 现已使用 `pg_get_indexdef` 和 `pg_get_expr` 获取完整定义和 WHERE 子句。操作符类、排序规则、并发标志等仍需进一步从 `pg_index` 元组字段提取，当前仅在 SQL 文件解析路径中可用。
+> **注意**: 数据库自省 (DBLoader) 现已使用 `pg_get_indexdef(indexrelid, column_no, true)` 按索引元素返回完整定义（包含表达式、opclass、collation、排序、NULLS），结构化解析为 `model.IndexElem`。`CONCURRENTLY` 标志仍需从 `pg_index` 元组字段提取，当前仅在 SQL 文件解析路径中可用。
 
 ---
 
@@ -137,13 +137,12 @@
 
 | 特性 | 状态 | 说明 |
 |------|------|------|
-| **视图** (`CREATE VIEW`) | ❌ | 不在解析器、Diff 引擎、渲染器中 |
-| **物化视图** (`CREATE MATERIALIZED VIEW`) | ❌ | 同上 |
-| **序列** (`CREATE SEQUENCE`) | ❌ | 不支持；`SERIAL` 类型已映射为 `integer` + 默认值 |
+| **视图** (`CREATE VIEW / CREATE MATERIALIZED VIEW`) | ✅ | 支持普通 view 的 parse、diff、render、introspect；物化视图仅 introspect 建模，创建渲染不在本轮支持。 |
+| **序列** (`CREATE SEQUENCE`) | ✅ | 支持结构化 sequence 选项：类型、start、increment、min/max、cache、cycle。 |
 | **触发器** (`CREATE TRIGGER`) | ❌ | 不支持 |
 | **规则** (`CREATE RULE`) | ❌ | 不支持 |
 | **行级安全策略** (`CREATE POLICY`) | ❌ | 不支持 |
-| **扩展** (`CREATE EXTENSION`) | ❌ | 不支持 |
+| **扩展** (`CREATE EXTENSION`) | ✅ | 支持 create/drop 和版本更新；schema 按 `pg_extension.extnamespace` 建模。 |
 | **排序规则** (`CREATE COLLATION`) | ❌ | 不支持 |
 | **全文搜索配置** (`CREATE TEXT SEARCH`) | ❌ | 不支持 |
 | **函数 / 过程** (`CREATE FUNCTION/PROCEDURE`) | ❌ | 不支持 |
@@ -221,6 +220,6 @@
 
 12. **存储参数**: `WITH (fillfactor=70)` 等存储参数被 pg_query 解析但 diff/renderer 不处理。
 
-13. **数据库自省的索引信息有限**: DBLoader 现已通过 `pg_get_indexdef` 和 `pg_get_expr` 获取完整索引定义和 WHERE 子句。操作符类、排序规则、并发标志仍需从 `pg_index` 元组字段提取，当前仅在 SQL 文件解析路径中可用。
+13. **数据库自省的索引信息有限**: DBLoader 现已通过 `pg_get_indexdef(indexrelid, column_no, true)` 按索引元素获取完整定义（表达式、opclass、collation、排序、NULLS），结构化解析为 `model.IndexElem`。`CONCURRENTLY` 标志仍需从 `pg_index` 元组字段提取，当前仅在 SQL 文件解析路径中可用。
 
 14. **`Rename Column` 启发式检测**: 见限制 #8。仅当列属性完全匹配时才判定为重命名，否则回退为 `DROP COLUMN + ADD COLUMN`。

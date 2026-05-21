@@ -29,6 +29,17 @@ const (
 	KindDropIdentity         Kind = "drop_identity"
 	KindAddIdentity          Kind = "add_identity"
 	KindRenameColumn         Kind = "rename_column"
+
+	// P3 object operations
+	KindCreateView           Kind = "create_view"
+	KindDropView             Kind = "drop_view"
+	KindReplaceView          Kind = "replace_view"
+	KindCreateSequence       Kind = "create_sequence"
+	KindDropSequence         Kind = "drop_sequence"
+	KindAlterSequence        Kind = "alter_sequence"
+	KindCreateExtension      Kind = "create_extension"
+	KindDropExtension        Kind = "drop_extension"
+	KindAlterExtensionUpdate Kind = "alter_extension_update"
 )
 
 // Operation is the interface for all diff operations
@@ -663,3 +674,185 @@ func NewDropSchemaOp(schema string) *DropSchemaOp {
 func (op *DropSchemaOp) IsDestructive() bool {
 	return true
 }
+
+// CreateViewOp represents creating a new view
+type CreateViewOp struct {
+	baseOperation
+	Schema string
+	View   *model.View
+}
+
+func NewCreateViewOp(schema string, view *model.View) *CreateViewOp {
+	return &CreateViewOp{
+		baseOperation: baseOperation{
+			kind:      KindCreateView,
+			objectKey: model.NewObjectKey(schema, view.Name, model.KindView),
+		},
+		Schema: schema,
+		View:   view,
+	}
+}
+
+func (op *CreateViewOp) IsDestructive() bool { return false }
+
+// DropViewOp represents dropping a view
+type DropViewOp struct {
+	baseOperation
+	Schema string
+	Name   string
+}
+
+func NewDropViewOp(schema, name string) *DropViewOp {
+	return &DropViewOp{
+		baseOperation: baseOperation{
+			kind:      KindDropView,
+			objectKey: model.NewObjectKey(schema, name, model.KindView),
+		},
+		Schema: schema,
+		Name:   name,
+	}
+}
+
+func (op *DropViewOp) IsDestructive() bool { return true }
+
+// ReplaceViewOp represents replacing a view's definition
+type ReplaceViewOp struct {
+	baseOperation
+	Schema string
+	View   *model.View
+}
+
+func NewReplaceViewOp(schema string, view *model.View) *ReplaceViewOp {
+	return &ReplaceViewOp{
+		baseOperation: baseOperation{
+			kind:      KindReplaceView,
+			objectKey: model.NewObjectKey(schema, view.Name, model.KindView),
+		},
+		Schema: schema,
+		View:   view,
+	}
+}
+
+func (op *ReplaceViewOp) IsDestructive() bool { return false }
+
+// CreateSequenceOp represents creating a new sequence
+type CreateSequenceOp struct {
+	baseOperation
+	Schema   string
+	Sequence *model.Sequence
+}
+
+func NewCreateSequenceOp(schema string, seq *model.Sequence) *CreateSequenceOp {
+	return &CreateSequenceOp{
+		baseOperation: baseOperation{
+			kind:      KindCreateSequence,
+			objectKey: model.NewObjectKey(schema, seq.Name, model.KindSequence),
+		},
+		Schema:   schema,
+		Sequence: seq,
+	}
+}
+
+func (op *CreateSequenceOp) IsDestructive() bool { return false }
+
+// DropSequenceOp represents dropping a sequence
+type DropSequenceOp struct {
+	baseOperation
+	Schema string
+	Name   string
+}
+
+func NewDropSequenceOp(schema, name string) *DropSequenceOp {
+	return &DropSequenceOp{
+		baseOperation: baseOperation{
+			kind:      KindDropSequence,
+			objectKey: model.NewObjectKey(schema, name, model.KindSequence),
+		},
+		Schema: schema,
+		Name:   name,
+	}
+}
+
+func (op *DropSequenceOp) IsDestructive() bool { return true }
+
+// AlterSequenceOp represents altering a sequence's properties
+type AlterSequenceOp struct {
+	baseOperation
+	Schema string
+	From   *model.Sequence
+	To     *model.Sequence
+}
+
+func NewAlterSequenceOp(schema string, from, to *model.Sequence) *AlterSequenceOp {
+	return &AlterSequenceOp{
+		baseOperation: baseOperation{
+			kind:      KindAlterSequence,
+			objectKey: model.NewObjectKey(schema, to.Name, model.KindSequence),
+		},
+		Schema: schema,
+		From:   from,
+		To:     to,
+	}
+}
+
+func (op *AlterSequenceOp) IsDestructive() bool { return false }
+
+// CreateExtensionOp represents creating a new extension
+type CreateExtensionOp struct {
+	baseOperation
+	Schema    string
+	Extension *model.Extension
+}
+
+func NewCreateExtensionOp(schema string, ext *model.Extension) *CreateExtensionOp {
+	return &CreateExtensionOp{
+		baseOperation: baseOperation{
+			kind:      KindCreateExtension,
+			objectKey: model.NewObjectKey(schema, ext.Name, model.KindExtension),
+		},
+		Schema:    schema,
+		Extension: ext,
+	}
+}
+
+func (op *CreateExtensionOp) IsDestructive() bool { return false }
+
+// DropExtensionOp represents dropping an extension
+type DropExtensionOp struct {
+	baseOperation
+	Schema string
+	Name   string
+}
+
+func NewDropExtensionOp(schema, name string) *DropExtensionOp {
+	return &DropExtensionOp{
+		baseOperation: baseOperation{
+			kind:      KindDropExtension,
+			objectKey: model.NewObjectKey(schema, name, model.KindExtension),
+		},
+		Schema: schema,
+		Name:   name,
+	}
+}
+
+func (op *DropExtensionOp) IsDestructive() bool { return true }
+
+// AlterExtensionUpdateOp represents updating an extension to a new version
+type AlterExtensionUpdateOp struct {
+	baseOperation
+	Schema    string
+	Extension *model.Extension
+}
+
+func NewAlterExtensionUpdateOp(schema string, ext *model.Extension) *AlterExtensionUpdateOp {
+	return &AlterExtensionUpdateOp{
+		baseOperation: baseOperation{
+			kind:      KindAlterExtensionUpdate,
+			objectKey: model.NewObjectKey(schema, ext.Name, model.KindExtension),
+		},
+		Schema:    schema,
+		Extension: ext,
+	}
+}
+
+func (op *AlterExtensionUpdateOp) IsDestructive() bool { return false }

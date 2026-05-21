@@ -80,6 +80,13 @@ func TestTablePlaceholderSerialization(t *testing.T) {
 	}
 }
 
+func TestNewNamespace_InitializesObjectMaps(t *testing.T) {
+	ns := NewNamespace("public")
+	if ns.Tables == nil || ns.Types == nil || ns.Views == nil || ns.Sequences == nil || ns.Extensions == nil {
+		t.Fatalf("namespace maps must be initialized: %#v", ns)
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || func() bool {
 		for i := 0; i <= len(s)-len(substr); i++ {

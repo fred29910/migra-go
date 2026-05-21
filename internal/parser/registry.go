@@ -46,5 +46,8 @@ func DefaultRegistry() *HandlerRegistry {
 	r.Register(&pg_query.Node{Node: &pg_query.Node_IndexStmt{}}, &CreateIndexHandler{})
 	r.Register(&pg_query.Node{Node: &pg_query.Node_CreateSchemaStmt{}}, &CreateSchemaHandler{})
 	r.Register(&pg_query.Node{Node: &pg_query.Node_RenameStmt{}}, &RenameStmtHandler{})
+	r.Register(&pg_query.Node{Node: &pg_query.Node_ViewStmt{}}, &CreateViewHandler{})
+	r.Register(&pg_query.Node{Node: &pg_query.Node_CreateSeqStmt{}}, &CreateSequenceHandler{})
+	r.Register(&pg_query.Node{Node: &pg_query.Node_CreateExtensionStmt{}}, &CreateExtensionHandler{})
 	return r
 }

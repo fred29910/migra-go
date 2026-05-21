@@ -81,6 +81,11 @@ func (c *diffContext) diffNamespace(source, target *model.Namespace) {
 
 	// Compare types (enums)
 	c.diffTypes(source, target)
+
+	// Compare P3 objects
+	c.diffViews(source, target)
+	c.diffSequences(source, target)
+	c.diffExtensions(source, target)
 }
 
 // diffTypes compares enum types between two namespaces
@@ -183,4 +188,143 @@ func sameStringSlice(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// diffViews compares views between two namespaces
+func (c *diffContext) diffViews(source, target *model.Namespace) {
+	if source == nil {
+		names := make([]string, 0, len(target.Views))
+		for name := range target.Views {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			c.addOp(NewCreateViewOp(target.Name, target.Views[name]))
+		}
+		return
+	}
+
+	// Find views to add or replace
+	targetNames := make([]string, 0, len(target.Views))
+	for name := range target.Views {
+		targetNames = append(targetNames, name)
+	}
+	sort.Strings(targetNames)
+	for _, name := range targetNames {
+		if src, ok := source.Views[name]; !ok {
+			c.addOp(NewCreateViewOp(target.Name, target.Views[name]))
+		} else if src.Materialized != target.Views[name].Materialized {
+			c.addOp(NewDropViewOp(source.Name, name))
+			c.addOp(NewCreateViewOp(target.Name, target.Views[name]))
+		} else if src.Definition != target.Views[name].Definition {
+			c.addOp(NewReplaceViewOp(target.Name, target.Views[name]))
+		}
+	}
+
+	// Find views to drop
+	sourceNames := make([]string, 0, len(source.Views))
+	for name := range source.Views {
+		sourceNames = append(sourceNames, name)
+	}
+	sort.Strings(sourceNames)
+	for _, name := range sourceNames {
+		if _, ok := target.Views[name]; !ok {
+			c.addOp(NewDropViewOp(source.Name, name))
+		}
+	}
+}
+
+// diffSequences compares sequences between two namespaces
+func (c *diffContext) diffSequences(source, target *model.Namespace) {
+	if source == nil {
+		names := make([]string, 0, len(target.Sequences))
+		for name := range target.Sequences {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			c.addOp(NewCreateSequenceOp(target.Name, target.Sequences[name]))
+		}
+		return
+	}
+
+	// Find sequences to add or alter
+	targetNames := make([]string, 0, len(target.Sequences))
+	for name := range target.Sequences {
+		targetNames = append(targetNames, name)
+	}
+	sort.Strings(targetNames)
+	for _, name := range targetNames {
+		if src, ok := source.Sequences[name]; !ok {
+			c.addOp(NewCreateSequenceOp(target.Name, target.Sequences[name]))
+		} else if !sameSequenceContent(src, target.Sequences[name]) {
+			c.addOp(NewAlterSequenceOp(target.Name, src, target.Sequences[name]))
+		}
+	}
+
+	// Find sequences to drop
+	sourceNames := make([]string, 0, len(source.Sequences))
+	for name := range source.Sequences {
+		sourceNames = append(sourceNames, name)
+	}
+	sort.Strings(sourceNames)
+	for _, name := range sourceNames {
+		if _, ok := target.Sequences[name]; !ok {
+			c.addOp(NewDropSequenceOp(source.Name, name))
+		}
+	}
+}
+
+// sameSequenceContent checks if two sequences have the same content
+func sameSequenceContent(a, b *model.Sequence) bool {
+	return a.DataType == b.DataType &&
+		a.StartValue == b.StartValue &&
+		a.IncrementBy == b.IncrementBy &&
+		a.MinValue == b.MinValue &&
+		a.MaxValue == b.MaxValue &&
+		a.CacheSize == b.CacheSize &&
+		a.Cycle == b.Cycle &&
+		a.OwnedByTable == b.OwnedByTable &&
+		a.OwnedByColumn == b.OwnedByColumn
+}
+
+// diffExtensions compares extensions between two namespaces
+func (c *diffContext) diffExtensions(source, target *model.Namespace) {
+	if source == nil {
+		names := make([]string, 0, len(target.Extensions))
+		for name := range target.Extensions {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			c.addOp(NewCreateExtensionOp(target.Name, target.Extensions[name]))
+		}
+		return
+	}
+
+	// Find extensions to add or update
+	targetNames := make([]string, 0, len(target.Extensions))
+	for name := range target.Extensions {
+		targetNames = append(targetNames, name)
+	}
+	sort.Strings(targetNames)
+	for _, name := range targetNames {
+		if src, ok := source.Extensions[name]; !ok {
+			c.addOp(NewCreateExtensionOp(target.Name, target.Extensions[name]))
+		} else if src.Version != "" && target.Extensions[name].Version != "" && src.Version != target.Extensions[name].Version {
+			c.addOp(NewAlterExtensionUpdateOp(target.Name, target.Extensions[name]))
+		}
+	}
+
+	// Find extensions to drop
+	sourceNames := make([]string, 0, len(source.Extensions))
+	for name := range source.Extensions {
+		sourceNames = append(sourceNames, name)
+	}
+	sort.Strings(sourceNames)
+	for _, name := range sourceNames {
+		if _, ok := target.Extensions[name]; !ok {
+			c.addOp(NewDropExtensionOp(source.Name, name))
+		}
+	}
 }

@@ -91,11 +91,19 @@
 - 支持表达式索引、排序规则、opclass、`NULLS FIRST/LAST`。
 - DB introspect 使用 `pg_get_indexdef()` 或结构化 catalog 查询还原高级索引定义。
 
+> 实施计划：`docs/superpowers/plans/2026-05-21-p2-p3-index-object-expansion.md`。
+>
+> P2 目标是完成 SQL 文件和 DB introspect 的结构化索引闭环。P3 首批对象限定为 view、sequence、extension；function、trigger、policy 保持为下一阶段扩展。
+
 ### P3：扩展新对象类型
 
 - 优先考虑 view、sequence、extension。
 - 其次考虑 function、trigger、policy。
 - 每类对象都应独立设计 model 与 diff 语义，避免把 raw SQL 字符串直接塞进现有 table/type 模型。
+
+> 实施计划：`docs/superpowers/plans/2026-05-21-p2-p3-index-object-expansion.md`。
+>
+> P2 目标是完成 SQL 文件和 DB introspect 的结构化索引闭环。P3 首批对象限定为 view、sequence、extension；function、trigger、policy 保持为下一阶段扩展。
 
 ## 验证记录
 
