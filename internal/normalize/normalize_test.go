@@ -147,6 +147,32 @@ func TestNormalizeDefaultExpr_TypeCast(t *testing.T) {
 	}
 }
 
+func TestCanonicalizeIndex_PreservesDefinitionAndPredicate(t *testing.T) {
+	s := model.NewSchema()
+	ns := s.GetOrCreateNamespace("public")
+	tbl := model.NewTable("public", "users")
+	ns.Tables["users"] = tbl
+	tbl.Indexes["idx_users_email"] = &model.Index{
+		Name:        "idx_users_email",
+		Table:       "users",
+		Columns:     []string{"email"},
+		Method:      "btree",
+		Definition:  "CREATE INDEX idx_users_email ON public.users USING btree (email)",
+		WhereClause: "email IS NOT NULL",
+	}
+
+	if err := CanonicalizeSchema(s); err != nil {
+		t.Fatal(err)
+	}
+	idx := tbl.Indexes["idx_users_email"]
+	if idx.WhereClause != "email IS NOT NULL" {
+		t.Fatalf("unexpected predicate: %q", idx.WhereClause)
+	}
+	if idx.Definition == "" {
+		t.Fatal("expected definition to be preserved")
+	}
+}
+
 func TestCanonicalizeSchema_InPlace(t *testing.T) {
 	s := model.NewSchema()
 	ns := s.GetOrCreateNamespace("Public")
