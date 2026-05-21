@@ -6,6 +6,21 @@ import (
 	"github.com/fred29910/migra-go/internal/diff"
 )
 
+func TestPlanner_SchemaStages(t *testing.T) {
+	planner := NewPlanner(true)
+	stages := planner.Plan([]diff.Operation{
+		diff.NewCreateSchemaOp("auth"),
+		diff.NewDropSchemaOp("old_schema"),
+	})
+
+	if len(stages[StagePreDeploy]) != 1 || stages[StagePreDeploy][0].Kind() != diff.KindCreateSchema {
+		t.Fatalf("expected create_schema in pre-deploy, got %#v", stages[StagePreDeploy])
+	}
+	if len(stages[StagePostDeploy]) != 1 || stages[StagePostDeploy][0].Kind() != diff.KindDropSchema {
+		t.Fatalf("expected drop_schema in post-deploy, got %#v", stages[StagePostDeploy])
+	}
+}
+
 func TestPlanner_NewOperationStages(t *testing.T) {
 	ops := []diff.Operation{
 		diff.NewAddEnumLabelOp("public", "user_role", "guest"),
