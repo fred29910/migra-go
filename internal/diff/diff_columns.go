@@ -40,9 +40,12 @@ func (c *diffContext) diffColumn(schema, table string, source, target *model.Col
 
 	// Check for identity change
 	if source.IsIdentity != target.IsIdentity || source.IdentityKind != target.IdentityKind {
-		if target.IsIdentity {
+		switch {
+		case !source.IsIdentity && target.IsIdentity:
+			c.addOp(NewAddIdentityOp(schema, table, source.Name, target.IdentityKind))
+		case source.IsIdentity && target.IsIdentity:
 			c.addOp(NewSetIdentityOp(schema, table, source.Name, target.IdentityKind))
-		} else {
+		case source.IsIdentity && !target.IsIdentity:
 			c.addOp(NewDropIdentityOp(schema, table, source.Name))
 		}
 	}
