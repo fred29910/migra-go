@@ -387,6 +387,8 @@ func renderConstraintDefinition(c *model.Constraint) string {
 			sql += fmt.Sprintf(" ON UPDATE %s", c.OnUpdate)
 		}
 		return sql
+	case "unique":
+		return fmt.Sprintf("UNIQUE (%s)", quoteIdentifierList(c.Columns))
 	case "check":
 		if c.Expression != "" {
 			return fmt.Sprintf("CHECK (%s)", c.Expression)
