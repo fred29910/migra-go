@@ -16,7 +16,7 @@
 | `DROP TABLE IF EXISTS` | — | ✅ | ✅ | — | ✅ |
 | `ALTER TABLE ... ADD COLUMN` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ALTER TABLE ... DROP COLUMN` | ✅ | ✅ | ✅ `DROP COLUMN IF EXISTS` | ✅ | ✅ |
-| `ALTER TABLE ... ALTER COLUMN TYPE` | ⚠️ (基础类型支持，`USING` 待补齐) | ✅ | ⚠️ (`USING` 待补齐) | ✅ | ⚠️ |
+| `ALTER TABLE ... ALTER COLUMN TYPE` | ✅ (含 `USING`) | ✅ | ✅ | ✅ | ✅ |
 | `ALTER TABLE ... RENAME COLUMN` | ✅ (RenameStmtHandler) | ✅ (启发式检测) | ✅ `RENAME COLUMN ... TO ...` | — | ✅ |
 | `ALTER TABLE ... SET (storage_param)` | ⚠️ pg_query 解析但不处理 | ❌ | ❌ | — | ⚠️ |
 | 表继承 (`INHERITS`) | ⚠️ pg_query 解析但不处理 | ❌ | ❌ | — | ⚠️ |
@@ -59,14 +59,14 @@
 |------|:---:|:---:|:---:|:---:|------|
 | `PRIMARY KEY` (单列) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `PRIMARY KEY` (复合键) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `UNIQUE` 约束 (表级) | ⚠️ (DB introspect 支持，SQL 文件解析待补齐) | ✅ | ✅ | ✅ | ⚠️ |
-| `UNIQUE` 约束 (行内) | ⚠️ (DB introspect 支持，SQL 文件解析待补齐) | ✅ | ✅ | ✅ | ⚠️ |
+| `UNIQUE` 约束 (表级) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `UNIQUE` 约束 (行内) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `FOREIGN KEY` (单列) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `FOREIGN KEY` (复合键) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `FOREIGN KEY` 跨 schema 引用 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `FOREIGN KEY` `ON DELETE` / `ON UPDATE` | ✅ (含级联动作) | ✅ (`sameConstraintContent` 比较 OnDelete/OnUpdate) | ✅ (`ON DELETE CASCADE` 等) | ✅ (查询 confupdtype/confdeltype) | ✅ |
-| `CHECK` 约束 (表级) | ⚠️ (DB introspect 支持，SQL 文件解析待补齐) | ✅ | ✅ | ✅ | ⚠️ |
-| `CHECK` 约束 (行内) | ⚠️ (DB introspect 支持，SQL 文件解析待补齐) | ✅ | ✅ | ✅ | ⚠️ |
+| `CHECK` 约束 (表级) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `CHECK` 约束 (行内) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ALTER TABLE ... ADD CONSTRAINT` | ✅ | ✅ | ✅ | — | ✅ |
 | `ALTER TABLE ... DROP CONSTRAINT` | — | ✅ (源端检测) | ✅ | — | ✅ |
 | 约束命名 (`CONSTRAINT name`) | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -85,18 +85,18 @@
 | `CREATE UNIQUE INDEX` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `DROP INDEX` | — | ✅ (源端检测) | ✅ `DROP INDEX IF EXISTS` | — | ✅ |
 | `DROP INDEX IF EXISTS` | — | ✅ | ✅ | — | ✅ |
-| 索引方法 (`USING btree/hash/gin/gist/brin`) | ✅ | ✅ | ⚠️ (待输出 `USING`) | ✅ (btree/hash/gin/gist/brin) | ⚠️ |
-| 表达式索引 (`ON tbl (lower(col))`) | ⚠️ (表达式需可读反解析) | ✅ | ⚠️ | ❌ | ⚠️ |
-| 部分索引 (`WHERE` 子句) | ⚠️ (predicate 需可读反解析) | ✅ | ⚠️ | ❌ | ⚠️ |
-| 操作符类 (`text_pattern_ops`, 等) | ⚠️ (待提取 opclass) | ✅ | ⚠️ | ❌ | ⚠️ |
-| 排序规则 (`ASC`/`DESC`, `NULLS FIRST/LAST`) | ✅ | ✅ | ⚠️ | ❌ | ⚠️ |
-| `CONCURRENTLY` | ✅ | ✅ | ⚠️ | ❌ | ⚠️ |
-| `IF NOT EXISTS` | ✅ | ✅ | ⚠️ | — | ⚠️ |
+| 索引方法 (`USING btree/hash/gin/gist/brin`) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 表达式索引 (`ON tbl (lower(col))`) | ✅ (DeparseNode 反解析) | ✅ | ✅ | ❌ | ⚠️ |
+| 部分索引 (`WHERE` 子句) | ✅ | ✅ | ✅ | ✅ (pg_get_expr) | ✅ |
+| 操作符类 (`text_pattern_ops`, 等) | ✅ | ✅ | ✅ | ❌ | ⚠️ |
+| 排序规则 (`ASC`/`DESC`, `NULLS FIRST/LAST`) | ✅ | ✅ | ✅ | ❌ | ⚠️ |
+| `CONCURRENTLY` | ✅ | ✅ | ✅ | ❌ | ⚠️ |
+| `IF NOT EXISTS` | ✅ | ✅ | ✅ | — | ✅ |
 | 索引列命名 (`INDEX col_name_idx`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ALTER INDEX ... RENAME` | ❌ | ❌ | ❌ | — | ❌ |
 | `REINDEX INDEX` | ❌ | ❌ | ❌ | — | ❌ |
 
-> **注意**: 数据库自省 (DBLoader) 查询索引时仅获取 `index_name, table_name, column_names, is_unique, method`，不包含 `WHERE` 子句、操作符类、排序规则、并发标志等。这些高级特性仅在 SQL 文件解析路径中可用。
+> **注意**: 数据库自省 (DBLoader) 现已使用 `pg_get_indexdef` 和 `pg_get_expr` 获取完整定义和 WHERE 子句。操作符类、排序规则、并发标志等仍需进一步从 `pg_index` 元组字段提取，当前仅在 SQL 文件解析路径中可用。
 
 ---
 
@@ -125,11 +125,11 @@
 | Schema 限定表引用 (`schema.table`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Schema 限定枚举引用 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `CREATE SCHEMA` | ✅ (CreateSchemaHandler) | ✅ (生成 CreateSchemaOp) | ✅ (IF NOT EXISTS) | — | ✅ |
-| `DROP SCHEMA` | — | ⚠️ (可检测但不生成 DDL, 见限制 #6) | ✅ (IF EXISTS, 框架已就绪) | — | ⚠️ |
+| `DROP SCHEMA` | — | ✅ (生成 DropSchemaOp) | ✅ (IF EXISTS) | — | ✅ |
 | `ALTER SCHEMA ... RENAME` | ❌ | ❌ | ❌ | — | ❌ |
 | Schema 迁移 (跨 schema 移动对象) | ❌ | ❌ | ❌ | — | ❌ |
 
-> **注意**: 数据库自省中，Schema 列表通过 `--schema` / `-s` 参数指定，默认仅 `public`。删除 Schema 时会输出警告 `"namespace drop is not implemented yet"`。
+> **注意**: 数据库自省中，Schema 列表通过 `--schema` / `-s` 参数指定，默认仅 `public`。删除 Schema 受 `--unsafe-drop` 保护，默认不输出。
 
 ---
 
@@ -182,16 +182,16 @@
 
 | 阶段 | 包含操作 | 状态 |
 |------|---------|------|
-| **Pre-deploy** (创建) | `ADD TABLE`, `ADD COLUMN`, `ADD INDEX`, `ADD CONSTRAINT`, `ADD ENUM TYPE` | ✅ |
-| **Deploy** (修改) | `ALTER COLUMN TYPE`, `SET/DROP NOT NULL`, `SET/DROP DEFAULT`, `SET/DROP IDENTITY`, `ADD ENUM LABEL`, `RENAME COLUMN`, `ALTER COLUMN COLLATION`, `CREATE/DROP SCHEMA` | ✅ |
-| **Post-deploy** (删除, 需 `--unsafe-drop`) | `DROP TABLE`, `DROP COLUMN`, `DROP INDEX`, `DROP CONSTRAINT`, `DROP ENUM TYPE` | ✅ |
+| **Pre-deploy** (创建) | `CREATE SCHEMA`, `ADD TABLE`, `ADD COLUMN`, `ADD INDEX`, `ADD CONSTRAINT`, `ADD ENUM TYPE` | ✅ |
+| **Deploy** (修改) | `ALTER COLUMN TYPE`, `SET/DROP NOT NULL`, `SET/DROP DEFAULT`, `SET/DROP IDENTITY`, `ADD ENUM LABEL`, `RENAME COLUMN`, `ALTER COLUMN COLLATION` | ✅ |
+| **Post-deploy** (删除, 需 `--unsafe-drop`) | `DROP SCHEMA`, `DROP TABLE`, `DROP COLUMN`, `DROP INDEX`, `DROP CONSTRAINT`, `DROP ENUM TYPE` | ✅ |
 
 依赖排序使用 **Kahn 拓扑排序** 算法，确保:
 - 外键引用的表先于引用它的表创建
 - 删除操作先于创建操作执行 (同约束名)
 - 列的添加先于索引创建
 
-> **注意**: `CREATE SCHEMA` (应归 Pre-deploy) 和 `DROP SCHEMA` (应归 Post-deploy) 因未在 `assignStage()` 中显式匹配，当前落入默认的 Deploy 阶段。`alter_column_collation`, `set_identity`, `drop_identity` 同理落入 Deploy 阶段。
+> **注意**: `CREATE SCHEMA` 和 `DROP SCHEMA` 已在 `assignStage()` 中显式分配为 Pre-deploy / Post-deploy 阶段。`alter_column_collation`, `set_identity`, `drop_identity` 通过默认分支落入 Deploy 阶段。
 
 ---
 
@@ -201,7 +201,7 @@
 
 2. **枚举标签删除/重命名**: Diff 引擎仅支持追加检测 (`append-only`)，非追加变更输出警告但不生成修复操作。
 
-3. **Schema 删除**: 检测到源端存在但目标端缺失的 Schema 时输出警告，不生成 `DROP SCHEMA` 语句。
+3. **Schema 删除**: 检测到源端存在但目标端缺失的 Schema 时生成 `DROP SCHEMA` 语句（需 `--unsafe-drop` 放行）。
 
 4. **`UNSAFE DROP` 机制**: 默认情况下所有 `DROP` 操作被过滤并替换为警告，需显式传递 `--unsafe-drop` 标志。
 
@@ -213,7 +213,7 @@
 
 8. **重命名列启发式检测的限制**: Diff 引擎通过比较 `DataType`、`IsNullable`、`DefaultExpr`、`Collation` 来推断列重命名。此启发式方法可能产生误报——例如用户删除了具有属性 X 的列并新增了具有相同属性的列（但语义不同）。未来可通过 SQL 注释声明 (`-- @rename from_col to_col`) 来显式声明重命名，消除误报。
 
-9. **执行计划阶段不完整**: `create_schema`、`drop_schema`、`set_identity`、`drop_identity`、`alter_column_collation` 等操作类型未在 `assignStage()` 中显式分配阶段，当前全部归入 `StageDeploy`（通过默认分支）。后续应完善阶段分配——`create_schema` 先于 Pre-deploy 阶段执行、`drop_schema` 和 `drop_identity` 归入 Post-deploy 阶段。
+9. **执行计划阶段不完整**: `create_schema`、`drop_schema` 已在 `assignStage()` 中分配为 Pre-deploy / Post-deploy。`set_identity`、`drop_identity`、`alter_column_collation` 等操作类型未显式匹配，当前通过默认分支归入 `StageDeploy`。
 
 10. **`ONLY` 子句 (表继承)**: `CREATE TABLE ... INHERITS (...)` 被 pg_query 解析但 diff/renderer 不处理继承关系。
 
@@ -221,6 +221,6 @@
 
 12. **存储参数**: `WITH (fillfactor=70)` 等存储参数被 pg_query 解析但 diff/renderer 不处理。
 
-13. **数据库自省的索引信息有限**: DBLoader 仅查询 `pg_index` + `pg_am` 获取索引名、表、列、唯一性和方法，不包含 `WHERE` 子句、操作符类、排序规则、并发标志。
+13. **数据库自省的索引信息有限**: DBLoader 现已通过 `pg_get_indexdef` 和 `pg_get_expr` 获取完整索引定义和 WHERE 子句。操作符类、排序规则、并发标志仍需从 `pg_index` 元组字段提取，当前仅在 SQL 文件解析路径中可用。
 
 14. **`Rename Column` 启发式检测**: 见限制 #8。仅当列属性完全匹配时才判定为重命名，否则回退为 `DROP COLUMN + ADD COLUMN`。
