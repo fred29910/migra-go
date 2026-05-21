@@ -82,6 +82,25 @@ func TestCanonicalizeIndex_SQLFileParserElementsNotAffected(t *testing.T) {
 // This is critical for idempotency: PostgreSQL information_schema returns 'character varying' as data_type
 // but the actual type with length comes from character_maximum_length. After introspect builds
 // 'character varying(50)', normalize must produce 'varchar(50)' to match the SQL file parser output.
+func TestNormalizeDataType_CharacterWithLength(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"character(10)", "char(10)"},
+		{"CHARACTER(10)", "char(10)"},
+		{"char(10)", "char(10)"},
+		{"character", "char"},
+		{"CHARACTER", "char"},
+	}
+	for _, tt := range tests {
+		got := normalizeDataType(tt.input)
+		if got != tt.want {
+			t.Errorf("normalizeDataType(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
 func TestNormalizeDataType_VarcharWithLength(t *testing.T) {
 	tests := []struct {
 		input string

@@ -94,12 +94,16 @@ var typeAliases = map[string]string{
 	"int2":                        "smallint",
 	"bool":                        "boolean",
 	"character varying":           "varchar",
+	"character":                   "char",
 	"timestamp without time zone": "timestamp",
 	"timestamp with time zone":    "timestamptz",
 }
 
 // charVaryingWithLenRe matches "character varying(N)" (case-insensitive), used in normalizeDataType
 var charVaryingWithLenRe = regexp.MustCompile(`(?i)^character varying\((\d+)\)$`)
+
+// characterWithLenRe matches "character(N)" / "char(N)" (case-insensitive)
+var characterWithLenRe = regexp.MustCompile(`(?i)^character\((\d+)\)$`)
 
 // These two regexes work together in normalizeDefaultExpr and must run in this order:
 // 1. nestedTypeCastRe first strips 'literal'::type → 'literal' (nested casts)
@@ -115,6 +119,10 @@ func normalizeDataType(dt string) string {
 
 	if m := charVaryingWithLenRe.FindStringSubmatch(lower); m != nil {
 		return "varchar(" + m[1] + ")"
+	}
+
+	if m := characterWithLenRe.FindStringSubmatch(lower); m != nil {
+		return "char(" + m[1] + ")"
 	}
 
 	if canonical, ok := typeAliases[lower]; ok {
