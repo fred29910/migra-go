@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"os"
 	"testing"
 
 	"github.com/fred29910/migra-go/internal/model"
@@ -334,4 +335,128 @@ func TestCreateSchemaHandler_IfNotExists(t *testing.T) {
 	mut, ok := mutations[0].(CreateSchemaMutation)
 	require.True(t, ok)
 	assert.Equal(t, "auth", mut.Schema)
+}
+
+func TestParseAlterOperations(t *testing.T) {
+	sql, err := os.ReadFile("../../testdata/alter_operations.sql")
+	if err != nil {
+		t.Fatalf("failed to read testdata: %v", err)
+	}
+
+	p := NewParser()
+
+	schema, err := p.ParseSQL(string(sql))
+	if err != nil {
+		t.Fatalf("ParseSQL failed: %v", err)
+	}
+
+	ns := schema.GetNamespace("public")
+	if ns == nil {
+		t.Fatal("expected public namespace")
+	}
+	items, ok := ns.Tables["items"]
+	if !ok {
+		t.Fatal("expected items table")
+	}
+
+	colNames := make(map[string]bool)
+	for _, col := range items.Columns {
+		colNames[col.Name] = true
+	}
+	for _, expected := range []string{"item_code", "tags", "sort_order", "uuid_col"} {
+		if !colNames[expected] {
+			t.Fatalf("expected column %q in items table", expected)
+		}
+	}
+
+	t.Logf("Parsed %d columns from items table", len(items.Columns))
+}
+
+func TestParseComplexDDL(t *testing.T) {
+	sql, err := os.ReadFile("../../testdata/complex_ddl.sql")
+	if err != nil {
+		t.Fatalf("failed to read testdata: %v", err)
+	}
+
+	p := NewParser()
+
+	schema, err := p.ParseSQL(string(sql))
+	if err != nil {
+		t.Fatalf("ParseSQL failed: %v", err)
+	}
+
+	ns := schema.GetNamespace("public")
+	if ns == nil {
+		t.Fatal("expected public namespace")
+	}
+
+	for _, tableName := range []string{"order_items", "products", "analytics", "content_items"} {
+		if _, ok := ns.Tables[tableName]; !ok {
+			t.Fatalf("expected table %q", tableName)
+		}
+	}
+
+	if _, ok := ns.Types["user_status"]; !ok {
+		t.Fatal("expected user_status enum type")
+	}
+	if _, ok := ns.Types["content_type"]; !ok {
+		t.Fatal("expected content_type enum type")
+	}
+
+	t.Logf("Parsed %d tables and %d enum types", len(ns.Tables), len(ns.Types))
+}
+
+func TestParseDropScenarios(t *testing.T) {
+	sql, err := os.ReadFile("../../testdata/drop_scenarios.sql")
+	if err != nil {
+		t.Fatalf("failed to read testdata: %v", err)
+	}
+
+	p := NewParser()
+
+	schema, err := p.ParseSQL(string(sql))
+	if err != nil {
+		t.Fatalf("ParseSQL failed: %v", err)
+	}
+
+	ns := schema.GetNamespace("public")
+	if ns == nil {
+		t.Fatal("expected public namespace")
+	}
+
+	if _, ok := ns.Tables["active_items"]; !ok {
+		t.Fatal("expected active_items table")
+	}
+	if _, ok := ns.Types["item_status"]; !ok {
+		t.Fatal("expected item_status enum type")
+	}
+
+	t.Logf("Parsed %d tables, %d types from drop_scenarios", len(ns.Tables), len(ns.Types))
+}
+
+func TestParseEdgeCases(t *testing.T) {
+	sql, err := os.ReadFile("../../testdata/edge_cases.sql")
+	if err != nil {
+		t.Fatalf("failed to read testdata: %v", err)
+	}
+
+	p := NewParser()
+
+	schema, err := p.ParseSQL(string(sql))
+	if err != nil {
+		t.Fatalf("ParseSQL failed: %v", err)
+	}
+
+	ns := schema.GetNamespace("public")
+	if ns == nil {
+		t.Fatal("expected public namespace")
+	}
+
+	for _, tableName := range []string{"MixedCase", "empty_table", "child_table", "partitioned_table", "users"} {
+		if _, ok := ns.Tables[tableName]; !ok {
+			t.Fatalf("expected table %q to be parsed", tableName)
+		}
+	}
+
+	t.Logf("Parsed %d tables from edge_cases (including quoted, inheritance, partition)", len(ns.Tables))
 }
