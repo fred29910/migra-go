@@ -1,43 +1,68 @@
 # migra 配置文件示例
 # 复制为 ~/.migra.yaml 或 ./migra.yaml
+#
+# 配置优先级（从高到低）：
+#   命令行参数 > 环境变量(MIGRA_*) > 配置文件 > 默认值
+#
+# 环境变量使用 MIGRA_ 前缀，通过 viper 自动绑定
+# 例如：diff.schemas → MIGRA_DIFF_SCHEMAS
+
+# 全局选项
+verbose: false     # 详细输出模式（默认：false）
 
 # 数据库连接
 database:
   # 默认数据库连接字符串
+  # diff 单参数模式（migra diff file.sql）时，target 从此字段读取
+  # push 命令的 target 也使用此字段
   url: "postgres://localhost:5432/mydb?sslmode=disable"
-  
-  # 连接池配置
-  pool:
-    max_open_conns: 10
-    max_idle_conns: 5
-    conn_max_lifetime: "1h"
 
-# 比较选项
+  # diff 零参数模式（migra diff）的来源与目标
+  source: "postgres://localhost/db1"
+  target: "postgres://localhost/db2"
+
+# 比较选项（diff / push 共用）
 diff:
-  # 指定要比较的 schema（默认：public）
+  # 指定要比较的 schema 列表
+  # 默认值：["public"]
   schemas:
     - public
     - auth
     - api
-  
+
   # 是否允许破坏性 DROP 操作
+  # false：DROP 操作被过滤，仅输出警告
+  # true：允许输出/执行所有 DROP 操作
   unsafe_drop: false
-  
-  # 遇到不支持的语句时是否失败
+
+  # 遇到不支持的语句时是否失败退出
+  # false：跳过并继续，仅输出警告
+  # true：直接报错退出
   strict: false
-  
+
   # 输出格式：sql 或 json
   format: sql
 
 # 输出选项
 output:
-  # 输出文件（空则输出到 stdout）
+  # 输出文件路径（空则输出到 stdout）
   file: ""
-  
-  # 是否显示详细输出
-  verbose: false
 
-# 日志配置
-logging:
-  level: "info"  # debug, info, warn, error
-  format: "text"  # text, json
+# ========================================================
+# 以下字段已定义在配置结构体中，但代码中暂未读取
+# （为后续实现预留，放入 config 文件不会报错，但无实际效果）
+# ========================================================
+
+# 连接池配置（database.pool.*）
+# 需配合 pgx 连接池参数使用，当前 DBLoader 未读取此配置
+# database:
+#   pool:
+#     max_open_conns: 10
+#     max_idle_conns: 5
+#     conn_max_lifetime: "1h"
+
+# 日志配置（logging.*）
+# 当前代码未集成日志库，此配置暂不生效
+# logging:
+#   level: "info"   # debug | info | warn | error
+#   format: "text"  # text | json
