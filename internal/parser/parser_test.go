@@ -372,6 +372,28 @@ func TestParseDefaultFunctionExpressionConsistentForCreateAndAlter(t *testing.T)
 	}
 }
 
+func TestParseP3Objects(t *testing.T) {
+	sql := `
+CREATE VIEW active_users AS SELECT id, email FROM users WHERE active = true;
+CREATE SEQUENCE invoice_id_seq AS bigint START WITH 100 INCREMENT BY 5 CACHE 20 CYCLE;
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH VERSION '1.3';
+`
+	schema, err := NewParser().ParseSQL(sql)
+	if err != nil {
+		t.Fatalf("ParseSQL failed: %v", err)
+	}
+	ns := schema.Schemas["public"]
+	if ns.Views["active_users"] == nil {
+		t.Fatal("expected active_users view")
+	}
+	if ns.Sequences["invoice_id_seq"] == nil {
+		t.Fatal("expected invoice_id_seq sequence")
+	}
+	if ns.Extensions["pgcrypto"] == nil {
+		t.Fatal("expected pgcrypto extension")
+	}
+}
+
 type panickingHandler struct{}
 
 func (h *panickingHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error) {

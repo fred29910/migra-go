@@ -143,3 +143,35 @@ func TestDiffIndex_ExpressionChange(t *testing.T) {
 		t.Error("expected CREATE INDEX operation for expression change")
 	}
 }
+
+func TestDiffIndex_CollationChange(t *testing.T) {
+	source := model.NewSchema()
+	sourceTable := model.NewTable("public", "users")
+	sourceTable.Indexes["idx_users_email"] = &model.Index{
+		Name: "idx_users_email", Table: "users", Method: "btree",
+		Elements: []model.IndexElem{{Name: "email", Collation: ""}},
+	}
+	source.GetOrCreateNamespace("public").Tables["users"] = sourceTable
+
+	target := model.NewSchema()
+	targetTable := model.NewTable("public", "users")
+	targetTable.Indexes["idx_users_email"] = &model.Index{
+		Name: "idx_users_email", Table: "users", Method: "btree",
+		Elements: []model.IndexElem{{Name: "email", Collation: "C"}},
+	}
+	target.GetOrCreateNamespace("public").Tables["users"] = targetTable
+
+	ops, _ := NewDiffer().Diff(source, target)
+	var foundDrop, foundCreate bool
+	for _, op := range ops {
+		if _, ok := op.(*DropIndexOp); ok {
+			foundDrop = true
+		}
+		if _, ok := op.(*CreateIndexOp); ok {
+			foundCreate = true
+		}
+	}
+	if !foundDrop || !foundCreate {
+		t.Fatalf("expected drop and create for collation change, got %#v", ops)
+	}
+}

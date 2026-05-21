@@ -52,11 +52,7 @@ func LoadFromDBWithConn(ctx context.Context, conn *pgx.Conn, opt LoadOptions) (*
 
 // loadNamespace loads a single namespace (schema)
 func loadNamespace(ctx context.Context, conn *pgx.Conn, schemaName string) (*model.Namespace, error) {
-	ns := &model.Namespace{
-		Name:   schemaName,
-		Tables: make(map[string]*model.Table),
-		Types:  make(map[string]*model.EnumType),
-	}
+	ns := model.NewNamespace(schemaName)
 
 	// Load tables and columns
 	if err := loadTables(ctx, conn, schemaName, ns); err != nil {
@@ -81,6 +77,21 @@ func loadNamespace(ctx context.Context, conn *pgx.Conn, schemaName string) (*mod
 	// Load enum types
 	if err := loadEnumTypes(ctx, conn, schemaName, ns); err != nil {
 		return nil, fmt.Errorf("failed to load enum types: %w", err)
+	}
+
+	// Load views
+	if err := loadViews(ctx, conn, schemaName, ns); err != nil {
+		return nil, fmt.Errorf("failed to load views: %w", err)
+	}
+
+	// Load sequences
+	if err := loadSequences(ctx, conn, schemaName, ns); err != nil {
+		return nil, fmt.Errorf("failed to load sequences: %w", err)
+	}
+
+	// Load extensions
+	if err := loadExtensions(ctx, conn, schemaName, ns); err != nil {
+		return nil, fmt.Errorf("failed to load extensions: %w", err)
 	}
 
 	return ns, nil

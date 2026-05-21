@@ -39,6 +39,22 @@ func TestRenderOutput_SupportsSQLAndJSON(t *testing.T) {
 	}
 }
 
+func TestRenderP3Objects(t *testing.T) {
+	r := NewRenderer()
+	cases := map[string]diff.Operation{
+		`CREATE VIEW "public"."active_users" AS SELECT id FROM users;`: diff.NewCreateViewOp("public", &model.View{Name: "active_users", Definition: "SELECT id FROM users"}),
+		`DROP VIEW IF EXISTS "public"."old_view";`:                    diff.NewDropViewOp("public", "old_view"),
+		`CREATE SEQUENCE "public"."invoice_id_seq" AS bigint START WITH 100 INCREMENT BY 5 CACHE 20 CYCLE;`: diff.NewCreateSequenceOp("public", &model.Sequence{Name: "invoice_id_seq", DataType: "bigint", StartValue: 100, IncrementBy: 5, CacheSize: 20, Cycle: true}),
+		`CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH VERSION '1.3';`: diff.NewCreateExtensionOp("public", &model.Extension{Name: "pgcrypto", Version: "1.3"}),
+		`ALTER EXTENSION "pgcrypto" UPDATE TO '1.3';`:                 diff.NewAlterExtensionUpdateOp("public", &model.Extension{Name: "pgcrypto", Version: "1.3"}),
+	}
+	for want, op := range cases {
+		if got := r.Render(op); !strings.Contains(got, want) {
+			t.Fatalf("expected %q in:\n%s", want, got)
+		}
+	}
+}
+
 func TestRenderAddTable_WithDefaultsAndConstraints(t *testing.T) {
 	defaultExpr := "now()"
 	table := model.NewTable("public", "comments")
@@ -468,5 +484,36 @@ func TestRenderDropIdentity(t *testing.T) {
 	want := `-- op: drop_identity risk:medium` + "\n" + `ALTER TABLE "public"."users" ALTER COLUMN "id" DROP IDENTITY;`
 	if !strings.Contains(sql, want) {
 		t.Errorf("expected SQL to contain %q, got:\n%s", want, sql)
+	}
+}
+
+func TestRenderCreateIndex_AlwaysRendersMethod(t *testing.T) {
+	idx := &model.Index{
+		Name:     "idx_users_email",
+		Table:    "users",
+		Method:   "btree",
+		Elements: []model.IndexElem{{Name: "email"}},
+	}
+	sql := NewRenderer().Render(diff.NewCreateIndexOp("public", idx))
+	want := `ON "public"."users" USING btree ("email")`
+	if !strings.Contains(sql, want) {
+		t.Fatalf("expected %q in:\n%s", want, sql)
+	}
+}
+
+func TestRenderCreateIndex_WithElementCollation(t *testing.T) {
+	idx := &model.Index{
+		Name:   "idx_users_email_c",
+		Table:  "users",
+		Method: "btree",
+		Elements: []model.IndexElem{{
+			Name:      "email",
+			Collation: "C",
+		}},
+	}
+	sql := NewRenderer().Render(diff.NewCreateIndexOp("public", idx))
+	want := `"email" COLLATE "C"`
+	if !strings.Contains(sql, want) {
+		t.Fatalf("expected %q in:\n%s", want, sql)
 	}
 }
