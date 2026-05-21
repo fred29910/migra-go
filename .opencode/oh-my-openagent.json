@@ -25,11 +25,11 @@
           "variant": "medium"
         },
         {
-          "model": "opencode/minimax-m2.5-free",
+          "model": "opencode/qwen3.6-plus-free",
           "variant": "medium"
         },
         {
-          "model": "opencode/minimax-m2.5-free"
+          "model": "opencode/qwen3.6-plus-free"
         },
         {
           "model": "opencode/big-pickle"
@@ -41,7 +41,7 @@
       "variant": "medium",
       "fallback_models": [
         {
-          "model": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+          "model": "opencode/nemotron-3-super-free",
           "variant": "medium"
         },
         {
@@ -53,7 +53,7 @@
           "variant": "medium"
         },
         {
-          "model": "opencode/minimax-m2.5-free",
+          "model": "opencode/qwen3.6-plus-free",
           "variant": "medium"
         }
       ]
@@ -71,7 +71,7 @@
           "variant": "high"
         },
         {
-          "model": "opencode/minimax-m2.5-free",
+          "model": "opencode/qwen3.6-plus-free",
           "variant": "high"
         },
         {
@@ -104,7 +104,7 @@
       "model": "openrouter/arcee-ai/trinity-large-thinking:free",
       "fallback_models": [
          {
-          "model": "opencode/minimax-m2.5-free",
+          "model": "opencode/qwen3.6-plus-free",
           "variant": "high"
         },
         {
@@ -146,7 +146,7 @@
       "variant": "medium",
       "fallback_models": [
         {
-          "model": "opencode/minimax-m2.5-free",
+          "model": "opencode/qwen3.6-plus-free",
           "variant": "medium"
         },
         {
@@ -189,7 +189,7 @@
           "variant": "high"
         },
         {
-          "model": "opencode/minimax-m2.5-free",
+          "model": "opencode/qwen3.6-plus-free",
           "variant": "high"
         },
         {
@@ -237,7 +237,7 @@
           "variant": "high"
         },
         {
-          "model": "opencode/minimax-m2.5-free",
+          "model": "opencode/qwen3.6-plus-free",
           "variant": "high"
         }
       ]
@@ -251,7 +251,7 @@
           "variant": "xhigh"
         },
         {
-          "model": "opencode/minimax-m2.5-free",
+          "model": "opencode/qwen3.6-plus-free",
           "variant": "xhigh"
         },
         {
@@ -306,7 +306,7 @@
           "variant": "high"
         },
         {
-          "model": "opencode/minimax-m2.5-free",
+          "model": "opencode/qwen3.6-plus-free",
           "variant": "medium"
         }
       ]
@@ -333,7 +333,7 @@
           "variant": "high"
         },
         {
-          "model": "opencode/minimax-m2.5-free",
+          "model": "opencode/qwen3.6-plus-free",
           "variant": "medium"
         },
         {
@@ -386,7 +386,7 @@
       "variant": "xhigh",
       "fallback_models": [
         {
-          "model": "opencode/minimax-m2.5-free",
+          "model": "opencode/qwen3.6-plus-free",
           "variant": "xhigh"
         },
         {
@@ -424,7 +424,7 @@
           "variant": "medium"
         },
         {
-          "model": "opencode/minimax-m2.5-free",
+          "model": "opencode/qwen3.6-plus-free",
           "variant": "medium"
         },
         {
@@ -484,7 +484,7 @@
           "model": "opencode/deepseek-v4-flash-free"
         },
         {
-          "model": "opencode/minimax-m2.5-free"
+          "model": "opencode/qwen3.6-plus-free"
         }
       ]
     },
@@ -522,7 +522,7 @@
           "model": "opencode/deepseek-v4-flash-free"
         },
         {
-          "model": "opencode/minimax-m2.5-free"
+          "model": "opencode/qwen3.6-plus-free"
         }
       ]
     },
@@ -556,7 +556,7 @@
           "model": "opencode/deepseek-v4-flash-free"
         },
         {
-          "model": "opencode/minimax-m2.5-free"
+          "model": "opencode/qwen3.6-plus-free"
         }
       ]
     },
@@ -581,7 +581,7 @@
           "variant": "high"
         },
         {
-          "model": "opencode/minimax-m2.5-free",
+          "model": "opencode/qwen3.6-plus-free",
           "variant": "high"
         },
         {
@@ -614,7 +614,7 @@
           "model": "opencode/deepseek-v4-flash-free"
         },
         {
-          "model": "opencode/minimax-m2.5-free"
+          "model": "opencode/qwen3.6-plus-free"
         }
       ]
     }
