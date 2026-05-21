@@ -250,6 +250,51 @@ func TestRenderForeignKeyCascade(t *testing.T) {
 	})
 }
 
+func TestRenderCreateIndexAdvanced(t *testing.T) {
+	idx := &model.Index{
+		Name:        "idx_users_email_pattern",
+		Table:       "users",
+		Method:      "btree",
+		Concurrent:  true,
+		IfNotExists: true,
+		WhereClause: "email IS NOT NULL",
+		Elements: []model.IndexElem{{
+			Name:          "email",
+			Opclass:       "text_pattern_ops",
+			Ordering:      "DESC",
+			NullsOrdering: "LAST",
+		}},
+	}
+	sql := NewRenderer().Render(diff.NewCreateIndexOp("public", idx))
+	want := `"email" text_pattern_ops DESC NULLS LAST`
+	if !strings.Contains(sql, want) {
+		t.Fatalf("expected %q in:\n%s", want, sql)
+	}
+	if !strings.Contains(sql, "CONCURRENTLY") {
+		t.Fatalf("expected CONCURRENTLY in:\n%s", sql)
+	}
+	if !strings.Contains(sql, "IF NOT EXISTS") {
+		t.Fatalf("expected IF NOT EXISTS in:\n%s", sql)
+	}
+	if !strings.Contains(sql, "WHERE email IS NOT NULL") {
+		t.Fatalf("expected WHERE in:\n%s", sql)
+	}
+}
+
+func TestRenderCreateIndex_WithMethod(t *testing.T) {
+	idx := &model.Index{
+		Name:    "idx_users_email",
+		Table:   "users",
+		Method:  "hash",
+		Elements: []model.IndexElem{{Name: "email"}},
+	}
+	sql := NewRenderer().Render(diff.NewCreateIndexOp("public", idx))
+	want := `USING hash`
+	if !strings.Contains(sql, want) {
+		t.Fatalf("expected %q in:\n%s", want, sql)
+	}
+}
+
 func TestRenderCreateIndex_Quoted(t *testing.T) {
 	r := NewRenderer()
 	op := &diff.CreateIndexOp{

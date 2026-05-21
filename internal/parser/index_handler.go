@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/fred29910/migra-go/internal/model"
 	"github.com/fred29910/migra-go/internal/parser/parserutil"
@@ -112,12 +113,33 @@ func parseIndexElem(node *pg_query.Node) (model.IndexElem, error) {
 		result.NullsOrdering = "LAST"
 	}
 
+	// Opclass
+	if len(elem.Opclass) > 0 {
+		parts := make([]string, 0, len(elem.Opclass))
+		for _, item := range elem.Opclass {
+			if s := item.GetString_(); s != nil {
+				parts = append(parts, s.Sval)
+			}
+		}
+		result.Opclass = strings.Join(parts, ".")
+	}
+	// Collation
+	if len(elem.Collation) > 0 {
+		parts := make([]string, 0, len(elem.Collation))
+		for _, item := range elem.Collation {
+			if s := item.GetString_(); s != nil {
+				parts = append(parts, s.Sval)
+			}
+		}
+		result.Collation = strings.Join(parts, ".")
+	}
+
 	return result, nil
 }
 
 // safeDeparse safely converts a pg_query node to its string representation
 func safeDeparse(node *pg_query.Node) string {
-	return fmt.Sprintf("%v", node)
+	return parserutil.DeparseNode(node)
 }
 
 // generateDefaultIndexName generates a default index name
