@@ -85,6 +85,9 @@ func canonicalizeIndexInPlace(idx *model.Index) {
 			}
 		}
 	}
+	// Normalize Definition and WhereClause whitespace
+	idx.Definition = strings.Join(strings.Fields(idx.Definition), " ")
+	idx.WhereClause = strings.Join(strings.Fields(idx.WhereClause), " ")
 }
 
 // typeAliases maps type aliases to canonical names (exact matches only, no length suffix)

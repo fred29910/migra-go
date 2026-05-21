@@ -29,6 +29,8 @@ type Index struct {
 	Primary      bool   // is primary key index
 	IsConstraint bool   // is it for a pkey/unique constraint
 	WhereClause  string // partial index predicate (WHERE clause)
+	Definition   string // pg_get_indexdef output for advanced index comparison
+	Predicate    string // partial index predicate (WHERE clause), empty = no predicate
 	Concurrent   bool   // concurrent index build
 	IfNotExists  bool   // IF NOT EXISTS
 }
