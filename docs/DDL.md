@@ -1,7 +1,7 @@
 # PostgreSQL DDL 特性支持矩阵
 
 > **项目**: migra-go — 基于 `pg_query_go` 的 PostgreSQL  schema diff 工具  
-> **最后更新**: 2026-05-19  
+> **最后更新**: 2026-05-21  
 > **Legend**: ✅ 完全支持 | ⚠️ 部分支持 (含多种情况: a) pg_query 可解析但下游不处理; b) 部分子特性支持; c) 能检测但不生成修复 DDL) | ❌ 暂不支持
 
 ---
