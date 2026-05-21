@@ -698,8 +698,9 @@ func (op *CreateViewOp) IsDestructive() bool { return false }
 // DropViewOp represents dropping a view
 type DropViewOp struct {
 	baseOperation
-	Schema string
-	Name   string
+	Schema     string
+	Name       string
+	IsRecreate bool // true when this drop is paired with a create (materialized change)
 }
 
 func NewDropViewOp(schema, name string) *DropViewOp {
@@ -713,7 +714,7 @@ func NewDropViewOp(schema, name string) *DropViewOp {
 	}
 }
 
-func (op *DropViewOp) IsDestructive() bool { return true }
+func (op *DropViewOp) IsDestructive() bool { return !op.IsRecreate }
 
 // ReplaceViewOp represents replacing a view's definition
 type ReplaceViewOp struct {

@@ -15,7 +15,7 @@ func loadIndexes(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mod
 	SELECT
 		idx.relname AS index_name,
 		t.relname AS table_name,
-		array_agg(a.attname ORDER BY key_pos.n) FILTER (WHERE a.attname IS NOT NULL) AS column_names,
+		array_agg(COALESCE(a.attname, '') ORDER BY key_pos.n) AS column_names,
 		array_agg(pg_get_indexdef(i.indexrelid, key_pos.n, true) ORDER BY key_pos.n) AS element_defs,
 		i.indisunique AS is_unique,
 		am.amname AS method,

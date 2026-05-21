@@ -214,7 +214,9 @@ func (c *diffContext) diffViews(source, target *model.Namespace) {
 		if src, ok := source.Views[name]; !ok {
 			c.addOp(NewCreateViewOp(target.Name, target.Views[name]))
 		} else if src.Materialized != target.Views[name].Materialized {
-			c.addOp(NewDropViewOp(source.Name, name))
+			drop := NewDropViewOp(source.Name, name)
+			drop.IsRecreate = true
+			c.addOp(drop)
 			c.addOp(NewCreateViewOp(target.Name, target.Views[name]))
 		} else if src.Definition != target.Views[name].Definition {
 			c.addOp(NewReplaceViewOp(target.Name, target.Views[name]))
