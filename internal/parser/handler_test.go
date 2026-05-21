@@ -255,6 +255,38 @@ func TestAlterTableHandler_AddIdentityColumn(t *testing.T) {
 	assert.Equal(t, "ALWAYS", mut.Column.IdentityKind)
 }
 
+func TestCreateTableHandler_UniqueAndCheckConstraints(t *testing.T) {
+	sql := `CREATE TABLE users (
+		id integer PRIMARY KEY,
+		email text UNIQUE,
+		age integer CHECK (age > 0),
+		CONSTRAINT users_email_lower_uniq UNIQUE (email),
+		CONSTRAINT users_age_check CHECK (age < 150)
+	)`
+	node := mustParseFirstStmt(t, sql)
+	h := &CreateTableHandler{}
+
+	mutations, err := h.Handle(node)
+	require.NoError(t, err)
+	require.Len(t, mutations, 1)
+
+	mut := mutations[0].(CreateTableMutation)
+	var uniqueCount, checkCount int
+	for _, c := range mut.Constraints {
+		switch c.Type {
+		case "unique":
+			uniqueCount++
+			assert.NotEmpty(t, c.Columns)
+		case "check":
+			checkCount++
+			assert.NotEmpty(t, c.Expression)
+		}
+		assert.NotEmpty(t, c.Name)
+	}
+	assert.Equal(t, 2, uniqueCount)
+	assert.Equal(t, 2, checkCount)
+}
+
 func TestCreateSchemaHandler_IfNotExists(t *testing.T) {
 	node := mustParseFirstStmt(t, "CREATE SCHEMA IF NOT EXISTS auth")
 	h := &CreateSchemaHandler{}
