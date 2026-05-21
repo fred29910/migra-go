@@ -14,18 +14,20 @@ func loadIndexes(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mod
 	SELECT
 		idx.relname AS index_name,
 		t.relname AS table_name,
-		array_agg(a.attname ORDER BY k.ordinality) AS column_names,
+		array_agg(a.attname ORDER BY k.ordinality) FILTER (WHERE a.attname IS NOT NULL) AS column_names,
 		i.indisunique AS is_unique,
-		am.amname AS method
+		am.amname AS method,
+		pg_get_indexdef(i.indexrelid) AS definition,
+		COALESCE(pg_get_expr(i.indpred, i.indrelid), '') AS predicate
 	FROM pg_index i
 	JOIN pg_class idx ON idx.oid = i.indexrelid
 	JOIN pg_class t ON t.oid = i.indrelid
 	JOIN pg_namespace n ON n.oid = idx.relnamespace
 	JOIN pg_am am ON am.oid = idx.relam
-	JOIN LATERAL unnest(i.indkey::int[]) WITH ORDINALITY AS k(attnum, ordinality) ON true
-	JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+	LEFT JOIN LATERAL unnest(i.indkey::int[]) WITH ORDINALITY AS k(attnum, ordinality) ON true
+	LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
 	WHERE n.nspname = $1 AND i.indisprimary = false
-	GROUP BY idx.oid, idx.relname, t.relname, i.indisunique, am.amname`
+	GROUP BY idx.oid, idx.relname, t.relname, i.indisunique, am.amname, i.indexrelid, i.indpred, i.indrelid`
 
 	rows, err := conn.Query(ctx, query, schemaName)
 	if err != nil {
@@ -39,10 +41,12 @@ func loadIndexes(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mod
 		columnNames []string
 		isUnique    bool
 		method      string
+		definition  string
+		predicate   string
 	)
 
 	for rows.Next() {
-		err := rows.Scan(&indexName, &tableName, &columnNames, &isUnique, &method)
+		err := rows.Scan(&indexName, &tableName, &columnNames, &isUnique, &method, &definition, &predicate)
 		if err != nil {
 			return fmt.Errorf("scan index row: %w", err)
 		}
@@ -53,11 +57,13 @@ func loadIndexes(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mod
 		}
 
 		index := &model.Index{
-			Name:    indexName,
-			Table:   tableName,
-			Columns: columnNames,
-			Unique:  isUnique,
-			Method:  method,
+			Name:        indexName,
+			Table:       tableName,
+			Columns:     columnNames,
+			Unique:      isUnique,
+			Method:      method,
+			Definition:  definition,
+			WhereClause: predicate,
 		}
 
 		table.Indexes[indexName] = index
