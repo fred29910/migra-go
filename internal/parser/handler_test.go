@@ -255,6 +255,28 @@ func TestAlterTableHandler_AddIdentityColumn(t *testing.T) {
 	assert.Equal(t, "ALWAYS", mut.Column.IdentityKind)
 }
 
+func TestAlterTableHandler_AddAndDropConstraint(t *testing.T) {
+	addNode := mustParseFirstStmt(t, `ALTER TABLE users ADD CONSTRAINT users_email_key UNIQUE (email)`)
+	h := &AlterTableHandler{}
+
+	addMutations, err := h.Handle(addNode)
+	require.NoError(t, err)
+	require.Len(t, addMutations, 1)
+	addMut := addMutations[0].(AddConstraintMutation)
+	assert.Equal(t, "public", addMut.Schema)
+	assert.Equal(t, "users", addMut.Table)
+	assert.Equal(t, "users_email_key", addMut.Constraint.Name)
+	assert.Equal(t, "unique", addMut.Constraint.Type)
+	assert.Equal(t, []string{"email"}, addMut.Constraint.Columns)
+
+	dropNode := mustParseFirstStmt(t, `ALTER TABLE users DROP CONSTRAINT users_email_key`)
+	dropMutations, err := h.Handle(dropNode)
+	require.NoError(t, err)
+	require.Len(t, dropMutations, 1)
+	dropMut := dropMutations[0].(DropConstraintMutation)
+	assert.Equal(t, "users_email_key", dropMut.Name)
+}
+
 func TestCreateTableHandler_UniqueAndCheckConstraints(t *testing.T) {
 	sql := `CREATE TABLE users (
 		id integer PRIMARY KEY,

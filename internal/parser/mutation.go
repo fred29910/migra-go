@@ -22,6 +22,8 @@ const (
 	MutKindDropDefault     MutationKind = "drop_default"
 	MutKindCreateSchema    MutationKind = "create_schema"
 	MutKindRenameColumn    MutationKind = "rename_column"
+	MutKindAddConstraint   MutationKind = "add_constraint"
+	MutKindDropConstraint  MutationKind = "drop_constraint"
 )
 
 // SchemaMutation is a self-describing and self-applying schema change.
@@ -309,5 +311,57 @@ func (m DropDefaultMutation) Apply(schema *model.Schema) error {
 		return fmt.Errorf("column %s.%s.%s not found", m.Schema, m.Table, m.Column)
 	}
 	col.DefaultExpr = nil
+	return nil
+}
+
+// AddConstraintMutation describes adding a constraint to an existing table.
+type AddConstraintMutation struct {
+	Schema     string
+	Table      string
+	Constraint model.Constraint
+}
+
+func (m AddConstraintMutation) Kind() MutationKind { return MutKindAddConstraint }
+func (m AddConstraintMutation) Target() model.ObjectKey {
+	return model.NewObjectKey(m.Schema, m.Table+"."+m.Constraint.Name, model.KindConstraint)
+}
+func (m AddConstraintMutation) Apply(schema *model.Schema) error {
+	ns := schema.GetNamespace(m.Schema)
+	if ns == nil {
+		return fmt.Errorf("schema %s not found", m.Schema)
+	}
+	table := ns.Tables[m.Table]
+	if table == nil {
+		return fmt.Errorf("table %s.%s not found", m.Schema, m.Table)
+	}
+	c := m.Constraint
+	if c.Table == "" {
+		c.Table = m.Table
+	}
+	table.Constraints[c.Name] = &c
+	return nil
+}
+
+// DropConstraintMutation describes dropping a constraint from an existing table.
+type DropConstraintMutation struct {
+	Schema string
+	Table  string
+	Name   string
+}
+
+func (m DropConstraintMutation) Kind() MutationKind { return MutKindDropConstraint }
+func (m DropConstraintMutation) Target() model.ObjectKey {
+	return model.NewObjectKey(m.Schema, m.Table+"."+m.Name, model.KindConstraint)
+}
+func (m DropConstraintMutation) Apply(schema *model.Schema) error {
+	ns := schema.GetNamespace(m.Schema)
+	if ns == nil {
+		return fmt.Errorf("schema %s not found", m.Schema)
+	}
+	table := ns.Tables[m.Table]
+	if table == nil {
+		return fmt.Errorf("table %s.%s not found", m.Schema, m.Table)
+	}
+	delete(table.Constraints, m.Name)
 	return nil
 }
