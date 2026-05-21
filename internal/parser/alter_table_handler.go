@@ -58,6 +58,10 @@ func (h *AlterTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error
 			}
 			if colDef := cmd.Def.GetColumnDef(); colDef != nil {
 				col := parserutil.ParseColumnDef(colDef)
+				// In pg_query_go's protobuf representation, the USING expression
+				// for ALTER COLUMN TYPE (PostgreSQL internal: AlterTableCmd.transform)
+				// is mapped into ColumnDef.RawDefault. The AlterTableCmd protobuf
+				// has no separate transform field; this is the correct field to read.
 				usingExpr := ""
 				if colDef.RawDefault != nil {
 					usingExpr = parserutil.FormatExpression(colDef.RawDefault)
