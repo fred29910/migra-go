@@ -12,6 +12,78 @@ import (
 // CreateTableHandler handles CREATE TABLE statements.
 type CreateTableHandler struct{}
 
+// parseTableConstraint converts a pg_query Constraint node into a model.Constraint.
+// Returns the constraint and true on success, or false if the constraint type is unsupported.
+func parseTableConstraint(tableName string, c *pg_query.Constraint) (model.Constraint, bool) {
+	switch c.Contype {
+	case pg_query.ConstrType_CONSTR_PRIMARY:
+		var cols []string
+		for _, key := range c.Keys {
+			if s := key.GetString_(); s != nil {
+				cols = append(cols, s.Sval)
+			}
+		}
+		con := model.Constraint{
+			Name:    c.Conname,
+			Type:    "primary_key",
+			Columns: cols,
+		}
+		con.Name = defaultConstraintName(tableName, con)
+		return con, true
+	case pg_query.ConstrType_CONSTR_FOREIGN:
+		var fkCols []string
+		for _, attr := range c.FkAttrs {
+			if s := attr.GetString_(); s != nil {
+				fkCols = append(fkCols, s.Sval)
+			}
+		}
+		var refCols []string
+		for _, attr := range c.PkAttrs {
+			if s := attr.GetString_(); s != nil {
+				refCols = append(refCols, s.Sval)
+			}
+		}
+		refSchema := "public"
+		if c.Pktable != nil && c.Pktable.Schemaname != "" {
+			refSchema = c.Pktable.Schemaname
+		}
+		refTable := ""
+		if c.Pktable != nil {
+			refTable = c.Pktable.Relname
+		}
+		con := model.Constraint{
+			Name:       c.Conname,
+			Type:       "foreign_key",
+			Columns:    fkCols,
+			RefSchema:  refSchema,
+			RefTable:   refTable,
+			RefColumns: refCols,
+			OnDelete:   fkActionCode(c.FkDelAction),
+			OnUpdate:   fkActionCode(c.FkUpdAction),
+		}
+		con.Name = defaultConstraintName(tableName, con)
+		return con, true
+	case pg_query.ConstrType_CONSTR_UNIQUE:
+		cols := parserutil.ParseConstraintColumns(c.Keys)
+		con := model.Constraint{
+			Name:    c.Conname,
+			Type:    "unique",
+			Columns: cols,
+		}
+		con.Name = defaultConstraintName(tableName, con)
+		return con, true
+	case pg_query.ConstrType_CONSTR_CHECK:
+		con := model.Constraint{
+			Name:       c.Conname,
+			Type:       "check",
+			Expression: parserutil.DeparseNode(c.RawExpr),
+		}
+		con.Name = defaultConstraintName(tableName, con)
+		return con, true
+	}
+	return model.Constraint{}, false
+}
+
 func defaultConstraintName(table string, constraint model.Constraint) string {
 	if constraint.Name != "" {
 		return constraint.Name
@@ -119,72 +191,14 @@ func (h *CreateTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, erro
 			columns = append(columns, *col)
 		case *pg_query.Node_Constraint:
 			constraint := elt.Constraint
-			switch constraint.Contype {
-			case pg_query.ConstrType_CONSTR_PRIMARY:
-				var cols []string
-				for _, key := range constraint.Keys {
-					if s := key.GetString_(); s != nil {
-						cols = append(cols, s.Sval)
+			con, ok := parseTableConstraint(tableName, constraint)
+			if ok {
+				if constraint.Contype == pg_query.ConstrType_CONSTR_PRIMARY {
+					primaryKey = &model.PrimaryKey{
+						Name:    con.Name,
+						Columns: con.Columns,
 					}
 				}
-				primaryKey = &model.PrimaryKey{
-					Name:    defaultConstraintName(tableName, model.Constraint{Name: "", Type: "primary_key"}),
-					Columns: cols,
-				}
-				constraints = append(constraints, model.Constraint{
-					Name:    primaryKey.Name,
-					Type:    "primary_key",
-					Columns: cols,
-				})
-			case pg_query.ConstrType_CONSTR_FOREIGN:
-				var fkCols []string
-				for _, attr := range constraint.FkAttrs {
-					if s := attr.GetString_(); s != nil {
-						fkCols = append(fkCols, s.Sval)
-					}
-				}
-				var refCols []string
-				for _, attr := range constraint.PkAttrs {
-					if s := attr.GetString_(); s != nil {
-						refCols = append(refCols, s.Sval)
-					}
-				}
-				refSchema := "public"
-				if constraint.Pktable != nil && constraint.Pktable.Schemaname != "" {
-					refSchema = constraint.Pktable.Schemaname
-				}
-				refTable := ""
-				if constraint.Pktable != nil {
-					refTable = constraint.Pktable.Relname
-				}
-				con := model.Constraint{
-					Name:       "",
-					Type:       "foreign_key",
-					Columns:    fkCols,
-					RefSchema:  refSchema,
-					RefTable:   refTable,
-					RefColumns: refCols,
-					OnDelete:   fkActionCode(constraint.FkDelAction),
-					OnUpdate:   fkActionCode(constraint.FkUpdAction),
-				}
-				con.Name = defaultConstraintName(tableName, con)
-				constraints = append(constraints, con)
-			case pg_query.ConstrType_CONSTR_UNIQUE:
-				cols := parserutil.ParseConstraintColumns(constraint.Keys)
-				con := model.Constraint{
-					Name:    constraint.Conname,
-					Type:    "unique",
-					Columns: cols,
-				}
-				con.Name = defaultConstraintName(tableName, con)
-				constraints = append(constraints, con)
-			case pg_query.ConstrType_CONSTR_CHECK:
-				con := model.Constraint{
-					Name:       constraint.Conname,
-					Type:       "check",
-					Expression: parserutil.DeparseNode(constraint.RawExpr),
-				}
-				con.Name = defaultConstraintName(tableName, con)
 				constraints = append(constraints, con)
 			}
 		}

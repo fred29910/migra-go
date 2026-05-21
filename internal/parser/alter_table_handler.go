@@ -114,6 +114,32 @@ func (h *AlterTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error
 				})
 			}
 
+		case pg_query.AlterTableType_AT_AddConstraint:
+			if cmd.Def == nil {
+				continue
+			}
+			c := cmd.Def.GetConstraint()
+			if c == nil {
+				continue
+			}
+			constraint, ok := parseTableConstraint(tableName, c)
+			if !ok {
+				fmt.Fprintf(os.Stderr, "warning: unsupported ADD CONSTRAINT type: %v\n", c.Contype)
+				continue
+			}
+			mutations = append(mutations, AddConstraintMutation{
+				Schema: schemaName, Table: tableName, Constraint: constraint,
+			})
+
+		case pg_query.AlterTableType_AT_DropConstraint:
+			if cmd.Name == "" {
+				fmt.Fprintf(os.Stderr, "warning: DROP CONSTRAINT missing constraint name\n")
+				continue
+			}
+			mutations = append(mutations, DropConstraintMutation{
+				Schema: schemaName, Table: tableName, Name: cmd.Name,
+			})
+
 		default:
 			// NOTE: Some ALTER TABLE subcommands (e.g., RENAME COLUMN) are parsed by
 			// pg_query_go as top-level RenameStmt nodes, not as AlterTableCmd subtypes.
