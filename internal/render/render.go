@@ -154,6 +154,24 @@ func (r *Renderer) Render(op diff.Operation) string {
 			quoteQualifiedIdentifier(v.Schema, v.Table),
 			quoteIdentifier(v.Column),
 		)
+	case *diff.CreateViewOp:
+		return r.renderCreateView(v)
+	case *diff.DropViewOp:
+		return r.renderDropView(v)
+	case *diff.ReplaceViewOp:
+		return r.renderReplaceView(v)
+	case *diff.CreateSequenceOp:
+		return r.renderCreateSequence(v)
+	case *diff.DropSequenceOp:
+		return r.renderDropSequence(v)
+	case *diff.AlterSequenceOp:
+		return r.renderAlterSequence(v)
+	case *diff.CreateExtensionOp:
+		return r.renderCreateExtension(v)
+	case *diff.DropExtensionOp:
+		return r.renderDropExtension(v)
+	case *diff.AlterExtensionUpdateOp:
+		return r.renderAlterExtensionUpdate(v)
 	default:
 		return fmt.Sprintf("-- Unknown operation: %T", op)
 	}
@@ -296,7 +314,7 @@ func (r *Renderer) renderCreateIndex(op *diff.CreateIndexOp) string {
 		ifNotExists = "IF NOT EXISTS "
 	}
 	method := ""
-	if idx.Method != "" && idx.Method != "btree" {
+	if idx.Method != "" {
 		method = " USING " + idx.Method
 	}
 
@@ -391,6 +409,99 @@ func (r *Renderer) renderAlterColumnCollation(op *diff.AlterColumnCollationOp) s
 func (r *Renderer) renderDropEnumType(op *diff.DropEnumTypeOp) string {
 	return fmt.Sprintf("-- op: drop_enum_type risk:high\nDROP TYPE %s%s;",
 		ifExistsPrefix(r.useIfExists), quoteQualifiedIdentifier(op.Schema, op.Name))
+}
+
+func (r *Renderer) renderCreateView(op *diff.CreateViewOp) string {
+	return fmt.Sprintf("-- op: create_view risk:low\nCREATE VIEW %s AS %s;",
+		quoteQualifiedIdentifier(op.Schema, op.View.Name), op.View.Definition)
+}
+
+func (r *Renderer) renderReplaceView(op *diff.ReplaceViewOp) string {
+	return fmt.Sprintf("-- op: replace_view risk:medium\nCREATE OR REPLACE VIEW %s AS %s;",
+		quoteQualifiedIdentifier(op.Schema, op.View.Name), op.View.Definition)
+}
+
+func (r *Renderer) renderDropView(op *diff.DropViewOp) string {
+	return fmt.Sprintf("-- op: drop_view risk:high\nDROP VIEW %s%s;",
+		ifExistsPrefix(r.useIfExists), quoteQualifiedIdentifier(op.Schema, op.Name))
+}
+
+func (r *Renderer) renderCreateSequence(op *diff.CreateSequenceOp) string {
+	seq := op.Sequence
+	parts := []string{"CREATE SEQUENCE " + quoteQualifiedIdentifier(op.Schema, seq.Name)}
+	if seq.DataType != "" {
+		parts = append(parts, "AS "+seq.DataType)
+	}
+	if seq.StartValue != 0 {
+		parts = append(parts, fmt.Sprintf("START WITH %d", seq.StartValue))
+	}
+	if seq.IncrementBy != 0 {
+		parts = append(parts, fmt.Sprintf("INCREMENT BY %d", seq.IncrementBy))
+	}
+	if seq.MinValue != 0 {
+		parts = append(parts, fmt.Sprintf("MINVALUE %d", seq.MinValue))
+	}
+	if seq.MaxValue != 0 {
+		parts = append(parts, fmt.Sprintf("MAXVALUE %d", seq.MaxValue))
+	}
+	if seq.CacheSize != 0 && seq.CacheSize != 1 {
+		parts = append(parts, fmt.Sprintf("CACHE %d", seq.CacheSize))
+	}
+	if seq.Cycle {
+		parts = append(parts, "CYCLE")
+	}
+	return "-- op: create_sequence risk:low\n" + strings.Join(parts, " ") + ";"
+}
+
+func (r *Renderer) renderDropSequence(op *diff.DropSequenceOp) string {
+	return fmt.Sprintf("-- op: drop_sequence risk:high\nDROP SEQUENCE %s%s;",
+		ifExistsPrefix(r.useIfExists), quoteQualifiedIdentifier(op.Schema, op.Name))
+}
+
+func (r *Renderer) renderAlterSequence(op *diff.AlterSequenceOp) string {
+	seq := op.To
+	parts := []string{"ALTER SEQUENCE " + quoteQualifiedIdentifier(op.Schema, seq.Name)}
+	if seq.DataType != "" && seq.DataType != op.From.DataType {
+		parts = append(parts, "AS "+seq.DataType)
+	}
+	if seq.StartValue != 0 && seq.StartValue != op.From.StartValue {
+		parts = append(parts, fmt.Sprintf("START WITH %d", seq.StartValue))
+	}
+	if seq.IncrementBy != 0 && seq.IncrementBy != op.From.IncrementBy {
+		parts = append(parts, fmt.Sprintf("INCREMENT BY %d", seq.IncrementBy))
+	}
+	if seq.MinValue != 0 && seq.MinValue != op.From.MinValue {
+		parts = append(parts, fmt.Sprintf("MINVALUE %d", seq.MinValue))
+	}
+	if seq.MaxValue != 0 && seq.MaxValue != op.From.MaxValue {
+		parts = append(parts, fmt.Sprintf("MAXVALUE %d", seq.MaxValue))
+	}
+	if seq.CacheSize != 0 && seq.CacheSize != op.From.CacheSize {
+		parts = append(parts, fmt.Sprintf("CACHE %d", seq.CacheSize))
+	}
+	if seq.Cycle != op.From.Cycle {
+		parts = append(parts, "CYCLE")
+	}
+	return "-- op: alter_sequence risk:low\n" + strings.Join(parts, " ") + ";"
+}
+
+func (r *Renderer) renderCreateExtension(op *diff.CreateExtensionOp) string {
+	sql := "CREATE EXTENSION IF NOT EXISTS " + quoteIdentifier(op.Extension.Name)
+	if op.Extension.Version != "" {
+		sql += " WITH VERSION " + quoteString(op.Extension.Version)
+	}
+	return "-- op: create_extension risk:low\n" + sql + ";"
+}
+
+func (r *Renderer) renderDropExtension(op *diff.DropExtensionOp) string {
+	return fmt.Sprintf("-- op: drop_extension risk:high\nDROP EXTENSION %s%s;",
+		ifExistsPrefix(r.useIfExists), quoteQualifiedIdentifier(op.Schema, op.Name))
+}
+
+func (r *Renderer) renderAlterExtensionUpdate(op *diff.AlterExtensionUpdateOp) string {
+	sql := fmt.Sprintf("ALTER EXTENSION %s UPDATE TO %s",
+		quoteIdentifier(op.Extension.Name), quoteString(op.Extension.Version))
+	return "-- op: alter_extension_update risk:low\n" + sql + ";"
 }
 
 // Helper functions

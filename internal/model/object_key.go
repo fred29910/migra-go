@@ -12,6 +12,8 @@ const (
 	KindView       ObjectKind = "view"
 	KindFunction   ObjectKind = "function"
 	KindSchema     ObjectKind = "schema"
+	KindSequence   ObjectKind = "sequence"
+	KindExtension  ObjectKind = "extension"
 )
 
 // ObjectKey uniquely identifies a database object

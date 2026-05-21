@@ -317,6 +317,12 @@ func sameIndexContent(a, b *model.Index) bool {
 		if a.Elements[i].Name != b.Elements[i].Name {
 			return false
 		}
+		if a.Elements[i].IndexColName != b.Elements[i].IndexColName {
+			return false
+		}
+		if a.Elements[i].Collation != b.Elements[i].Collation {
+			return false
+		}
 		if a.Elements[i].Expr != b.Elements[i].Expr {
 			return false
 		}

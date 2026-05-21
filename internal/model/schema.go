@@ -7,9 +7,24 @@ type Schema struct {
 
 // Namespace represents a schema namespace (e.g., public, app)
 type Namespace struct {
-	Name   string
-	Tables map[string]*Table
-	Types  map[string]*EnumType
+	Name       string
+	Tables     map[string]*Table
+	Types      map[string]*EnumType
+	Views      map[string]*View
+	Sequences  map[string]*Sequence
+	Extensions map[string]*Extension
+}
+
+// NewNamespace creates a new Namespace with initialized object maps
+func NewNamespace(name string) *Namespace {
+	return &Namespace{
+		Name:       name,
+		Tables:     make(map[string]*Table),
+		Types:      make(map[string]*EnumType),
+		Views:      make(map[string]*View),
+		Sequences:  make(map[string]*Sequence),
+		Extensions: make(map[string]*Extension),
+	}
 }
 
 // EnumType represents a PostgreSQL enum type
@@ -30,11 +45,7 @@ func (s *Schema) GetOrCreateNamespace(name string) *Namespace {
 	if ns, ok := s.Schemas[name]; ok {
 		return ns
 	}
-	ns := &Namespace{
-		Name:   name,
-		Tables: make(map[string]*Table),
-		Types:  make(map[string]*EnumType),
-	}
+	ns := NewNamespace(name)
 	s.Schemas[name] = ns
 	return ns
 }

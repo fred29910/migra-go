@@ -2,8 +2,8 @@ package parser
 
 import (
 	"fmt"
-	"strings"
 
+	"github.com/fred29910/migra-go/internal/indexdef"
 	"github.com/fred29910/migra-go/internal/model"
 	"github.com/fred29910/migra-go/internal/parser/parserutil"
 	pg_query "github.com/pganalyze/pg_query_go/v6"
@@ -71,70 +71,7 @@ func (h *CreateIndexHandler) Handle(node *pg_query.Node) ([]SchemaMutation, erro
 
 // parseIndexElem parses a single IndexElem from pg_query node
 func parseIndexElem(node *pg_query.Node) (model.IndexElem, error) {
-	elem := node.GetIndexElem()
-	if elem == nil {
-		return model.IndexElem{}, fmt.Errorf("expected IndexElem, got %T", node)
-	}
-
-	result := model.IndexElem{}
-
-	// Column name (simple column index)
-	if elem.Name != "" {
-		result.Name = elem.Name
-	}
-
-	// Expression (expression index)
-	if elem.Expr != nil {
-		result.Expr = safeDeparse(elem.Expr)
-	}
-
-	// Index column name
-	if elem.Indexcolname != "" {
-		result.IndexColName = elem.Indexcolname
-	}
-
-	// Ordering
-	switch elem.Ordering {
-	case pg_query.SortByDir_SORTBY_DEFAULT:
-		result.Ordering = "default"
-	case pg_query.SortByDir_SORTBY_ASC:
-		result.Ordering = "ASC"
-	case pg_query.SortByDir_SORTBY_DESC:
-		result.Ordering = "DESC"
-	}
-
-	// Nulls ordering
-	switch elem.NullsOrdering {
-	case pg_query.SortByNulls_SORTBY_NULLS_DEFAULT:
-		result.NullsOrdering = "default"
-	case pg_query.SortByNulls_SORTBY_NULLS_FIRST:
-		result.NullsOrdering = "FIRST"
-	case pg_query.SortByNulls_SORTBY_NULLS_LAST:
-		result.NullsOrdering = "LAST"
-	}
-
-	// Opclass
-	if len(elem.Opclass) > 0 {
-		parts := make([]string, 0, len(elem.Opclass))
-		for _, item := range elem.Opclass {
-			if s := item.GetString_(); s != nil {
-				parts = append(parts, s.Sval)
-			}
-		}
-		result.Opclass = strings.Join(parts, ".")
-	}
-	// Collation
-	if len(elem.Collation) > 0 {
-		parts := make([]string, 0, len(elem.Collation))
-		for _, item := range elem.Collation {
-			if s := item.GetString_(); s != nil {
-				parts = append(parts, s.Sval)
-			}
-		}
-		result.Collation = strings.Join(parts, ".")
-	}
-
-	return result, nil
+	return indexdef.FromNode(node)
 }
 
 // safeDeparse safely converts a pg_query node to its string representation
