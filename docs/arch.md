@@ -1,6 +1,6 @@
 # MIGRA-Go 架构文档
 
-> 最后更新：2026-05-19
+> 最后更新：2026-05-21
 
 ## 概述
 
@@ -259,7 +259,7 @@ type SchemaMutation interface {
 }
 ```
 
-**所有 Mutation 类型（11 种）：**
+**所有 Mutation 类型（12 种）：**
 
 | MutationKind | Mutation 结构体 | 用途 |
 |-------------|----------------|------|
@@ -358,7 +358,7 @@ Diff
 
 **diffContext** (`context.go`) 跟踪单次 diff 的状态，收集 ops 和 warnings。
 
-**重命名列启发式检测** (`diff_tables.go:162-189`)：当某列在 source 中存在且在 target 中消失，同时另一列在 target 中出现，如果两列的 `DataType`、`IsNullable`、`DefaultExpr`、`Collation` 均匹配，则判定为重命名并生成 `RenameColumnOp` 而不是 `DropColumnOp + AddColumnOp`。该启发式可能存在误报，未来可通过 SQL 注释提示或 ordinal_position 邻近性优化。
+**重命名列启发式检测** (`diff_tables.go:180-195`)：当某列在 source 中存在且在 target 中消失，同时另一列在 target 中出现，如果两列的 `DataType`、`IsNullable`、`DefaultExpr`、`Collation` 均匹配，则判定为重命名并生成 `RenameColumnOp` 而不是 `DropColumnOp + AddColumnOp`。该启发式可能存在误报，未来可通过 SQL 注释提示或 ordinal_position 邻近性优化。
 
 **约束比较策略**：`sameConstraintContent` 比较结构化字段（Type、Columns、Refs、Expression、OnDelete、OnUpdate），排除派生字段 Definition。`sameConstraintSemantics` 作为第二道防线，在 content 比较失败时检查语义等价性，避免不必要的 DROP+ADD 循环。
 
@@ -583,8 +583,8 @@ cmd/migra/main.go  (Cobra root + Viper config)
    │                 └── WalkDir → 解析 schema.sql → 合并 → *model.Schema (target)
    │
    ├── ComputeDiff(source, target, cfg)
-   │     ├── FilterNamespaces (仅保留 --schema 指定的命名空间)
    │     ├── NormalizeSchemas (规范化双方 schema)
+   │     ├── FilterNamespaces (仅保留 --schema 指定的命名空间)
    │     ├── Differ.Diff(source, target)
    │     │     ├── diffSchemas → diffTables
    │     │     │     ├── posts → 相同，跳过
