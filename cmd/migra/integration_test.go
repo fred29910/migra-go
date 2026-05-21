@@ -480,3 +480,126 @@ CREATE TABLE auth.permissions (
 		t.Fatalf("unexpected parse error in output:\n%s", out)
 	}
 }
+
+func TestV3DirectoryDiff(t *testing.T) {
+	out, warns, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+		Source:     "../../testdata/diff/v1/",
+		Target:     "../../testdata/diff/v2/",
+		Schemas:    []string{"public"},
+		Format:     "sql",
+		Timeout:    defaultDiffTimeout,
+		UnsafeDrop: false,
+	})
+	if err != nil {
+		t.Fatalf("diff service failed: %v", err)
+	}
+
+	for _, want := range []string{
+		`CREATE TABLE "public"."comments"`,
+		`ADD COLUMN "age"`,
+		`ALTER TYPE "public"."user_role" ADD VALUE 'guest'`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got:\n%s", want, out)
+		}
+	}
+
+	if len(warns) > 0 {
+		t.Fatalf("unexpected warnings: %v", warns)
+	}
+}
+
+func TestV3UnsafeDropDiff_Safe(t *testing.T) {
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+		Source:     "../../testdata/diff/v2/schema.sql",
+		Target:     "../../testdata/diff/v3/schema.sql",
+		Schemas:    []string{"public"},
+		Format:     "sql",
+		Timeout:    defaultDiffTimeout,
+		UnsafeDrop: false,
+	})
+	if err != nil {
+		t.Fatalf("diff service failed: %v", err)
+	}
+
+	for _, drop := range []string{"DROP COLUMN", "DROP TABLE", "DROP INDEX"} {
+		if strings.Contains(out, drop) {
+			t.Fatalf("safe mode should not contain %q, got:\n%s", drop, out)
+		}
+	}
+
+	if !strings.Contains(out, `ADD COLUMN "phone"`) {
+		t.Fatalf("expected ADD COLUMN phone in safe mode, got:\n%s", out)
+	}
+}
+
+func TestV3UnsafeDropDiff_Unsafe(t *testing.T) {
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+		Source:     "../../testdata/diff/v2/schema.sql",
+		Target:     "../../testdata/diff/v3/schema.sql",
+		Schemas:    []string{"public"},
+		Format:     "sql",
+		Timeout:    defaultDiffTimeout,
+		UnsafeDrop: true,
+	})
+	if err != nil {
+		t.Fatalf("diff service failed: %v", err)
+	}
+
+	for _, want := range []string{
+		`DROP COLUMN IF EXISTS "age"`,
+		`ADD COLUMN "phone"`,
+		`idx_users_username_unique`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestNestedDirectoryDiff(t *testing.T) {
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+		Source:     "../../testdata/diff/nested/",
+		Target:     "../../testdata/diff/nested_target/",
+		Schemas:    []string{"public"},
+		Format:     "sql",
+		Timeout:    defaultDiffTimeout,
+		UnsafeDrop: false,
+	})
+	if err != nil {
+		t.Fatalf("diff service failed: %v", err)
+	}
+
+	for _, want := range []string{
+		`ADD COLUMN "email"`,
+		`ADD CONSTRAINT "posts_user_id_fkey"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestMultiSchemaDirectoryDiffStatic(t *testing.T) {
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+		Source:     "../../testdata/diff/multi_schema/v1/",
+		Target:     "../../testdata/diff/multi_schema/v2/",
+		Schemas:    []string{"public", "auth"},
+		Format:     "sql",
+		Timeout:    defaultDiffTimeout,
+		UnsafeDrop: false,
+	})
+	if err != nil {
+		t.Fatalf("diff service failed: %v", err)
+	}
+
+	for _, want := range []string{
+		`CREATE TABLE "public"."profiles"`,
+		`ALTER TABLE "auth"."roles" ADD COLUMN "description"`,
+		`ALTER TABLE "public"."users" ADD COLUMN "email"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got:\n%s", want, out)
+		}
+	}
+}
