@@ -309,6 +309,20 @@ func TestCreateTableHandler_UniqueAndCheckConstraints(t *testing.T) {
 	assert.Equal(t, 2, checkCount)
 }
 
+func TestAlterTableHandler_AlterColumnTypeUsing(t *testing.T) {
+	node := mustParseFirstStmt(t, `ALTER TABLE users ALTER COLUMN id TYPE bigint USING id::bigint`)
+	h := &AlterTableHandler{}
+
+	mutations, err := h.Handle(node)
+	require.NoError(t, err)
+	require.Len(t, mutations, 1)
+
+	mut := mutations[0].(AlterColumnTypeMutation)
+	assert.Equal(t, "id", mut.Column)
+	assert.Equal(t, "bigint", mut.ToType)
+	assert.Contains(t, mut.UsingExpr, "bigint")
+}
+
 func TestCreateSchemaHandler_IfNotExists(t *testing.T) {
 	node := mustParseFirstStmt(t, "CREATE SCHEMA IF NOT EXISTS auth")
 	h := &CreateSchemaHandler{}

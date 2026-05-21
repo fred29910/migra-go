@@ -263,6 +263,9 @@ func (r *Renderer) renderAddColumn(op *diff.AddColumnOp) string {
 func (r *Renderer) renderAlterColumnType(op *diff.AlterColumnTypeOp) string {
 	sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s",
 		quoteQualifiedIdentifier(op.Schema, op.Table), quoteIdentifier(op.Column), op.ToType)
+	if op.UsingExpr != "" {
+		sql += " USING " + op.UsingExpr
+	}
 	return fmt.Sprintf("-- op: alter_column_type risk:high\n%s;", sql)
 }
 
