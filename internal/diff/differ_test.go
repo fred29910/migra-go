@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fred29910/migra-go/internal/model"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -192,6 +193,25 @@ func TestDiffer_NoCollationDifferenceWhenSame(t *testing.T) {
 			t.Fatal("expected NO AlterColumnCollationOp when collation is the same")
 		}
 	}
+}
+
+func TestDiffer_DropSchema(t *testing.T) {
+	source := model.NewSchema()
+	source.GetOrCreateNamespace("old_schema")
+	target := model.NewSchema()
+	target.GetOrCreateNamespace("public")
+
+	ops, warnings := NewDiffer().Diff(source, target)
+	require.Empty(t, warnings)
+
+	found := false
+	for _, op := range ops {
+		if drop, ok := op.(*DropSchemaOp); ok {
+			found = true
+			assert.Equal(t, "old_schema", drop.Schema)
+		}
+	}
+	assert.True(t, found, "expected DropSchemaOp")
 }
 
 func TestDiffer_CreateSchemaOp(t *testing.T) {

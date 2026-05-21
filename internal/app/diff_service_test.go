@@ -70,6 +70,17 @@ func TestNormalizeSchemas(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestFilterDestructiveOps_DropSchema(t *testing.T) {
+	ops := []diff.Operation{diff.NewDropSchemaOp("old_schema")}
+	filtered, warnings := FilterDestructiveOps(ops, false)
+	require.Empty(t, filtered)
+	require.NotEmpty(t, warnings)
+
+	filtered, warnings = FilterDestructiveOps(ops, true)
+	require.Len(t, filtered, 1)
+	require.Empty(t, warnings)
+}
+
 func TestFilterDestructiveOps(t *testing.T) {
 	ops := []diff.Operation{
 		diff.NewAddTableOp("public", "new_table", &model.Table{Name: "new_table"}),

@@ -59,7 +59,7 @@ func (c *diffContext) diffSchemas(source, target *model.Schema) {
 
 	for _, name := range sourceNames {
 		if _, exists := target.Schemas[name]; !exists {
-			c.warnf("namespace drop is not implemented yet (ignored): %s", name)
+			c.addOp(NewDropSchemaOp(name))
 		}
 	}
 }

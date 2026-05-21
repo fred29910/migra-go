@@ -64,7 +64,8 @@ func (p *Planner) assignStage(op diff.Operation) Stage {
 
 	switch kind {
 	// Pre-deploy: create new objects
-	case diff.KindAddTable, diff.KindAddColumn, diff.KindAddIndex, diff.KindAddConstraint, diff.KindAddEnumType:
+	case diff.KindCreateSchema, diff.KindAddTable, diff.KindAddColumn, diff.KindAddIndex,
+		diff.KindAddConstraint, diff.KindAddEnumType:
 		return StagePreDeploy
 
 	// Deploy: alter existing objects
@@ -75,7 +76,7 @@ func (p *Planner) assignStage(op diff.Operation) Stage {
 		return StageDeploy
 
 	// Post-deploy: drop objects (dangerous)
-	case diff.KindDropTable, diff.KindDropColumn, diff.KindDropIndex,
+	case diff.KindDropSchema, diff.KindDropTable, diff.KindDropColumn, diff.KindDropIndex,
 		diff.KindDropConstraint, diff.KindDropEnumType, diff.KindDropIdentity:
 		if p.unsafeDrops {
 			return StagePostDeploy
