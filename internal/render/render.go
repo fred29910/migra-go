@@ -287,25 +287,64 @@ func (r *Renderer) renderCreateIndex(op *diff.CreateIndexOp) string {
 	if idx.Unique {
 		unique = "UNIQUE "
 	}
-	// Build column list from Elements, fallback to Columns for backward compatibility
+	concurrently := ""
+	if idx.Concurrent {
+		concurrently = "CONCURRENTLY "
+	}
+	ifNotExists := ""
+	if idx.IfNotExists {
+		ifNotExists = "IF NOT EXISTS "
+	}
+	method := ""
+	if idx.Method != "" && idx.Method != "btree" {
+		method = " USING " + idx.Method
+	}
+
 	quotedItems := make([]string, 0, len(idx.Elements))
 	if len(idx.Elements) > 0 {
 		for _, elem := range idx.Elements {
-			if elem.Name != "" {
-				quotedItems = append(quotedItems, quoteIdentifier(elem.Name))
-			} else if elem.Expr != "" {
-				quotedItems = append(quotedItems, "("+elem.Expr+")")
-			}
+			quotedItems = append(quotedItems, renderIndexElem(elem))
 		}
 	} else if len(idx.Columns) > 0 {
-		// Backward compatibility
 		for _, c := range idx.Columns {
 			quotedItems = append(quotedItems, quoteIdentifier(c))
 		}
 	}
 	items := strings.Join(quotedItems, ", ")
-	return fmt.Sprintf("-- op: add_index risk:low\nCREATE %sINDEX %s ON %s (%s);",
-		unique, quoteIdentifier(idx.Name), quoteQualifiedIdentifier(op.Schema, idx.Table), items)
+
+	sql := fmt.Sprintf("CREATE %s%s%sINDEX %s ON %s%s (%s)",
+		unique, concurrently, ifNotExists, quoteIdentifier(idx.Name),
+		quoteQualifiedIdentifier(op.Schema, idx.Table), method, items)
+
+	if idx.WhereClause != "" {
+		sql += " WHERE " + idx.WhereClause
+	}
+	return fmt.Sprintf("-- op: add_index risk:low\n%s;", sql)
+}
+
+func renderIndexElem(elem model.IndexElem) string {
+	item := ""
+	if elem.Name != "" {
+		item = quoteIdentifier(elem.Name)
+	} else if elem.Expr != "" {
+		item = "(" + elem.Expr + ")"
+	}
+	if elem.Collation != "" {
+		item += " COLLATE " + quoteIdentifier(elem.Collation)
+	}
+	if elem.Opclass != "" {
+		item += " " + elem.Opclass
+	}
+	if elem.Ordering == "ASC" || elem.Ordering == "DESC" {
+		item += " " + elem.Ordering
+	}
+	if elem.NullsOrdering == "FIRST" || elem.NullsOrdering == "LAST" {
+		item += " NULLS " + elem.NullsOrdering
+	}
+	if item == "" {
+		return "?"
+	}
+	return item
 }
 
 func (r *Renderer) renderDropIndex(op *diff.DropIndexOp) string {

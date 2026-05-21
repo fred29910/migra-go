@@ -94,6 +94,42 @@ func TestCreateIndexHandler_PrimaryKey(t *testing.T) {
 	t.Skip("Primary key index test needs special handling")
 }
 
+func TestCreateIndexHandler_AdvancedElements(t *testing.T) {
+	p := NewParser()
+	sql := `CREATE TABLE users (email text);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_email_pattern
+ON users USING btree (email text_pattern_ops DESC NULLS LAST)
+WHERE email IS NOT NULL;`
+
+	schema, err := p.ParseSQL(sql)
+	if err != nil {
+		t.Fatalf("ParseSQL failed: %v", err)
+	}
+	idx := schema.Schemas["public"].Tables["users"].Indexes["idx_users_email_pattern"]
+	if idx == nil {
+		t.Fatal("expected index")
+	}
+	if !idx.Concurrent {
+		t.Fatal("expected Concurrent=true")
+	}
+	if !idx.IfNotExists {
+		t.Fatal("expected IfNotExists=true")
+	}
+	if idx.Method != "btree" {
+		t.Fatalf("expected btree, got %q", idx.Method)
+	}
+	if idx.WhereClause == "" {
+		t.Fatal("expected where clause")
+	}
+	t.Logf("Index: Method=%q, Concurrent=%v, IfNotExists=%v, WhereClause=%q",
+		idx.Method, idx.Concurrent, idx.IfNotExists, idx.WhereClause)
+	t.Logf("Elements: %+v", idx.Elements)
+	if len(idx.Elements) > 0 {
+		t.Logf("Element 0: Opclass=%q, Ordering=%q, NullsOrdering=%q",
+			idx.Elements[0].Opclass, idx.Elements[0].Ordering, idx.Elements[0].NullsOrdering)
+	}
+}
+
 func TestCreateIndexHandler_WithMethod(t *testing.T) {
 	p := NewParser()
 	sql := `CREATE TABLE users (id integer, email varchar(100)); CREATE INDEX idx_users_email ON users USING hash (email);`
