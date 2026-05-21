@@ -303,7 +303,9 @@ func (r *Renderer) renderCreateIndex(op *diff.CreateIndexOp) string {
 	quotedItems := make([]string, 0, len(idx.Elements))
 	if len(idx.Elements) > 0 {
 		for _, elem := range idx.Elements {
-			quotedItems = append(quotedItems, renderIndexElem(elem))
+			if s := renderIndexElem(elem); s != "" {
+				quotedItems = append(quotedItems, s)
+			}
 		}
 	} else if len(idx.Columns) > 0 {
 		for _, c := range idx.Columns {
@@ -340,9 +342,6 @@ func renderIndexElem(elem model.IndexElem) string {
 	}
 	if elem.NullsOrdering == "FIRST" || elem.NullsOrdering == "LAST" {
 		item += " NULLS " + elem.NullsOrdering
-	}
-	if item == "" {
-		return "?"
 	}
 	return item
 }

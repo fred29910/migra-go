@@ -59,6 +59,12 @@ func (c *diffContext) diffSchemas(source, target *model.Schema) {
 
 	for _, name := range sourceNames {
 		if _, exists := target.Schemas[name]; !exists {
+			// The public schema is always present in PostgreSQL databases
+			// and should never be dropped in normal migrations.
+			if name == "public" {
+				c.warnf("dropping 'public' schema is not allowed")
+				continue
+			}
 			c.addOp(NewDropSchemaOp(name))
 		}
 	}

@@ -2,6 +2,8 @@ package parser
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestCreateIndexHandler_Basic(t *testing.T) {
@@ -118,16 +120,13 @@ WHERE email IS NOT NULL;`
 	if idx.Method != "btree" {
 		t.Fatalf("expected btree, got %q", idx.Method)
 	}
-	if idx.WhereClause == "" {
-		t.Fatal("expected where clause")
-	}
-	t.Logf("Index: Method=%q, Concurrent=%v, IfNotExists=%v, WhereClause=%q",
-		idx.Method, idx.Concurrent, idx.IfNotExists, idx.WhereClause)
-	t.Logf("Elements: %+v", idx.Elements)
-	if len(idx.Elements) > 0 {
-		t.Logf("Element 0: Opclass=%q, Ordering=%q, NullsOrdering=%q",
-			idx.Elements[0].Opclass, idx.Elements[0].Ordering, idx.Elements[0].NullsOrdering)
-	}
+	require.Equal(t, "email IS NOT NULL", idx.WhereClause)
+	require.Len(t, idx.Elements, 1)
+	elem := idx.Elements[0]
+	require.Equal(t, "email", elem.Name)
+	require.Equal(t, "text_pattern_ops", elem.Opclass)
+	require.Equal(t, "DESC", elem.Ordering)
+	require.Equal(t, "LAST", elem.NullsOrdering)
 }
 
 func TestCreateIndexHandler_WithMethod(t *testing.T) {
