@@ -16,7 +16,7 @@
 | `DROP TABLE IF EXISTS` | — | ✅ | ✅ | — | ✅ |
 | `ALTER TABLE ... ADD COLUMN` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ALTER TABLE ... DROP COLUMN` | ✅ | ✅ | ✅ `DROP COLUMN IF EXISTS` | ✅ | ✅ |
-| `ALTER TABLE ... ALTER COLUMN TYPE` | ✅ (含 `USING`) | ✅ | ✅ | ✅ | ✅ |
+| `ALTER TABLE ... ALTER COLUMN TYPE` | ⚠️ (基础类型支持，`USING` 待补齐) | ✅ | ⚠️ (`USING` 待补齐) | ✅ | ⚠️ |
 | `ALTER TABLE ... RENAME COLUMN` | ✅ (RenameStmtHandler) | ✅ (启发式检测) | ✅ `RENAME COLUMN ... TO ...` | — | ✅ |
 | `ALTER TABLE ... SET (storage_param)` | ⚠️ pg_query 解析但不处理 | ❌ | ❌ | — | ⚠️ |
 | 表继承 (`INHERITS`) | ⚠️ pg_query 解析但不处理 | ❌ | ❌ | — | ⚠️ |
@@ -59,14 +59,14 @@
 |------|:---:|:---:|:---:|:---:|------|
 | `PRIMARY KEY` (单列) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `PRIMARY KEY` (复合键) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `UNIQUE` 约束 (表级) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `UNIQUE` 约束 (行内) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `UNIQUE` 约束 (表级) | ⚠️ (DB introspect 支持，SQL 文件解析待补齐) | ✅ | ✅ | ✅ | ⚠️ |
+| `UNIQUE` 约束 (行内) | ⚠️ (DB introspect 支持，SQL 文件解析待补齐) | ✅ | ✅ | ✅ | ⚠️ |
 | `FOREIGN KEY` (单列) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `FOREIGN KEY` (复合键) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `FOREIGN KEY` 跨 schema 引用 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `FOREIGN KEY` `ON DELETE` / `ON UPDATE` | ✅ (含级联动作) | ✅ (`sameConstraintContent` 比较 OnDelete/OnUpdate) | ✅ (`ON DELETE CASCADE` 等) | ✅ (查询 confupdtype/confdeltype) | ✅ |
-| `CHECK` 约束 (表级) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `CHECK` 约束 (行内) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `CHECK` 约束 (表级) | ⚠️ (DB introspect 支持，SQL 文件解析待补齐) | ✅ | ✅ | ✅ | ⚠️ |
+| `CHECK` 约束 (行内) | ⚠️ (DB introspect 支持，SQL 文件解析待补齐) | ✅ | ✅ | ✅ | ⚠️ |
 | `ALTER TABLE ... ADD CONSTRAINT` | ✅ | ✅ | ✅ | — | ✅ |
 | `ALTER TABLE ... DROP CONSTRAINT` | — | ✅ (源端检测) | ✅ | — | ✅ |
 | 约束命名 (`CONSTRAINT name`) | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -85,13 +85,13 @@
 | `CREATE UNIQUE INDEX` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `DROP INDEX` | — | ✅ (源端检测) | ✅ `DROP INDEX IF EXISTS` | — | ✅ |
 | `DROP INDEX IF EXISTS` | — | ✅ | ✅ | — | ✅ |
-| 索引方法 (`USING btree/hash/gin/gist/brin`) | ✅ | ✅ | ✅ | ✅ (btree/hash/gin/gist/brin) | ✅ |
-| 表达式索引 (`ON tbl (lower(col))`) | ✅ | ✅ | ✅ | ❌ | ⚠️ |
-| 部分索引 (`WHERE` 子句) | ✅ | ✅ | ✅ | ❌ | ⚠️ |
-| 操作符类 (`text_pattern_ops`, 等) | ✅ | ✅ | ✅ | ❌ | ⚠️ |
-| 排序规则 (`ASC`/`DESC`, `NULLS FIRST/LAST`) | ✅ | ✅ | ✅ | ❌ | ⚠️ |
-| `CONCURRENTLY` | ✅ | ✅ | ✅ | ❌ | ⚠️ |
-| `IF NOT EXISTS` | ✅ | ✅ | ✅ | — | ✅ |
+| 索引方法 (`USING btree/hash/gin/gist/brin`) | ✅ | ✅ | ⚠️ (待输出 `USING`) | ✅ (btree/hash/gin/gist/brin) | ⚠️ |
+| 表达式索引 (`ON tbl (lower(col))`) | ⚠️ (表达式需可读反解析) | ✅ | ⚠️ | ❌ | ⚠️ |
+| 部分索引 (`WHERE` 子句) | ⚠️ (predicate 需可读反解析) | ✅ | ⚠️ | ❌ | ⚠️ |
+| 操作符类 (`text_pattern_ops`, 等) | ⚠️ (待提取 opclass) | ✅ | ⚠️ | ❌ | ⚠️ |
+| 排序规则 (`ASC`/`DESC`, `NULLS FIRST/LAST`) | ✅ | ✅ | ⚠️ | ❌ | ⚠️ |
+| `CONCURRENTLY` | ✅ | ✅ | ⚠️ | ❌ | ⚠️ |
+| `IF NOT EXISTS` | ✅ | ✅ | ⚠️ | — | ⚠️ |
 | 索引列命名 (`INDEX col_name_idx`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ALTER INDEX ... RENAME` | ❌ | ❌ | ❌ | — | ❌ |
 | `REINDEX INDEX` | ❌ | ❌ | ❌ | — | ❌ |
