@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fred29910/migra-go/internal/diff"
+	"github.com/fred29910/migra-go/internal/model"
 )
 
 func TestPlanner_SchemaStages(t *testing.T) {
@@ -40,5 +41,20 @@ func TestPlanner_NewOperationStages(t *testing.T) {
 	unsafeStages := NewPlanner(true).Plan(ops)
 	if len(unsafeStages[StagePostDeploy]) != 1 {
 		t.Fatalf("expected drop column in post-deploy with unsafe-drop")
+	}
+}
+
+func TestPlanner_P3ObjectStages(t *testing.T) {
+	stages := NewPlanner(true).Plan([]diff.Operation{
+		diff.NewCreateViewOp("public", &model.View{Name: "v"}),
+		diff.NewDropViewOp("public", "old_v"),
+		diff.NewCreateSequenceOp("public", &model.Sequence{Name: "s"}),
+		diff.NewDropExtensionOp("public", "old_ext"),
+	})
+	if len(stages[StagePreDeploy]) != 2 {
+		t.Fatalf("expected 2 pre-deploy ops, got %d: %#v", len(stages[StagePreDeploy]), stages[StagePreDeploy])
+	}
+	if len(stages[StagePostDeploy]) != 2 {
+		t.Fatalf("expected 2 post-deploy ops, got %d: %#v", len(stages[StagePostDeploy]), stages[StagePostDeploy])
 	}
 }

@@ -26,6 +26,18 @@ func canonicalizeNamespaceInPlace(ns *model.Namespace) {
 	for _, enumType := range ns.Types {
 		canonicalizeEnumTypeInPlace(enumType)
 	}
+
+	for _, view := range ns.Views {
+		canonicalizeViewInPlace(view)
+	}
+
+	for _, seq := range ns.Sequences {
+		canonicalizeSequenceInPlace(seq)
+	}
+
+	for _, ext := range ns.Extensions {
+		canonicalizeExtensionInPlace(ext)
+	}
 }
 
 func canonicalizeTableInPlace(table *model.Table) {
@@ -88,6 +100,20 @@ func canonicalizeIndexInPlace(idx *model.Index) {
 	// Normalize Definition and WhereClause whitespace
 	idx.Definition = strings.Join(strings.Fields(idx.Definition), " ")
 	idx.WhereClause = strings.Join(strings.Fields(idx.WhereClause), " ")
+}
+
+func canonicalizeViewInPlace(v *model.View) {
+	v.Name = normalizeIdentifier(v.Name)
+	v.Definition = strings.TrimSuffix(strings.TrimSpace(v.Definition), ";")
+}
+
+func canonicalizeSequenceInPlace(s *model.Sequence) {
+	s.Name = normalizeIdentifier(s.Name)
+	s.DataType = normalizeDataType(s.DataType)
+}
+
+func canonicalizeExtensionInPlace(e *model.Extension) {
+	e.Name = normalizeIdentifier(e.Name)
 }
 
 // typeAliases maps type aliases to canonical names (exact matches only, no length suffix)

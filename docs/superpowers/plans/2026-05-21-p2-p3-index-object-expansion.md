@@ -150,7 +150,7 @@ func FromNode(node *pg_query.Node) (model.IndexElem, error) {
 		result.Name = elem.Name
 	}
 	if elem.Expr != nil {
-		result.Expr = strings.Trim(parserutil.DeparseNode(elem.Expr), "()")
+		result.Expr = parserutil.DeparseNode(elem.Expr)
 	}
 	if elem.Indexcolname != "" {
 		result.IndexColName = elem.Indexcolname
@@ -1071,7 +1071,11 @@ func (c *diffContext) diffViews(source, target *model.Namespace) {
 	for _, name := range sortedViewNames(target.Views) {
 		if src, ok := source.Views[name]; !ok {
 			c.addOp(NewCreateViewOp(target.Name, target.Views[name]))
-		} else if src.Definition != target.Views[name].Definition || src.Materialized != target.Views[name].Materialized {
+		} else if src.Materialized != target.Views[name].Materialized {
+			// Materialized 属性发生变更，不能用 REPLACE，必须先 Drop 再 Create
+			c.addOp(NewDropViewOp(source.Name, name))
+			c.addOp(NewCreateViewOp(target.Name, target.Views[name]))
+		} else if src.Definition != target.Views[name].Definition {
 			c.addOp(NewReplaceViewOp(target.Name, target.Views[name]))
 		}
 	}
@@ -1485,7 +1489,7 @@ for _, ext := range ns.Extensions {
 ```go
 func canonicalizeViewInPlace(v *model.View) {
 	v.Name = normalizeIdentifier(v.Name)
-	v.Definition = strings.TrimSuffix(strings.Join(strings.Fields(v.Definition), " "), ";")
+	v.Definition = strings.TrimSuffix(strings.TrimSpace(v.Definition), ";")
 }
 
 func canonicalizeSequenceInPlace(s *model.Sequence) {
