@@ -68,11 +68,15 @@ func (p *Planner) assignStage(op diff.Operation) Stage {
 		return StagePreDeploy
 
 	// Deploy: alter existing objects
-	case diff.KindAlterColumnType, diff.KindSetNotNull, diff.KindDropNotNull, diff.KindAddEnumLabel, diff.KindSetDefault, diff.KindDropDefault, diff.KindRenameColumn:
+	case diff.KindAlterColumnType, diff.KindSetNotNull, diff.KindDropNotNull,
+		diff.KindAddEnumLabel, diff.KindSetDefault, diff.KindDropDefault,
+		diff.KindRenameColumn, diff.KindAddIdentity, diff.KindSetIdentity,
+		diff.KindAlterColumnCollation:
 		return StageDeploy
 
 	// Post-deploy: drop objects (dangerous)
-	case diff.KindDropTable, diff.KindDropColumn, diff.KindDropIndex, diff.KindDropConstraint, diff.KindDropEnumType:
+	case diff.KindDropTable, diff.KindDropColumn, diff.KindDropIndex,
+		diff.KindDropConstraint, diff.KindDropEnumType, diff.KindDropIdentity:
 		if p.unsafeDrops {
 			return StagePostDeploy
 		}

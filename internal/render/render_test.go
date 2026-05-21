@@ -398,6 +398,15 @@ func TestRenderUniqueAndCheckConstraints(t *testing.T) {
 	}
 }
 
+func TestRenderAddIdentity(t *testing.T) {
+	op := diff.NewAddIdentityOp("public", "users", "id", "ALWAYS")
+	sql := NewRenderer().Render(op)
+	want := `ALTER TABLE "public"."users" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY;`
+	if !strings.Contains(sql, want) {
+		t.Fatalf("expected %q in:\n%s", want, sql)
+	}
+}
+
 func TestRenderDropIdentity(t *testing.T) {
 	op := diff.NewDropIdentityOp("public", "users", "id")
 	sql := NewRenderer().Render(op)
