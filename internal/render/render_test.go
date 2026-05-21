@@ -357,6 +357,16 @@ func TestRenderCreateSchema(t *testing.T) {
 	})
 }
 
+func TestRenderAlterColumnTypeUsing(t *testing.T) {
+	op := diff.NewAlterColumnTypeOp("public", "users", "id", "integer", "bigint")
+	op.UsingExpr = "id::bigint"
+	sql := NewRenderer().Render(op)
+	want := `ALTER TABLE "public"."users" ALTER COLUMN "id" TYPE bigint USING id::bigint;`
+	if !strings.Contains(sql, want) {
+		t.Fatalf("expected %q in:\n%s", want, sql)
+	}
+}
+
 func TestRenderSetIdentityAlways(t *testing.T) {
 	op := diff.NewSetIdentityOp("public", "users", "id", "ALWAYS")
 	sql := NewRenderer().Render(op)

@@ -58,11 +58,16 @@ func (h *AlterTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error
 			}
 			if colDef := cmd.Def.GetColumnDef(); colDef != nil {
 				col := parserutil.ParseColumnDef(colDef)
+				usingExpr := ""
+				if colDef.RawDefault != nil {
+					usingExpr = parserutil.FormatExpression(colDef.RawDefault)
+				}
 				mutations = append(mutations, AlterColumnTypeMutation{
-					Schema: schemaName,
-					Table:  tableName,
-					Column: colName,
-					ToType: col.DataType,
+					Schema:    schemaName,
+					Table:     tableName,
+					Column:    colName,
+					ToType:    col.DataType,
+					UsingExpr: usingExpr,
 				})
 			}
 

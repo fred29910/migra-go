@@ -142,11 +142,12 @@ func (op *AddColumnOp) DependsOn() []model.ObjectKey {
 // AlterColumnTypeOp represents changing a column's data type
 type AlterColumnTypeOp struct {
 	baseOperation
-	Schema   string
-	Table    string
-	Column   string
-	FromType string
-	ToType   string
+	Schema    string
+	Table     string
+	Column    string
+	FromType  string
+	ToType    string
+	UsingExpr string
 }
 
 func NewAlterColumnTypeOp(schema, table, column, fromType, toType string) *AlterColumnTypeOp {
