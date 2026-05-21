@@ -59,6 +59,28 @@ testdata/
     │   └── v2/                   ←   版本 v2：重命名 + 删列 + 新增 + 改索引
     │       └── schema.sql        ←      users(login_name, phone) + idx_users_login_name
     │
+    ├── v4/                       ← 版本 v4：IDENTITY + COLLATE + FK CASCADE
+    │   ├── schema.sql            ←   在 v3 基础上将 id 转为 IDENTITY，引入 COLLATE、CASCADE FK
+    │   └── README.md             ←   变更说明
+    │
+    ├── identity_example/         ← IDENTITY 列检测专用场景
+    │   ├── v1/                   ←   版本 v1：SERIAL 基线
+    │   │   └── schema.sql        ←      users(id SERIAL, ...)
+    │   └── v2/                   ←   版本 v2：IDENTITY 版本
+    │       └── schema.sql        ←      users(id GENERATED ALWAYS AS IDENTITY, ...)
+    │
+    ├── collate_example/          ← COLLATE 子句检测专用场景
+    │   ├── v1/                   ←   版本 v1：无 COLLATE
+    │   │   └── schema.sql        ←      users(name varchar)
+    │   └── v2/                   ←   版本 v2：含 COLLATE
+    │       └── schema.sql        ←      users(name varchar COLLATE "en_US")
+    │
+    ├── objects_example/          ← VIEW/SEQUENCE/EXTENSION 检测专用场景
+    │   ├── v1/                   ←   版本 v1：仅表
+    │   │   └── schema.sql        ←      users + posts
+    │   └── v2/                   ←   版本 v2：表 + EXTENSION + SEQUENCE + VIEW
+    │       └── schema.sql        ←      + pgcrypto + seq_id + user_view
+    │
     └── edge/                     ← DirectoryLoader 边界情况测试数据
         ├── tables/users.sql      ←   正常 SQL 文件（可被加载）
         ├── .hidden.sql           ←   隐藏文件（应被跳过）
@@ -80,22 +102,26 @@ testdata/
 | 测试数据文件 | 被哪些测试引用 | 测试场景 |
 |---|---|---|
 | `example_source.sql` + `example_target.sql` | `internal/app/diff_service_test.go:TestDiffService_Run`<br>`cmd/migra/integration_test.go:TestExampleSQLFilesDiffIncludesEnumAndConstraints` | 基础 diff 流水线：增列、增表、枚举加标签 |
-| `diff/v1/schema.sql` → `diff/v2/schema.sql` | 未直接引用（供未来集成测试用） | 目录 vs 目录 diff：相同变更集 |
-| `diff/v3/schema.sql` | 未直接引用 | 删除/修改场景：删列、删表、改索引名、改枚举 |
-| `diff/nested/` → `diff/nested_target/` | 未直接引用 | 嵌套子目录 diff |
-| `diff/multi_schema/v1/` → `diff/multi_schema/v2/` | 未直接引用 | 多 schema（public + auth）diff |
+| `diff/v1/schema.sql` → `diff/v2/schema.sql` | `cmd/migra/integration_test.go:TestV3DirectoryDiff` | 目录 vs 目录 diff：相同变更集 |
+| `diff/v3/schema.sql` | `cmd/migra/integration_test.go:TestV3UnsafeDropDiff_Safe`<br>`cmd/migra/integration_test.go:TestV3UnsafeDropDiff_Unsafe` | 删除/修改场景：删列、删表、改索引名、改枚举 |
+| `diff/nested/` → `diff/nested_target/` | `cmd/migra/integration_test.go:TestNestedDirectoryDiff` | 嵌套子目录 diff |
+| `diff/multi_schema/v1/` → `diff/multi_schema/v2/` | `cmd/migra/integration_test.go:TestMultiSchemaDirectoryDiffStatic` | 多 schema（public + auth）diff |
 | `diff/rename_example/v1/` → `diff/rename_example/v2/` | `cmd/migra/integration_test.go:TestRenameColumnDiff` | RENAME COLUMN 基础场景 |
 | `diff/rename_complex/v1/` → `diff/rename_complex/v2/` | `cmd/migra/integration_test.go:TestRenameColumnComplexDiff` | RENAME COLUMN + 删列 + 新增组合 |
+| `diff/v4/` | 未直接引用（供未来集成测试用） | v3→v4 演进：IDENTITY + COLLATE + FK CASCADE |
+| `diff/identity_example/v1/` → `diff/identity_example/v2/` | `cmd/migra/integration_test.go:TestIdentityColumnDiff` | IDENTITY 列检测专用 |
+| `diff/collate_example/v1/` → `diff/collate_example/v2/` | `cmd/migra/integration_test.go:TestCollateClauseDiff` | COLLATE 子句检测专用 |
+| `diff/objects_example/v1/` → `diff/objects_example/v2/` | `cmd/migra/integration_test.go:TestObjectsDiff` | VIEW/SEQUENCE/EXTENSION 检测专用 |
 | `diff/edge/{.hidden.sql,readme.txt,empty/...}` | 未直接引用（DirLoader 测试用 `t.TempDir()` 动态创建数据） | DirectoryLoader 边界条件 |
-| `alter_operations.sql` | 未直接引用 | ALTER TABLE 全操作集解析 |
-| `complex_ddl.sql` | 未直接引用 | 复合约束/高级类型解析 |
-| `drop_scenarios.sql` | 未直接引用 | DROP 语义残留状态 |
-| `edge_cases.sql` | 未直接引用 | 边界 SQL 模式 |
+| `alter_operations.sql` | `internal/parser/handler_test.go:TestParseAlterOperations` | ALTER TABLE 全操作集解析 |
+| `complex_ddl.sql` | `internal/parser/handler_test.go:TestParseComplexDDL` | 复合约束/高级类型解析 |
+| `drop_scenarios.sql` | `internal/parser/handler_test.go:TestParseDropScenarios` | DROP 语义残留状态 |
+| `edge_cases.sql` | `internal/parser/handler_test.go:TestParseEdgeCases` | 边界 SQL 模式 |
 | `internal/model/testdata/schema_golden.json` | `internal/model/golden_test.go:TestGoldenSchema` | Schema JSON 序列化稳定性 |
 
 ### 版本演进图谱
 
-`diff/v1/` → `diff/v2/` → `diff/v3/` 构成一个三阶段演进序列：
+`diff/v1/` → `diff/v2/` → `diff/v3/` → `diff/v4/` 构成一个四阶段演进序列：
 
 ```
 v1 (基线)
@@ -116,6 +142,13 @@ v3 (v2 - 删除 + 修改)
 ├── comments:  删除
 ├── idx_users_username → idx_users_username_unique
 ├── user_role: -'guest', +'moderator'
+│
+v4 (v3 + IDENTITY + COLLATE + FK CASCADE)
+├── users:     id → GENERATED ALWAYS AS IDENTITY (was SERIAL)
+├── posts:     user_id +content COLLATE "en_US"
+├── categories: name COLLATE "en_US"
+├── categories: 新增 UNIQUE(name)
+├── posts:     FK user_id 新增 ON DELETE CASCADE
 ```
 
 ## 测试流程
@@ -174,6 +207,18 @@ v3 (v2 - 删除 + 修改)
 | `TestIntegrationEnumType` | 代码构造 Schema | 枚举 diff + render |
 | `TestIntegrationDAGSort` | 代码构造 Operation | DAG 顺序：AddTable 先于 AddColumn |
 | `TestExampleSQLFilesDiffIncludesEnumAndConstraints` | `testdata/example_source.sql` + `testdata/example_target.sql` | 增表、增列、枚举加标签、主键 |
+| `TestV3DirectoryDiff` | `testdata/diff/v2/schema.sql` + `testdata/diff/v3/schema.sql` | v2→v3 差异（safe mode） |
+| `TestV2ToV3SafeDiff` | `testdata/diff/v1/` + `testdata/diff/v3/` | v1 目录 vs v3 目录 diff |
+| `TestV3UnsafeDropDiff_Safe` | `testdata/diff/v2/schema.sql` + `testdata/diff/v3/schema.sql` | v2→v3 安全模式（过滤 DROP） |
+| `TestV3UnsafeDropDiff_Unsafe` | `testdata/diff/v2/schema.sql` + `testdata/diff/v3/schema.sql` | v2→v3 unsafe-drop 模式（含 DROP） |
+| `TestNestedDirectoryDiff` | `testdata/diff/nested/` + `testdata/diff/nested_target/` | 嵌套子目录 diff |
+| `TestMultiSchemaDirectoryDiffStatic` | `testdata/diff/multi_schema/v1/` + `testdata/diff/multi_schema/v2/` | 多 schema diff |
+| `TestRenameColumnDiff` | `testdata/diff/rename_example/v1/` + `testdata/diff/rename_example/v2/` | RENAME COLUMN 基础 |
+| `TestRenameColumnComplexDiff` | `testdata/diff/rename_complex/v1/` + `testdata/diff/rename_complex/v2/` | RENAME COLUMN 组合变更 |
+| `TestIdentityColumnDiff` | `testdata/diff/identity_example/v1/` + `testdata/diff/identity_example/v2/` | SERIAL → IDENTITY 变更检测 |
+| `TestCollateClauseDiff` | `testdata/diff/collate_example/v1/` + `testdata/diff/collate_example/v2/` | COLLATE 子句新增检测 |
+| `TestObjectsDiff` | `testdata/diff/objects_example/v1/` + `testdata/diff/objects_example/v2/` | EXTENSION + SEQUENCE + VIEW 差异 |
+| `TestV3ToV4Diff` | `testdata/diff/v3/schema.sql` + `testdata/diff/v4/schema.sql` | v3→v4 IDENTITY/COLLATE/CASCADE 演进 |
 | `TestFullPipeline` | 代码构造 Schema (占位) | 流水线编排框架 |
 | `TestDirectoryVsDirectory_Diff` | `t.TempDir()` 动态创建 | 目录 vs 目录 diff |
 | `TestDirectoryVsFile_Diff` | `t.TempDir()` 动态创建 | 目录 vs 文件 diff |
@@ -296,10 +341,11 @@ CI 中 `go test -short` 会进一步确保不触发数据库连接。
 ## 测试数据设计原则
 
 1. **自包含**：每个 .sql 文件独立可解析，不依赖其他文件
-2. **渐进复杂**：v1（基础）→ v2（新增）→ v3（删除/修改）构成完整演进序列
-3. **边界覆盖**：隐藏文件、空目录、非 SQL 文件、大目录、UTF-8 编码
-4. **多粒度**：单文件、多文件、嵌套目录、多 schema
-5. **版本一致性**：`snapshot.sql` 文件与对应目录内容等效，用于测试 "目录 vs 单文件" 同语义 diff
+2. **渐进复杂**：v1（基线）→ v2（新增）→ v3（删除/修改）→ v4（IDENTITY/COLLATE/CASCADE）构成完整演进序列
+3. **模块化场景**：新增单个 DDL 特性的专项测试数据（`identity_example/`、`collate_example/`、`objects_example/`），与演进序列互为补充
+4. **边界覆盖**：隐藏文件、空目录、非 SQL 文件、大目录、UTF-8 编码
+5. **多粒度**：单文件、多文件、嵌套目录、多 schema
+6. **版本一致性**：`snapshot.sql` 文件与对应目录内容等效，用于测试 "目录 vs 单文件" 同语义 diff
 
 ## 如何新增测试数据
 
@@ -812,4 +858,8 @@ make build
 | `diff/multi_schema/v1/` → `diff/multi_schema/v2/` | ADD TABLE profiles, ADD COLUMN email/description | 多 schema 命名空间支持 |
 | `diff/rename_example/v1/` → `diff/rename_example/v2/` | RENAME COLUMN username TO login_name | RENAME COLUMN 基础检测 |
 | `diff/rename_complex/v1/` → `diff/rename_complex/v2/` | RENAME COLUMN + ADD COLUMN phone + ADD INDEX + ADD ENUM | 重命名与其他变更组合 |
+| `diff/v3/schema.sql` → `diff/v4/schema.sql` | IDENTITY + COLLATE + FK CASCADE 变更 | v3→v4 多特性组合演进 |
+| `diff/identity_example/v1/` → `diff/identity_example/v2/` | ALTER COLUMN id SET DATA TYPE → GENERATED ALWAYS AS IDENTITY | IDENTITY 列专项检测 |
+| `diff/collate_example/v1/` → `diff/collate_example/v2/` | ADD COLUMN name COLLATE "en_US" | COLLATE 子句新增检测 |
+| `diff/objects_example/v1/` → `diff/objects_example/v2/` | ADD EXTENSION + ADD SEQUENCE + ADD VIEW | 非表对象新增检测 |
 | `diff/edge/tables/` → `diff/edge/tables/` | 无变更 | 隐藏文件被跳过（加载正常） |
