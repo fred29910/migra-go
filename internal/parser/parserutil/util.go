@@ -127,6 +127,31 @@ var typeNameMapping = map[string]string{
 	"smallserial": "smallint",
 }
 
+// ParseConstraintColumns extracts column names from pg_query constraint key list
+func ParseConstraintColumns(keys []*pg_query.Node) []string {
+	cols := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if s := key.GetString_(); s != nil {
+			cols = append(cols, s.Sval)
+		}
+	}
+	return cols
+}
+
+// DeparseNode converts a pg_query Node back to SQL string using pg_query.Deparse
+func DeparseNode(node *pg_query.Node) string {
+	if node == nil {
+		return ""
+	}
+	sql, err := pg_query.Deparse(&pg_query.ParseResult{
+		Stmts: []*pg_query.RawStmt{{Stmt: node}},
+	})
+	if err == nil {
+		return strings.TrimSpace(strings.TrimSuffix(sql, ";"))
+	}
+	return fmt.Sprintf("%v", node)
+}
+
 // ExtractCollation extracts the collation name from a ColumnDef's CollClause.
 // Returns empty string if no collation is specified.
 func ExtractCollation(colDef *pg_query.ColumnDef) string {

@@ -375,6 +375,29 @@ func TestRenderSetIdentityByDefault(t *testing.T) {
 	}
 }
 
+func TestRenderUniqueAndCheckConstraints(t *testing.T) {
+	r := NewRenderer()
+	table := model.NewTable("public", "users")
+	table.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: false})
+	table.AddColumn(&model.Column{Name: "email", DataType: "text", IsNullable: false})
+	table.Constraints["users_email_key"] = &model.Constraint{
+		Name: "users_email_key", Type: "unique", Columns: []string{"email"},
+	}
+	table.Constraints["users_email_check"] = &model.Constraint{
+		Name: "users_email_check", Type: "check", Expression: "email <> ''",
+	}
+
+	sql := r.Render(diff.NewAddTableOp("public", "users", table))
+	for _, want := range []string{
+		`CONSTRAINT "users_email_key" UNIQUE ("email")`,
+		`CONSTRAINT "users_email_check" CHECK (email <> '')`,
+	} {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("expected %q in:\n%s", want, sql)
+		}
+	}
+}
+
 func TestRenderDropIdentity(t *testing.T) {
 	op := diff.NewDropIdentityOp("public", "users", "id")
 	sql := NewRenderer().Render(op)

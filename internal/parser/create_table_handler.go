@@ -19,6 +19,12 @@ func defaultConstraintName(table string, constraint model.Constraint) string {
 	if constraint.Type == "primary_key" {
 		return table + "_pkey"
 	}
+	if constraint.Type == "unique" && len(constraint.Columns) > 0 {
+		return table + "_" + strings.Join(constraint.Columns, "_") + "_key"
+	}
+	if constraint.Type == "check" {
+		return table + "_check"
+	}
 	if constraint.Type == "foreign_key" && len(constraint.Columns) > 0 {
 		return table + "_" + strings.Join(constraint.Columns, "_") + "_fkey"
 	}
@@ -90,6 +96,23 @@ func (h *CreateTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, erro
 						}
 						con.Name = defaultConstraintName(tableName, con)
 						constraints = append(constraints, con)
+					case pg_query.ConstrType_CONSTR_UNIQUE:
+						con := model.Constraint{
+							Name:    c.Conname,
+							Type:    "unique",
+							Columns: []string{col.Name},
+						}
+						con.Name = defaultConstraintName(tableName, con)
+						constraints = append(constraints, con)
+					case pg_query.ConstrType_CONSTR_CHECK:
+						con := model.Constraint{
+							Name:       c.Conname,
+							Type:       "check",
+							Columns:    []string{col.Name},
+							Expression: parserutil.DeparseNode(c.RawExpr),
+						}
+						con.Name = defaultConstraintName(tableName, con)
+						constraints = append(constraints, con)
 					}
 				}
 			}
@@ -143,6 +166,23 @@ func (h *CreateTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, erro
 					RefColumns: refCols,
 					OnDelete:   fkActionCode(constraint.FkDelAction),
 					OnUpdate:   fkActionCode(constraint.FkUpdAction),
+				}
+				con.Name = defaultConstraintName(tableName, con)
+				constraints = append(constraints, con)
+			case pg_query.ConstrType_CONSTR_UNIQUE:
+				cols := parserutil.ParseConstraintColumns(constraint.Keys)
+				con := model.Constraint{
+					Name:    constraint.Conname,
+					Type:    "unique",
+					Columns: cols,
+				}
+				con.Name = defaultConstraintName(tableName, con)
+				constraints = append(constraints, con)
+			case pg_query.ConstrType_CONSTR_CHECK:
+				con := model.Constraint{
+					Name:       constraint.Conname,
+					Type:       "check",
+					Expression: parserutil.DeparseNode(constraint.RawExpr),
 				}
 				con.Name = defaultConstraintName(tableName, con)
 				constraints = append(constraints, con)
