@@ -167,6 +167,55 @@ func ExtractCollation(colDef *pg_query.ColumnDef) string {
 	return strings.Join(parts, ".")
 }
 
+// FormatExpression formats a pg_query expression node as a SQL expression string.
+// Handles TypeCast (arg::type), ColumnRef (column names), FuncCall, and AConst nodes.
+// Falls back to fmt.Sprintf for unknown node types.
+func FormatExpression(node *pg_query.Node) string {
+	if node == nil {
+		return ""
+	}
+	switch n := node.GetNode().(type) {
+	case *pg_query.Node_TypeCast:
+		tc := n.TypeCast
+		arg := FormatExpression(tc.Arg)
+		typeName := ParseTypeName(tc.TypeName)
+		return arg + "::" + typeName
+	case *pg_query.Node_ColumnRef:
+		fields := make([]string, 0)
+		for _, f := range n.ColumnRef.Fields {
+			if s := f.GetString_(); s != nil {
+				fields = append(fields, s.Sval)
+			}
+		}
+		return strings.Join(fields, ".")
+	case *pg_query.Node_FuncCall:
+		parts := make([]string, 0, len(n.FuncCall.Funcname))
+		for _, item := range n.FuncCall.Funcname {
+			if s := item.GetString_(); s != nil {
+				parts = append(parts, s.Sval)
+			}
+		}
+		argStrs := make([]string, 0, len(n.FuncCall.Args))
+		for _, item := range n.FuncCall.Args {
+			argStrs = append(argStrs, FormatExpression(item))
+		}
+		return strings.Join(parts, ".") + "(" + strings.Join(argStrs, ", ") + ")"
+	case *pg_query.Node_AConst:
+		a := n.AConst
+		if sval := a.GetSval(); sval != nil {
+			return "'" + sval.Sval + "'"
+		}
+		if ival := a.GetIval(); ival != nil {
+			return fmt.Sprintf("%d", ival.Ival)
+		}
+		if fval := a.GetFval(); fval != nil {
+			return fval.Fval
+		}
+	}
+	// Fallback for unsupported node types
+	return fmt.Sprintf("%v", node)
+}
+
 // MapTypeName maps PostgreSQL internal type names to standard SQL names.
 func MapTypeName(name string) string {
 	if mapped, ok := typeNameMapping[name]; ok {
