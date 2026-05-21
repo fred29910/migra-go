@@ -580,6 +580,97 @@ func TestNestedDirectoryDiff(t *testing.T) {
 	}
 }
 
+func TestIdentityColumnDiff(t *testing.T) {
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+		Source:     "../../testdata/diff/identity_example/v1/schema.sql",
+		Target:     "../../testdata/diff/identity_example/v2/schema.sql",
+		Schemas:    []string{"public"},
+		Format:     "sql",
+		Timeout:    defaultDiffTimeout,
+		UnsafeDrop: false,
+	})
+	if err != nil {
+		t.Fatalf("diff service failed: %v", err)
+	}
+
+	if !strings.Contains(out, "IDENTITY") {
+		t.Fatalf("expected IDENTITY in output, got:\n%s", out)
+	}
+	if strings.Contains(out, "DROP COLUMN") {
+		t.Fatalf("should not DROP COLUMN for identity change, got:\n%s", out)
+	}
+}
+
+func TestCollateClauseDiff(t *testing.T) {
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+		Source:     "../../testdata/diff/collate_example/v1/schema.sql",
+		Target:     "../../testdata/diff/collate_example/v2/schema.sql",
+		Schemas:    []string{"public"},
+		Format:     "sql",
+		Timeout:    defaultDiffTimeout,
+		UnsafeDrop: false,
+	})
+	if err != nil {
+		t.Fatalf("diff service failed: %v", err)
+	}
+
+	if !strings.Contains(out, `COLLATE "en_US"`) {
+		t.Fatalf("expected COLLATE en_US in output, got:\n%s", out)
+	}
+}
+
+func TestObjectsDiff(t *testing.T) {
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+		Source:     "../../testdata/diff/objects_example/v1/schema.sql",
+		Target:     "../../testdata/diff/objects_example/v2/schema.sql",
+		Schemas:    []string{"public"},
+		Format:     "sql",
+		Timeout:    defaultDiffTimeout,
+		UnsafeDrop: false,
+	})
+	if err != nil {
+		t.Fatalf("diff service failed: %v", err)
+	}
+
+	for _, want := range []string{
+		`CREATE EXTENSION`,
+		`CREATE SEQUENCE`,
+		`CREATE VIEW`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestV3ToV4Diff(t *testing.T) {
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+		Source:     "../../testdata/diff/v3/schema.sql",
+		Target:     "../../testdata/diff/v4/schema.sql",
+		Schemas:    []string{"public"},
+		Format:     "sql",
+		Timeout:    defaultDiffTimeout,
+		UnsafeDrop: false,
+	})
+	if err != nil {
+		t.Fatalf("diff service failed: %v", err)
+	}
+
+	for _, want := range []string{
+		`IDENTITY`,
+		`COLLATE`,
+		`ON DELETE CASCADE`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got:\n%s", want, out)
+		}
+	}
+
+	if strings.Contains(out, "DROP COLUMN") {
+		t.Fatalf("v3→v4 should not contain DROP COLUMN, got:\n%s", out)
+	}
+}
+
 func TestMultiSchemaDirectoryDiffStatic(t *testing.T) {
 	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
 		Source:     "../../testdata/diff/multi_schema/v1/",
