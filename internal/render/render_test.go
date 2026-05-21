@@ -42,11 +42,11 @@ func TestRenderOutput_SupportsSQLAndJSON(t *testing.T) {
 func TestRenderP3Objects(t *testing.T) {
 	r := NewRenderer()
 	cases := map[string]diff.Operation{
-		`CREATE VIEW "public"."active_users" AS SELECT id FROM users;`: diff.NewCreateViewOp("public", &model.View{Name: "active_users", Definition: "SELECT id FROM users"}),
-		`DROP VIEW IF EXISTS "public"."old_view";`:                    diff.NewDropViewOp("public", "old_view"),
+		`CREATE VIEW "public"."active_users" AS SELECT id FROM users;`:                                      diff.NewCreateViewOp("public", &model.View{Name: "active_users", Definition: "SELECT id FROM users"}),
+		`DROP VIEW IF EXISTS "public"."old_view";`:                                                          diff.NewDropViewOp("public", "old_view"),
 		`CREATE SEQUENCE "public"."invoice_id_seq" AS bigint START WITH 100 INCREMENT BY 5 CACHE 20 CYCLE;`: diff.NewCreateSequenceOp("public", &model.Sequence{Name: "invoice_id_seq", DataType: "bigint", StartValue: 100, IncrementBy: 5, CacheSize: 20, Cycle: true}),
-		`CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH VERSION '1.3';`: diff.NewCreateExtensionOp("public", &model.Extension{Name: "pgcrypto", Version: "1.3"}),
-		`ALTER EXTENSION "pgcrypto" UPDATE TO '1.3';`:                 diff.NewAlterExtensionUpdateOp("public", &model.Extension{Name: "pgcrypto", Version: "1.3"}),
+		`CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH VERSION '1.3';`:                                     diff.NewCreateExtensionOp("public", &model.Extension{Name: "pgcrypto", Version: "1.3"}),
+		`ALTER EXTENSION "pgcrypto" UPDATE TO '1.3';`:                                                       diff.NewAlterExtensionUpdateOp("public", &model.Extension{Name: "pgcrypto", Version: "1.3"}),
 	}
 	for want, op := range cases {
 		if got := r.Render(op); !strings.Contains(got, want) {
@@ -299,9 +299,9 @@ func TestRenderCreateIndexAdvanced(t *testing.T) {
 
 func TestRenderCreateIndex_WithMethod(t *testing.T) {
 	idx := &model.Index{
-		Name:    "idx_users_email",
-		Table:   "users",
-		Method:  "hash",
+		Name:     "idx_users_email",
+		Table:    "users",
+		Method:   "hash",
 		Elements: []model.IndexElem{{Name: "email"}},
 	}
 	sql := NewRenderer().Render(diff.NewCreateIndexOp("public", idx))
