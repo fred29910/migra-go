@@ -43,6 +43,10 @@ diff:
   # 输出格式：sql 或 json
   format: sql
 
+  # Schema 加载超时时间（支持格式：30s, 2m, 1h）
+  # 默认值：30s
+  timeout: 30s
+
 # 输出选项
 output:
   # 输出文件路径（空则输出到 stdout）
