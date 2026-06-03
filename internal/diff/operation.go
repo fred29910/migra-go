@@ -31,9 +31,11 @@ const (
 	KindRenameColumn         Kind = "rename_column"
 
 	// P3 object operations
-	KindCreateView           Kind = "create_view"
-	KindDropView             Kind = "drop_view"
-	KindReplaceView          Kind = "replace_view"
+	KindCreateView               Kind = "create_view"
+	KindDropView                 Kind = "drop_view"
+	KindReplaceView              Kind = "replace_view"
+	KindCreateMaterializedView   Kind = "create_materialized_view"
+	KindDropMaterializedView     Kind = "drop_materialized_view"
 	KindCreateSequence       Kind = "create_sequence"
 	KindDropSequence         Kind = "drop_sequence"
 	KindAlterSequence        Kind = "alter_sequence"
@@ -735,6 +737,46 @@ func NewReplaceViewOp(schema string, view *model.View) *ReplaceViewOp {
 }
 
 func (op *ReplaceViewOp) IsDestructive() bool { return false }
+
+// CreateMaterializedViewOp represents creating a new materialized view
+type CreateMaterializedViewOp struct {
+	baseOperation
+	Schema          string
+	MaterializedView *model.View
+}
+
+func NewCreateMaterializedViewOp(schema string, view *model.View) *CreateMaterializedViewOp {
+	return &CreateMaterializedViewOp{
+		baseOperation: baseOperation{
+			kind:      KindCreateMaterializedView,
+			objectKey: model.NewObjectKey(schema, view.Name, model.KindView),
+		},
+		Schema:          schema,
+		MaterializedView: view,
+	}
+}
+
+func (op *CreateMaterializedViewOp) IsDestructive() bool { return false }
+
+// DropMaterializedViewOp represents dropping a materialized view
+type DropMaterializedViewOp struct {
+	baseOperation
+	Schema string
+	Name   string
+}
+
+func NewDropMaterializedViewOp(schema, name string) *DropMaterializedViewOp {
+	return &DropMaterializedViewOp{
+		baseOperation: baseOperation{
+			kind:      KindDropMaterializedView,
+			objectKey: model.NewObjectKey(schema, name, model.KindView),
+		},
+		Schema: schema,
+		Name:   name,
+	}
+}
+
+func (op *DropMaterializedViewOp) IsDestructive() bool { return true }
 
 // CreateSequenceOp represents creating a new sequence
 type CreateSequenceOp struct {

@@ -160,6 +160,10 @@ func (r *Renderer) Render(op diff.Operation) string {
 		return r.renderDropView(v)
 	case *diff.ReplaceViewOp:
 		return r.renderReplaceView(v)
+	case *diff.CreateMaterializedViewOp:
+		return r.renderCreateMaterializedView(v)
+	case *diff.DropMaterializedViewOp:
+		return r.renderDropMaterializedView(v)
 	case *diff.CreateSequenceOp:
 		return r.renderCreateSequence(v)
 	case *diff.DropSequenceOp:
@@ -426,6 +430,16 @@ func (r *Renderer) renderDropView(op *diff.DropViewOp) string {
 		ifExistsPrefix(r.useIfExists), quoteQualifiedIdentifier(op.Schema, op.Name))
 }
 
+func (r *Renderer) renderCreateMaterializedView(op *diff.CreateMaterializedViewOp) string {
+	return fmt.Sprintf("-- op: create_materialized_view risk:low\nCREATE MATERIALIZED VIEW %s AS %s;",
+		quoteQualifiedIdentifier(op.Schema, op.MaterializedView.Name), op.MaterializedView.Definition)
+}
+
+func (r *Renderer) renderDropMaterializedView(op *diff.DropMaterializedViewOp) string {
+	return fmt.Sprintf("-- op: drop_materialized_view risk:high\nDROP MATERIALIZED VIEW %s%s;",
+		ifExistsPrefix(r.useIfExists), quoteQualifiedIdentifier(op.Schema, op.Name))
+}
+
 func (r *Renderer) renderCreateSequence(op *diff.CreateSequenceOp) string {
 	seq := op.Sequence
 	parts := []string{"CREATE SEQUENCE " + quoteQualifiedIdentifier(op.Schema, seq.Name)}
@@ -495,7 +509,7 @@ func (r *Renderer) renderCreateExtension(op *diff.CreateExtensionOp) string {
 
 func (r *Renderer) renderDropExtension(op *diff.DropExtensionOp) string {
 	return fmt.Sprintf("-- op: drop_extension risk:high\nDROP EXTENSION %s%s;",
-		ifExistsPrefix(r.useIfExists), quoteQualifiedIdentifier(op.Schema, op.Name))
+		ifExistsPrefix(r.useIfExists), quoteIdentifier(op.Name))
 }
 
 func (r *Renderer) renderAlterExtensionUpdate(op *diff.AlterExtensionUpdateOp) string {
