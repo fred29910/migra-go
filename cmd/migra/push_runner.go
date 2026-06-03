@@ -130,15 +130,16 @@ func runPush(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("target must be a database connection string (postgres://...)")
 	}
 
-	ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
-	defer cancel()
+	// Schema loading phase: uses the configured timeout to avoid hanging on slow connections.
+	loadCtx, loadCancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
+	defer loadCancel()
 
-	sourceSchema, err := loadSchemaWithContext(ctx, cfg.Source, cfg.Schemas, false)
+	sourceSchema, err := loadSchemaWithContext(loadCtx, cfg.Source, cfg.Schemas, false)
 	if err != nil {
 		return fmt.Errorf("failed to load source schema: %w", err)
 	}
 
-	targetSchema, err := loadSchemaWithContext(ctx, cfg.Target, cfg.Schemas, false)
+	targetSchema, err := loadSchemaWithContext(loadCtx, cfg.Target, cfg.Schemas, false)
 	if err != nil {
 		return fmt.Errorf("failed to load target schema: %w", err)
 	}
@@ -196,7 +197,9 @@ func runPush(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	return executeWithConfirmation(ctx, cfg, sourceSchema, ops, renderer)
+	// Execution phase: uses cmd.Context() directly (no timeout) so interactive
+	// confirmation is not interrupted by the schema-loading timeout.
+	return executeWithConfirmation(cmd.Context(), cfg, sourceSchema, ops, renderer)
 }
 
 func executeWithConfirmation(ctx context.Context, cfg pushConfig, sourceSchema *model.Schema, ops []diff.Operation, renderer *render.Renderer) error {
