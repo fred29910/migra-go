@@ -34,7 +34,9 @@ diff:
 # 输出选项
 output:
   file: ""      # 输出文件路径（空则输出到 stdout）
-  verbose: false
+
+# 全局选项
+verbose: false    # 详细输出模式（注意：此为顶层键，不是 output.verbose）
 
 # 日志配置
 logging:
@@ -43,6 +45,8 @@ logging:
 ```
 
 示例文件：`examples/config.yaml`
+
+> **注意**：`diff.timeout` 配置项在代码中**未绑定到 Viper**，因此 YAML 配置文件中的 `diff.timeout` 值不会生效。超时时间只能通过 CLI 标志 `--timeout` 设置（默认 `30s`）。
 
 ### 环境变量配置
 
@@ -67,7 +71,9 @@ MIGRA_DIFF_FORMAT=sql
 
 # 输出选项
 MIGRA_OUTPUT_FILE=
-MIGRA_OUTPUT_VERBOSE=false
+
+# 全局选项
+MIGRA_VERBOSE=false
 
 # 日志
 MIGRA_LOGGING_LEVEL=info
