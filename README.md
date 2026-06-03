@@ -10,15 +10,15 @@
 ## 功能特性
 
 - 🔍 **多源比较**：支持 SQL 文件、目录、PostgreSQL 实例任意组合的双向对比。
-- 🏗️ **结构化模型**：基于中间 SchemaModel 表示数据库结构，涵盖表、列、主键、索引、约束（外键/唯一/检查）和枚举类型。
+- 🏗️ **结构化模型**：基于中间 SchemaModel 表示数据库结构，涵盖表、列、主键、索引、约束（外键/唯一/检查）、枚举类型、视图、序列和扩展。
 - 📋 **SQL 生成与执行**：输出可执行的迁移 SQL，并支持 `push` 命令将变更直接应用到目标数据库。
 - 🛡️ **交互式安全执行**：`push` 命令提供逐条确认、危险操作中断、事务保护与自动回滚。
 - 🛡️ **安全保护**：DROP 操作默认拦截告警，可选 `--unsafe-drop` 放行。
 - 🎯 **语义归一化**：同义类型名（如 `int4` → `integer`）自动映射，减少误报。
 - 🚀 **DAG 拓扑排序**：基于 Kahn 算法对有向无环图进行排序，保证执行顺序正确且高效（外键依赖先创建、后删除）。
-- ⚙️ **三阶段执行计划**：自动将操作分为 Pre-deploy（创建）、Deploy（修改）、Post-deploy（删除）三个阶段。
-- 🔧 **可扩展解析器**：基于 HandlerRegistry + 访问者模式的 OCP 设计，新增 DDL 类型只需实现 Handler + Mutation 并注册。
-- 🧩 **丰富的差异检测**：支持表、列、类型、默认值、非空约束、索引内容、约束（主键/外键/唯一/检查）的全量对比。
+- ⚙️ **三阶段执行计划**：自动将操作分为 Pre-deploy（创建）、Deploy（修改）、Post-deploy（删除）三个阶段，覆盖全部 33 种操作。
+- 🔧 **可扩展解析器**：基于 HandlerRegistry + 访问者模式的 OCP 设计，已支持 9 种 DDL（CREATE TABLE/ALTER TABLE/CREATE INDEX/CREATE ENUM/CREATE SCHEMA/RENAME/CREATE VIEW/CREATE SEQUENCE/CREATE EXTENSION），新增 DDL 只需实现 Handler + Mutation 并注册。
+- 🧩 **丰富的差异检测**：支持表、列、类型、默认值、非空约束、索引内容、约束（主键/外键/唯一/检查）、视图、序列、扩展的全量对比，共 33 种差异操作。
 - 📊 **多格式输出**：支持 SQL 和 JSON 两种输出格式。
 - ⏱️ **超时控制**：支持 `--timeout` 参数控制 Schema 加载超时时间。
 - 📁 **目录作为 Schema 来源**：支持递归扫描目录下所有 `.sql` 文件，合并为完整 schema 参与 diff，自动跳过隐藏文件/目录、支持嵌套子目录。
@@ -265,7 +265,7 @@ migra diff file.sql "postgres://myuser@localhost/mydb"
    - 通过 Registry 策略模式自动匹配来源类型
 2. **Parser** — 基于 pg_query_go 解析 AST，通过 Handler 访问者模式将 DDL 转换为 SchemaModel
 3. **Normalize** — 语义归一化（如 `int4` → `integer`），减少同义表达导致的误报
-4. **Diff** — 逐层比较两个 SchemaModel（表、列、索引、约束、枚举），生成 Operation 列表
+4. **Diff** — 逐层比较两个 SchemaModel（表、列、索引、约束、枚举、视图、序列、扩展），生成 33 种 Operation 列表
 5. **Plan** — 按三阶段分组（Pre-deploy/Deploy/Post-deploy），基于 Kahn 算法做 DAG 拓扑排序
 
 ### 项目结构
@@ -287,7 +287,7 @@ migra diff file.sql "postgres://myuser@localhost/mydb"
 │   ├── app/                # 应用层服务（依赖注入编排）
 │   │   ├── diff_service.go # 差异计算服务 + ComputeDiff 管线
 │   │   └── diff_service_test.go
-│   ├── model/              # 中间数据模型（Schema、Table、Column 等）
+│   ├── model/              # 中间数据模型（Schema、Table、Column、View、Sequence、Extension）
 │   │   ├── schema.go       # Schema / Namespace / EnumType
 │   │   ├── table.go        # Table / PrimaryKey / Index / Constraint
 │   │   ├── column.go       # Column 定义
@@ -417,7 +417,7 @@ make ci       # 本地运行完整 CI 检查流程
 
 ### 技术栈
 
-- **语言**：Go 1.26
+- **语言**：Go 1.26.2
 - **CLI 框架**：[Cobra](https://github.com/spf13/cobra) + [Viper](https://github.com/spf13/viper)
 - **数据库驱动**：[pgx v5](https://github.com/jackc/pgx)
 - **SQL 解析**：[pg_query_go](https://github.com/lfittl/pg_query_go)

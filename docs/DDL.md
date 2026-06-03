@@ -1,7 +1,7 @@
 # PostgreSQL DDL 特性支持矩阵
 
 > **项目**: migra-go — 基于 `pg_query_go` 的 PostgreSQL  schema diff 工具  
-> **最后更新**: 2026-05-21  
+> **最后更新**: 2026-06-03  
 > **Legend**: ✅ 完全支持 | ⚠️ 部分支持 (含多种情况: a) pg_query 可解析但下游不处理; b) 部分子特性支持; c) 能检测但不生成修复 DDL) | ❌ 暂不支持
 
 ---
@@ -137,12 +137,12 @@
 
 | 特性 | 状态 | 说明 |
 |------|------|------|
-| **视图** (`CREATE VIEW / CREATE MATERIALIZED VIEW`) | ✅ | 支持普通 view 的 parse、diff、render、introspect；物化视图仅 introspect 建模，创建渲染不在本轮支持。 |
-| **序列** (`CREATE SEQUENCE`) | ✅ | 支持结构化 sequence 选项：类型、start、increment、min/max、cache、cycle。 |
+| **视图** (`CREATE VIEW`) | ✅ | 支持普通 view 的 parse、diff、render、introspect。物化视图可被内省加载但 diff/render 将其视为普通 view 处理。 |
+| **序列** (`CREATE SEQUENCE`) | ✅ | 完整支持序列的 parse、diff、render、introspect。支持数据类型、start/increment/min/max/cache/cycle 属性变更检测。 |
 | **触发器** (`CREATE TRIGGER`) | ❌ | 不支持 |
 | **规则** (`CREATE RULE`) | ❌ | 不支持 |
 | **行级安全策略** (`CREATE POLICY`) | ❌ | 不支持 |
-| **扩展** (`CREATE EXTENSION`) | ✅ | 支持 create/drop 和版本更新；schema 按 `pg_extension.extnamespace` 建模。 |
+| **扩展** (`CREATE EXTENSION`) | ✅ | 完整支持扩展的 parse、diff、render、introspect。支持 create/drop 和 update to version。 |
 | **排序规则** (`CREATE COLLATION`) | ❌ | 不支持 |
 | **全文搜索配置** (`CREATE TEXT SEARCH`) | ❌ | 不支持 |
 | **函数 / 过程** (`CREATE FUNCTION/PROCEDURE`) | ❌ | 不支持 |
@@ -181,16 +181,16 @@
 
 | 阶段 | 包含操作 | 状态 |
 |------|---------|------|
-| **Pre-deploy** (创建) | `CREATE SCHEMA`, `ADD TABLE`, `ADD COLUMN`, `ADD INDEX`, `ADD CONSTRAINT`, `ADD ENUM TYPE` | ✅ |
-| **Deploy** (修改) | `ALTER COLUMN TYPE`, `SET/DROP NOT NULL`, `SET/DROP DEFAULT`, `SET/DROP IDENTITY`, `ADD ENUM LABEL`, `RENAME COLUMN`, `ALTER COLUMN COLLATION` | ✅ |
-| **Post-deploy** (删除, 需 `--unsafe-drop`) | `DROP SCHEMA`, `DROP TABLE`, `DROP COLUMN`, `DROP INDEX`, `DROP CONSTRAINT`, `DROP ENUM TYPE` | ✅ |
+| **Pre-deploy** (创建) | `CREATE SCHEMA`, `ADD TABLE`, `ADD COLUMN`, `ADD INDEX`, `ADD CONSTRAINT`, `ADD ENUM TYPE`, `CREATE VIEW`, `CREATE SEQUENCE`, `CREATE EXTENSION` | ✅ |
+| **Deploy** (修改) | `ALTER COLUMN TYPE`, `SET/DROP NOT NULL`, `SET/DROP DEFAULT`, `SET/DROP IDENTITY`, `ADD IDENTITY`, `ADD ENUM LABEL`, `RENAME COLUMN`, `ALTER COLUMN COLLATION`, `REPLACE VIEW`, `ALTER SEQUENCE`, `ALTER EXTENSION UPDATE` | ✅ |
+| **Post-deploy** (删除, 需 `--unsafe-drop`) | `DROP SCHEMA`, `DROP TABLE`, `DROP COLUMN`, `DROP INDEX`, `DROP CONSTRAINT`, `DROP ENUM TYPE`, `DROP IDENTITY`, `DROP VIEW`, `DROP SEQUENCE`, `DROP EXTENSION` | ✅ |
 
 依赖排序使用 **Kahn 拓扑排序** 算法，确保:
 - 外键引用的表先于引用它的表创建
 - 删除操作先于创建操作执行 (同约束名)
 - 列的添加先于索引创建
 
-> **注意**: `CREATE SCHEMA` 和 `DROP SCHEMA` 已在 `assignStage()` 中显式分配为 Pre-deploy / Post-deploy 阶段。`alter_column_collation`, `set_identity`, `drop_identity` 通过默认分支落入 Deploy 阶段。
+> **注意**: `CREATE SCHEMA`/`DROP SCHEMA` 已在 `assignStage()` 中显式分配为 Pre-deploy/Post-deploy。`alter_column_collation`, `set_identity`, `drop_identity`, `add_identity`, `replace_view`, `alter_sequence`, `alter_extension_update` 等均已在 `assignStage()` 中显式匹配到对应阶段。
 
 ---
 
@@ -212,7 +212,7 @@
 
 8. **重命名列启发式检测的限制**: Diff 引擎通过比较 `DataType`、`IsNullable`、`DefaultExpr`、`Collation` 来推断列重命名。此启发式方法可能产生误报——例如用户删除了具有属性 X 的列并新增了具有相同属性的列（但语义不同）。未来可通过 SQL 注释声明 (`-- @rename from_col to_col`) 来显式声明重命名，消除误报。
 
-9. **执行计划阶段不完整**: `create_schema`、`drop_schema` 已在 `assignStage()` 中分配为 Pre-deploy / Post-deploy。`set_identity`、`drop_identity`、`alter_column_collation` 等操作类型未显式匹配，当前通过默认分支归入 `StageDeploy`。
+9. **约束名称冲突处理**: 当同一条 ALTER TABLE 语句中同时存在 DROP CONSTRAINT 和 ADD CONSTRAINT 且名称相同时，pg_query_go 会将其拆分为独立的 AST 节点。当前处理方式先生成 Drop 再生成 Add，DAG 排序确保 Drop 先执行。但某些复杂场景（如递归生成引用自身的约束）可能导致排序问题。
 
 10. **`ONLY` 子句 (表继承)**: `CREATE TABLE ... INHERITS (...)` 被 pg_query 解析但 diff/renderer 不处理继承关系。
 
