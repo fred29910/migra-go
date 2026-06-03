@@ -460,3 +460,50 @@ func TestParseEdgeCases(t *testing.T) {
 
 	t.Logf("Parsed %d tables from edge_cases (including quoted, inheritance, partition)", len(ns.Tables))
 }
+
+func TestCreateMaterializedViewHandler(t *testing.T) {
+	node := mustParseFirstStmt(t, "CREATE MATERIALIZED VIEW mv_summary AS SELECT count(*) FROM users")
+	h := &CreateMaterializedViewHandler{}
+
+	mutations, err := h.Handle(node)
+	require.NoError(t, err)
+	require.Len(t, mutations, 1)
+
+	mut, ok := mutations[0].(CreateViewMutation)
+	require.True(t, ok)
+	assert.Equal(t, "mv_summary", mut.View.Name)
+	assert.Equal(t, "public", mut.Schema)
+	assert.True(t, mut.View.Materialized)
+	assert.Contains(t, mut.View.Definition, "SELECT count(*) FROM users")
+}
+
+func TestCreateMaterializedViewHandler_WithSchema(t *testing.T) {
+	node := mustParseFirstStmt(t, "CREATE MATERIALIZED VIEW analytics.mv_daily AS SELECT date, count(*) FROM events GROUP BY date")
+	h := &CreateMaterializedViewHandler{}
+
+	mutations, err := h.Handle(node)
+	require.NoError(t, err)
+	require.Len(t, mutations, 1)
+
+	mut, ok := mutations[0].(CreateViewMutation)
+	require.True(t, ok)
+	assert.Equal(t, "mv_daily", mut.View.Name)
+	assert.Equal(t, "analytics", mut.Schema)
+	assert.True(t, mut.View.Materialized)
+}
+
+func TestAlterTableSetDefault_UsesDeparse(t *testing.T) {
+	node := mustParseFirstStmt(t, "ALTER TABLE users ALTER COLUMN created_at SET DEFAULT now()")
+	h := &AlterTableHandler{}
+
+	mutations, err := h.Handle(node)
+	require.NoError(t, err)
+	require.Len(t, mutations, 1)
+
+	mut, ok := mutations[0].(SetDefaultMutation)
+	require.True(t, ok)
+	assert.Equal(t, "created_at", mut.Column)
+	assert.Equal(t, "public", mut.Schema)
+	assert.NotEmpty(t, mut.DefaultExpr, "default expression should not be empty")
+	assert.NotContains(t, mut.DefaultExpr, "&", "default expression should not be a Go fmt representation")
+}
