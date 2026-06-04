@@ -10,6 +10,7 @@
 | **Action** | `softprops/action-gh-release@v2` |
 | **错误码** | HTTP 403 |
 | **严重程度** | 🔴 高 — 阻断发布流程 |
+| **状态** | 已修复 |
 
 ---
 

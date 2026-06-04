@@ -9,7 +9,7 @@
 | **影响范围** | 所有在目录中同时包含分文件 DDL 和合并快照文件的 diff 场景 |
 | **触发命令** | `./migra diff --schema public --schema auth testdata/diff/multi_schema/v1/ testdata/diff/multi_schema/v2/` |
 | **前置修复** | 依赖 `docs/bugs/2026-05-15-multi-schema-diff-create-schema-stmt.md` 的修复（`CreateSchemaStmt` handler） |
-| **状态** | 待修复 |
+| **状态** | 已修复 |
 
 ---
 
