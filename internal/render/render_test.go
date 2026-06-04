@@ -521,8 +521,8 @@ func TestRenderCreateIndex_WithElementCollation(t *testing.T) {
 func TestRenderCreateMaterializedView(t *testing.T) {
 	r := NewRenderer()
 	op := diff.NewCreateMaterializedViewOp("public", &model.View{
-		Name:       "user_summary",
-		Definition: "SELECT count(*) FROM users",
+		Name:         "user_summary",
+		Definition:   "SELECT count(*) FROM users",
 		Materialized: true,
 	})
 	sql := r.Render(op)

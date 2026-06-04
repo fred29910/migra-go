@@ -253,7 +253,7 @@ func executeWithConfirmation(ctx context.Context, cfg pushConfig, sourceSchema *
 		return nil
 	}
 
-	next:
+next:
 	for i, op := range ops {
 		// Check for interrupt at the start of each iteration.
 		if err := checkInterrupt(); err != nil {
