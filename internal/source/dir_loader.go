@@ -87,13 +87,13 @@ func (l *DirectoryLoader) Load(ctx context.Context, source string, opt LoadOptio
 		combinedSQL.Write(data)
 	}
 
-	// Always treat parse errors as fatal for merged parsing: any file
-	// with invalid SQL corrupts the entire combined input, so partial
-	// recovery is not meaningful.
+	// Parse errors handling follows the same strict/non-strict semantics
+	// as SQLFileLoader: in strict mode, parse errors are fatal; in
+	// non-strict mode, partial results are returned alongside errors.
 	p := parser.NewParser()
 	schema, parseErr := p.ParseSQL(combinedSQL.String())
 	errs := p.Errors()
-	if parseErr != nil {
+	if parseErr != nil && opt.Strict {
 		return nil, errs, fmt.Errorf("failed to parse directory contents: %w", parseErr)
 	}
 
