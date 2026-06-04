@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/fred29910/migra-go/internal/errors"
 	"github.com/fred29910/migra-go/internal/model"
 )
 
@@ -31,5 +32,5 @@ func (r *Registry) Load(ctx context.Context, source string, opt LoadOptions) (*m
 			return loader.Load(ctx, source, opt)
 		}
 	}
-	return nil, nil, fmt.Errorf("no loader found for source: %s", source)
+	return nil, nil, fmt.Errorf("load schema: %w", errors.ErrNotFound)
 }
