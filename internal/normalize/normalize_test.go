@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fred29910/migra-go/internal/model"
+	"github.com/fred29910/migra-go/internal/util"
 )
 
 // TestCanonicalizeIndex_DBIntrospectColumnsPopulatedAsElements tests that when an index
@@ -94,9 +95,9 @@ func TestNormalizeDataType_CharacterWithLength(t *testing.T) {
 		{"CHARACTER", "char"},
 	}
 	for _, tt := range tests {
-		got := normalizeDataType(tt.input)
+		got := util.NormalizeDataType(tt.input)
 		if got != tt.want {
-			t.Errorf("normalizeDataType(%q) = %q, want %q", tt.input, got, tt.want)
+			t.Errorf("util.NormalizeDataType(%q) = %q, want %q", tt.input, got, tt.want)
 		}
 	}
 }
@@ -116,9 +117,9 @@ func TestNormalizeDataType_VarcharWithLength(t *testing.T) {
 		{"timestamp without time zone", "timestamp"},
 	}
 	for _, tt := range tests {
-		got := normalizeDataType(tt.input)
+		got := util.NormalizeDataType(tt.input)
 		if got != tt.want {
-			t.Errorf("normalizeDataType(%q) = %q, want %q", tt.input, got, tt.want)
+			t.Errorf("util.NormalizeDataType(%q) = %q, want %q", tt.input, got, tt.want)
 		}
 	}
 }

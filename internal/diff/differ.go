@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/fred29910/migra-go/internal/model"
+	"github.com/fred29910/migra-go/internal/util"
 )
 
 // DiffEngine defines the interface for schema diff computation.
@@ -161,7 +162,7 @@ func (c *diffContext) diffEnumType(schema, name string, sourceType, targetType *
 		for _, label := range targetType.Labels[len(sourceType.Labels):] {
 			c.addOp(NewAddEnumLabelOp(schema, name, label))
 		}
-	} else if !sameStringSlice(sourceType.Labels, targetType.Labels) {
+	} else if !util.SameStringSlice(sourceType.Labels, targetType.Labels) {
 		c.warnf("enum %s.%s change is not append-only and is not implemented", schema, name)
 	}
 }
@@ -172,18 +173,6 @@ func isEnumAppend(sourceLabels, targetLabels []string) bool {
 	}
 	for i, label := range sourceLabels {
 		if targetLabels[i] != label {
-			return false
-		}
-	}
-	return true
-}
-
-func sameStringSlice(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
 			return false
 		}
 	}
