@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/fred29910/migra-go/internal/model"
+	"github.com/fred29910/migra-go/internal/util"
 )
 
 // CanonicalizeSchema normalizes a schema to reduce false diffs
@@ -68,7 +69,7 @@ func canonicalizeTableInPlace(table *model.Table) {
 
 func canonicalizeColumnInPlace(col *model.Column) {
 	col.Name = normalizeIdentifier(col.Name)
-	col.DataType = normalizeDataType(col.DataType)
+	col.DataType = util.NormalizeDataType(col.DataType)
 	if col.DefaultExpr != nil {
 		*col.DefaultExpr = normalizeDefaultExpr(*col.DefaultExpr)
 	}
@@ -109,30 +110,12 @@ func canonicalizeViewInPlace(v *model.View) {
 
 func canonicalizeSequenceInPlace(s *model.Sequence) {
 	s.Name = normalizeIdentifier(s.Name)
-	s.DataType = normalizeDataType(s.DataType)
+	s.DataType = util.NormalizeDataType(s.DataType)
 }
 
 func canonicalizeExtensionInPlace(e *model.Extension) {
 	e.Name = normalizeIdentifier(e.Name)
 }
-
-// typeAliases maps type aliases to canonical names (exact matches only, no length suffix)
-var typeAliases = map[string]string{
-	"int4":                        "integer",
-	"int8":                        "bigint",
-	"int2":                        "smallint",
-	"bool":                        "boolean",
-	"character varying":           "varchar",
-	"character":                   "char",
-	"timestamp without time zone": "timestamp",
-	"timestamp with time zone":    "timestamptz",
-}
-
-// charVaryingWithLenRe matches "character varying(N)" (case-insensitive), used in normalizeDataType
-var charVaryingWithLenRe = regexp.MustCompile(`(?i)^character varying\((\d+)\)$`)
-
-// characterWithLenRe matches "character(N)" / "char(N)" (case-insensitive)
-var characterWithLenRe = regexp.MustCompile(`(?i)^character\((\d+)\)$`)
 
 // These two regexes work together in normalizeDefaultExpr and must run in this order:
 // 1. nestedTypeCastRe first strips 'literal'::type → 'literal' (nested casts)
@@ -140,25 +123,6 @@ var characterWithLenRe = regexp.MustCompile(`(?i)^character\((\d+)\)$`)
 // Reversing the order would break cases like nextval('seq'::regclass).
 var typeCastRe = regexp.MustCompile(`::[\w\s]+$`)
 var nestedTypeCastRe = regexp.MustCompile(`'([^']*)'::[\w\s]+`)
-
-// normalizeDataType normalizes type aliases to canonical names
-func normalizeDataType(dt string) string {
-	dt = strings.TrimSpace(dt)
-	lower := strings.ToLower(dt)
-
-	if m := charVaryingWithLenRe.FindStringSubmatch(lower); m != nil {
-		return "varchar(" + m[1] + ")"
-	}
-
-	if m := characterWithLenRe.FindStringSubmatch(lower); m != nil {
-		return "char(" + m[1] + ")"
-	}
-
-	if canonical, ok := typeAliases[lower]; ok {
-		return canonical
-	}
-	return lower
-}
 
 // normalizeIdentifier normalizes quoted/unquoted identifiers
 func normalizeIdentifier(id string) string {
