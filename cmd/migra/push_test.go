@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"strings"
 	"testing"
 	"time"
 
@@ -192,4 +194,87 @@ func TestParsePushConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParsePushConfig_AllFlags(t *testing.T) {
+	cmd := &cobra.Command{Use: "push", Args: cobra.ExactArgs(2)}
+	cmd.Flags().StringSlice("schema", []string{"public"}, "")
+	cmd.Flags().Bool("unsafe-drop", false, "")
+	cmd.Flags().Bool("dry-run", false, "")
+	cmd.Flags().Bool("execute", false, "")
+	cmd.Flags().Bool("no-verify", false, "")
+	cmd.Flags().Duration("timeout", 30*time.Second, "")
+
+	_ = cmd.Flags().Set("schema", "public,auth")
+	_ = cmd.Flags().Set("unsafe-drop", "true")
+	_ = cmd.Flags().Set("dry-run", "true")
+	_ = cmd.Flags().Set("execute", "true")
+	_ = cmd.Flags().Set("no-verify", "true")
+	_ = cmd.Flags().Set("timeout", "60s")
+
+	cfg, err := parsePushConfig(cmd, []string{"source.sql", "postgres://localhost/target"})
+	assert.NoError(t, err)
+
+	assert.Equal(t, "source.sql", cfg.Source)
+	assert.Equal(t, "postgres://localhost/target", cfg.Target)
+	assert.Equal(t, []string{"public", "auth"}, cfg.Schemas)
+	assert.True(t, cfg.UnsafeDrop)
+	assert.True(t, cfg.DryRun)
+	assert.True(t, cfg.Execute)
+	assert.True(t, cfg.NoVerify)
+	assert.Equal(t, 60*time.Second, cfg.Timeout)
+}
+
+func TestParsePushConfig_DefaultValues(t *testing.T) {
+	cmd := &cobra.Command{Use: "push", Args: cobra.ExactArgs(2)}
+	cmd.Flags().StringSlice("schema", []string{"public"}, "")
+	cmd.Flags().Bool("unsafe-drop", false, "")
+	cmd.Flags().Bool("dry-run", false, "")
+	cmd.Flags().Bool("execute", false, "")
+	cmd.Flags().Bool("no-verify", false, "")
+	cmd.Flags().Duration("timeout", 30*time.Second, "")
+
+	cfg, err := parsePushConfig(cmd, []string{"a.sql", "pg://localhost/db"})
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"public"}, cfg.Schemas)
+	assert.False(t, cfg.UnsafeDrop)
+	assert.False(t, cfg.DryRun)
+	assert.False(t, cfg.Execute)
+	assert.False(t, cfg.NoVerify)
+	assert.Equal(t, 30*time.Second, cfg.Timeout)
+}
+
+func TestReadUserInput(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"yes", "y\n", "y"},
+		{"no", "n\n", "n"},
+		{"apply all", "a\n", "a"},
+		{"skip", "s\n", "s"},
+		{"uppercase Y", "Y\n", "y"},
+		{"with spaces", "  y  \n", "y"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			oldReader := stdinReader
+			stdinReader = bufio.NewReader(strings.NewReader(tt.input))
+			defer func() { stdinReader = oldReader }()
+
+			got := readUserInput()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestReadUserInputEOF(t *testing.T) {
+	oldReader := stdinReader
+	stdinReader = bufio.NewReader(strings.NewReader(""))
+	defer func() { stdinReader = oldReader }()
+
+	got := readUserInput()
+	assert.Equal(t, "n", got)
 }
