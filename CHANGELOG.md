@@ -10,6 +10,48 @@
 ### 杂务 (Chores)
 - chore: 更新 release.sh，移除手动构建步骤
 
+## [0.2.1] - 2026-06-03
+
+### 修复 (Bug Fixes)
+- fix(render): 修复 RenderJSON 输出与文档规范不一致的问题
+- fix(render): 修复 View 与 Materialized View 渲染模型不一致的问题
+- fix(render): 修复 DROP EXTENSION 生成 schema-qualified 名称导致 SQL 无效的问题
+- fix(render): 修复 ALTER SEQUENCE 对 CYCLE 仅能打开不能关闭的问题
+- fix(parser): 修复 ALTER TABLE SET DEFAULT 默认值提取逻辑错误
+- fix(push): 修复 push 交互流程复用 30s 超时上下文问题
+- fix(push): 修复 push 中断处理使用 goroutine + os.Exit(1) 的问题
+- fix(source): 修复 strict 行为在不同 source loader 上不一致的问题
+
+### 测试 (Tests)
+- test: 补充 IDENTITY、COLLATE、VIEW/SEQUENCE/EXTENSION 测试用例
+- test: 补充 render 层 rename、view、sequence、extension 渲染测试
+
+### 文档 (Documentation)
+- docs: 同步架构文档与实际代码实现
+- docs: 更新 DDL 特性支持矩阵
+- docs: 添加代码评审报告
+
+## [0.2.0] - 2026-05-21
+
+### 特性 (Features)
+- feat(parser): 添加 CREATE VIEW 解析支持（CreateViewHandler）
+- feat(parser): 添加 CREATE SEQUENCE 解析支持（CreateSequenceHandler）
+- feat(parser): 添加 CREATE EXTENSION 解析支持（CreateExtensionHandler）
+- feat(introspect): 添加视图、序列、扩展的数据库内省支持
+- feat(diff): 添加视图、序列、扩展的差异比较操作
+- feat(render): 添加视图、序列、扩展的 SQL 渲染支持
+- feat(diff): 添加 IDENTITY 列差异检测（add/set/drop identity）
+- feat(diff): 添加列排序规则差异检测（alter_column_collation）
+- feat(render): 添加 IDENTITY 列和列排序规则的 SQL 渲染
+
+### 修复 (Bug Fixes)
+- fix(parser): 修复多 Schema diff 中 CreateSchemaStmt 解析失败问题
+- fix(directory-diff): 修复目录差异比较评审中的问题
+
+### 文档 (Documentation)
+- docs: 添加 DDL 特性扩展支持分析文档
+- docs: 添加深度技术评审与优化报告
+
 ## [0.1.5] - 2026-05-18
 
 ### 特性 (Features)
@@ -68,7 +110,9 @@
 - 添加破坏性变更诊断
 - 添加单元测试和集成测试框架
 
-[未发布]: https://github.com/fred29910/migra-go/compare/v0.1.5...HEAD
+[未发布]: https://github.com/fred29910/migra-go/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/fred29910/migra-go/releases/tag/v0.2.1
+[0.2.0]: https://github.com/fred29910/migra-go/releases/tag/v0.2.0
 [0.1.5]: https://github.com/fred29910/migra-go/releases/tag/v0.1.5
 [0.1.1]: https://github.com/fred29910/migra-go/releases/tag/v0.1.1
 [0.1.0]: https://github.com/fred29910/migra-go/releases/tag/v0.1.0
