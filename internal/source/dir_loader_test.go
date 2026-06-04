@@ -228,7 +228,37 @@ CREATE UNIQUE INDEX idx_users_username ON users(username);`
 	}
 }
 
-func TestDirectoryLoader_Load_ParseError(t *testing.T) {
+func TestDirectoryLoader_Load_ParseError_NonStrict(t *testing.T) {
+	dir := t.TempDir()
+
+	// Use a statement that pg_query can parse but that produces a
+	// statement-level error (unsupported type), so ParseSQL returns
+	// a non-nil schema with partial results + error.
+	sql1 := `CREATE TABLE users (id SERIAL PRIMARY KEY);`
+	sql2 := `CREATE TABLE users (id SERIAL PRIMARY KEY);` // duplicate table causes statement-level error
+
+	if err := os.WriteFile(filepath.Join(dir, "01_good.sql"), []byte(sql1), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "02_dup.sql"), []byte(sql2), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	loader := &DirectoryLoader{}
+	// Non-strict mode: parse errors should not be fatal, partial results returned
+	schema, errs, err := loader.Load(context.TODO(), dir, LoadOptions{Strict: false})
+	if err != nil {
+		t.Fatalf("non-strict mode should not return fatal error, got: %v", err)
+	}
+	if schema == nil {
+		t.Fatal("expected non-nil schema in non-strict mode")
+	}
+	if len(errs) == 0 {
+		t.Error("expected parse errors in errs, got none")
+	}
+}
+
+func TestDirectoryLoader_Load_ParseError_Strict(t *testing.T) {
 	dir := t.TempDir()
 
 	sql1 := `CREATE TABLE users (id SERIAL PRIMARY KEY);`
@@ -242,9 +272,10 @@ func TestDirectoryLoader_Load_ParseError(t *testing.T) {
 	}
 
 	loader := &DirectoryLoader{}
-	_, _, err := loader.Load(context.TODO(), dir, LoadOptions{})
+	// Strict mode: parse errors should be fatal
+	_, _, err := loader.Load(context.TODO(), dir, LoadOptions{Strict: true})
 	if err == nil {
-		t.Fatal("expected error for parse failure, got nil")
+		t.Fatal("expected error for parse failure in strict mode, got nil")
 	}
 }
 

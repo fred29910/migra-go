@@ -494,7 +494,11 @@ func (r *Renderer) renderAlterSequence(op *diff.AlterSequenceOp) string {
 		parts = append(parts, fmt.Sprintf("CACHE %d", seq.CacheSize))
 	}
 	if seq.Cycle != op.From.Cycle {
-		parts = append(parts, "CYCLE")
+		if seq.Cycle {
+			parts = append(parts, "CYCLE")
+		} else {
+			parts = append(parts, "NO CYCLE")
+		}
 	}
 	return "-- op: alter_sequence risk:low\n" + strings.Join(parts, " ") + ";"
 }

@@ -542,6 +542,30 @@ func TestRenderDropMaterializedView(t *testing.T) {
 	}
 }
 
+func TestRenderAlterSequence_CycleToNoCycle(t *testing.T) {
+	r := NewRenderer()
+	from := &model.Sequence{Name: "invoice_seq", Cycle: true}
+	to := &model.Sequence{Name: "invoice_seq", Cycle: false}
+	op := diff.NewAlterSequenceOp("public", from, to)
+	sql := r.Render(op)
+	want := `ALTER SEQUENCE "public"."invoice_seq" NO CYCLE;`
+	if !strings.Contains(sql, want) {
+		t.Fatalf("expected %q in:\n%s", want, sql)
+	}
+}
+
+func TestRenderAlterSequence_NoCycleToCycle(t *testing.T) {
+	r := NewRenderer()
+	from := &model.Sequence{Name: "invoice_seq", Cycle: false}
+	to := &model.Sequence{Name: "invoice_seq", Cycle: true}
+	op := diff.NewAlterSequenceOp("public", from, to)
+	sql := r.Render(op)
+	want := `ALTER SEQUENCE "public"."invoice_seq" CYCLE;`
+	if !strings.Contains(sql, want) {
+		t.Fatalf("expected %q in:\n%s", want, sql)
+	}
+}
+
 func TestRenderDropExtension_NoSchemaPrefix(t *testing.T) {
 	r := NewRenderer()
 	op := diff.NewDropExtensionOp("public", "pgcrypto")
