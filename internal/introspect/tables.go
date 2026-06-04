@@ -6,11 +6,9 @@ import (
 	"fmt"
 
 	"github.com/fred29910/migra-go/internal/model"
-	"github.com/jackc/pgx/v5"
 )
 
-// loadTables loads tables and their columns from information_schema
-func loadTables(ctx context.Context, conn *pgx.Conn, schemaName string, ns *model.Namespace) error {
+func loadTables(ctx context.Context, q Querier, schemaName string, ns *model.Namespace) error {
 	query := `
 	SELECT 
 		t.table_name,
@@ -28,7 +26,7 @@ func loadTables(ctx context.Context, conn *pgx.Conn, schemaName string, ns *mode
 	WHERE t.table_schema = $1 AND t.table_type = 'BASE TABLE'
 	ORDER BY t.table_name, c.ordinal_position`
 
-	rows, err := conn.Query(ctx, query, schemaName)
+	rows, err := q.Query(ctx, query, schemaName)
 	if err != nil {
 		return fmt.Errorf("query tables: %w", err)
 	}

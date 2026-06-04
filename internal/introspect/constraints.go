@@ -5,11 +5,9 @@ import (
 	"fmt"
 
 	"github.com/fred29910/migra-go/internal/model"
-	"github.com/jackc/pgx/v5"
 )
 
-// loadConstraints loads constraints (primary key, unique, check) from pg_constraint
-func loadConstraints(ctx context.Context, conn *pgx.Conn, schemaName string, ns *model.Namespace) error {
+func loadConstraints(ctx context.Context, q Querier, schemaName string, ns *model.Namespace) error {
 	query := `
 	SELECT
 		c.conname,
@@ -25,7 +23,7 @@ func loadConstraints(ctx context.Context, conn *pgx.Conn, schemaName string, ns 
 	WHERE n.nspname = $1 AND c.contype IN ('p', 'u', 'c')
 	GROUP BY c.oid, c.conname, c.contype, t.relname`
 
-	rows, err := conn.Query(ctx, query, schemaName)
+	rows, err := q.Query(ctx, query, schemaName)
 	if err != nil {
 		return fmt.Errorf("query constraints: %w", err)
 	}
@@ -89,8 +87,7 @@ func pgConstraintAction(code string) string {
 	return model.FKActionCode(code)
 }
 
-// loadForeignKeys loads foreign key constraints from pg_constraint
-func loadForeignKeys(ctx context.Context, conn *pgx.Conn, schemaName string, ns *model.Namespace) error {
+func loadForeignKeys(ctx context.Context, q Querier, schemaName string, ns *model.Namespace) error {
 	query := `
 	SELECT
 		c.conname,
@@ -114,7 +111,7 @@ func loadForeignKeys(ctx context.Context, conn *pgx.Conn, schemaName string, ns 
 	WHERE n.nspname = $1 AND c.contype = 'f'
 	GROUP BY c.oid, c.conname, t.relname, rt.relname, rn.nspname`
 
-	rows, err := conn.Query(ctx, query, schemaName)
+	rows, err := q.Query(ctx, query, schemaName)
 	if err != nil {
 		return fmt.Errorf("query foreign keys: %w", err)
 	}
