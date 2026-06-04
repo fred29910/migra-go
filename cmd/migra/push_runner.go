@@ -209,12 +209,28 @@ func executeWithConfirmation(ctx context.Context, cfg pushConfig, sourceSchema *
 	}
 	defer func() { _ = conn.Close(ctx) }()
 
+	// Create a cancellable context for the execution phase so that
+	// interrupt signals can trigger a graceful rollback instead of
+	// calling os.Exit(1).
+	execCtx, execCancel := context.WithCancel(ctx)
+	defer execCancel()
+
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
+	go func() {
+		defer signal.Stop(sigChan)
+		select {
+		case <-sigChan:
+			fmt.Println("\nInterrupt received, cancelling...")
+			execCancel()
+		case <-execCtx.Done():
+		}
+	}()
+
 	autoMode := cfg.Execute
 
-	tx, err := conn.Begin(ctx)
+	tx, err := conn.Begin(execCtx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -225,15 +241,25 @@ func executeWithConfirmation(ctx context.Context, cfg pushConfig, sourceSchema *
 		}
 	}()
 
-	go func() {
-		<-sigChan
-		fmt.Println("\nInterrupt received, rolling back...")
-		_ = tx.Rollback(ctx)
-		os.Exit(1)
-	}()
+	// checkInterrupt returns a non-nil error if the context has been
+	// cancelled (e.g. by an interrupt signal).
+	checkInterrupt := func() error {
+		if err := execCtx.Err(); err != nil {
+			fmt.Println("Rolling back transaction...")
+			_ = tx.Rollback(ctx)
+			txActive = false
+			return fmt.Errorf("execution interrupted: %w", err)
+		}
+		return nil
+	}
 
-next:
+	next:
 	for i, op := range ops {
+		// Check for interrupt at the start of each iteration.
+		if err := checkInterrupt(); err != nil {
+			return err
+		}
+
 		sql := renderer.RenderSingle(op)
 		if sql == "" || strings.HasPrefix(sql, "-- Unknown") {
 			continue
@@ -253,6 +279,9 @@ next:
 				fmt.Printf("SQL #%d skipped (destructive) \u2014 use --unsafe-drop to execute\n", i+1)
 				continue next
 			}
+			if err := checkInterrupt(); err != nil {
+				return err
+			}
 			if err := execSQL(tx, ctx, sql, i+1); err != nil {
 				fmt.Println("Rolling back transaction...")
 				_ = tx.Rollback(ctx)
@@ -270,6 +299,11 @@ next:
 		fmt.Print(prompt)
 
 		input := readUserInput()
+
+		// Check for interrupt after blocking read.
+		if err := checkInterrupt(); err != nil {
+			return err
+		}
 
 		switch input {
 		case "y":
