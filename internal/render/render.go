@@ -8,6 +8,7 @@ import (
 
 	"github.com/fred29910/migra-go/internal/diff"
 	"github.com/fred29910/migra-go/internal/model"
+	"github.com/fred29910/migra-go/internal/util"
 )
 
 // SQLEngine defines the interface for SQL rendering.
@@ -90,15 +91,15 @@ func (r *Renderer) Render(op diff.Operation) string {
 			return ""
 		}
 		return fmt.Sprintf("-- op: add_constraint risk:medium\nALTER TABLE %s ADD CONSTRAINT %s %s;",
-			quoteQualifiedIdentifier(v.Schema, v.Table),
-			quoteIdentifier(v.Constraint.Name),
+			util.QuoteQualifiedIdentifier(v.Schema, v.Table),
+			util.QuoteIdentifier(v.Constraint.Name),
 			definition,
 		)
 	case *diff.DropConstraintOp:
 		return fmt.Sprintf("-- op: drop_constraint risk:medium\nALTER TABLE %s DROP CONSTRAINT %s%s;",
-			quoteQualifiedIdentifier(v.Schema, v.Table),
+			util.QuoteQualifiedIdentifier(v.Schema, v.Table),
 			ifExistsPrefix(r.useIfExists),
-			quoteIdentifier(v.Name),
+			util.QuoteIdentifier(v.Name),
 		)
 	case *diff.AddEnumTypeOp:
 		return r.renderAddEnumType(v)
@@ -106,19 +107,19 @@ func (r *Renderer) Render(op diff.Operation) string {
 		return r.renderDropEnumType(v)
 	case *diff.AddEnumLabelOp:
 		return fmt.Sprintf("-- op: add_enum_label risk:low\nALTER TYPE %s ADD VALUE %s;",
-			quoteQualifiedIdentifier(v.Schema, v.Type),
+			util.QuoteQualifiedIdentifier(v.Schema, v.Type),
 			quoteString(v.Label),
 		)
 	case *diff.SetDefaultOp:
 		return fmt.Sprintf("-- op: set_default risk:low\nALTER TABLE %s ALTER COLUMN %s SET DEFAULT %s;",
-			quoteQualifiedIdentifier(v.Schema, v.Table),
-			quoteIdentifier(v.Column),
+			util.QuoteQualifiedIdentifier(v.Schema, v.Table),
+			util.QuoteIdentifier(v.Column),
 			v.DefaultExpr,
 		)
 	case *diff.DropDefaultOp:
 		return fmt.Sprintf("-- op: drop_default risk:low\nALTER TABLE %s ALTER COLUMN %s DROP DEFAULT;",
-			quoteQualifiedIdentifier(v.Schema, v.Table),
-			quoteIdentifier(v.Column),
+			util.QuoteQualifiedIdentifier(v.Schema, v.Table),
+			util.QuoteIdentifier(v.Column),
 		)
 	case *diff.AlterColumnCollationOp:
 		return r.renderAlterColumnCollation(v)
@@ -128,31 +129,31 @@ func (r *Renderer) Render(op diff.Operation) string {
 		return r.renderDropSchema(v)
 	case *diff.AddIdentityOp:
 		return fmt.Sprintf("-- op: add_identity risk:low\nALTER TABLE %s ALTER COLUMN %s ADD GENERATED %s AS IDENTITY;",
-			quoteQualifiedIdentifier(v.Schema, v.Table),
-			quoteIdentifier(v.Column),
+			util.QuoteQualifiedIdentifier(v.Schema, v.Table),
+			util.QuoteIdentifier(v.Column),
 			v.IdentityKind,
 		)
 	case *diff.SetIdentityOp:
 		return fmt.Sprintf("-- op: set_identity risk:low\nALTER TABLE %s ALTER COLUMN %s SET GENERATED %s;",
-			quoteQualifiedIdentifier(v.Schema, v.Table),
-			quoteIdentifier(v.Column),
+			util.QuoteQualifiedIdentifier(v.Schema, v.Table),
+			util.QuoteIdentifier(v.Column),
 			v.IdentityKind,
 		)
 	case *diff.DropIdentityOp:
 		return fmt.Sprintf("-- op: drop_identity risk:medium\nALTER TABLE %s ALTER COLUMN %s DROP IDENTITY;",
-			quoteQualifiedIdentifier(v.Schema, v.Table),
-			quoteIdentifier(v.Column),
+			util.QuoteQualifiedIdentifier(v.Schema, v.Table),
+			util.QuoteIdentifier(v.Column),
 		)
 	case *diff.RenameColumnOp:
 		return fmt.Sprintf("-- op: rename_column risk:low\nALTER TABLE %s RENAME COLUMN %s TO %s;",
-			quoteQualifiedIdentifier(v.Schema, v.Table),
-			quoteIdentifier(v.OldName),
-			quoteIdentifier(v.NewName),
+			util.QuoteQualifiedIdentifier(v.Schema, v.Table),
+			util.QuoteIdentifier(v.OldName),
+			util.QuoteIdentifier(v.NewName),
 		)
 	case *diff.DropColumnOp:
 		return fmt.Sprintf("-- op: drop_column risk:high\nALTER TABLE %s DROP COLUMN IF EXISTS %s;",
-			quoteQualifiedIdentifier(v.Schema, v.Table),
-			quoteIdentifier(v.Column),
+			util.QuoteQualifiedIdentifier(v.Schema, v.Table),
+			util.QuoteIdentifier(v.Column),
 		)
 	case *diff.CreateViewOp:
 		return r.renderCreateView(v)
@@ -192,7 +193,7 @@ func (r *Renderer) renderAddTable(op *diff.AddTableOp) string {
 	lines := make([]string, 0)
 
 	for _, col := range table.Columns {
-		colDef := fmt.Sprintf("    %s %s", quoteIdentifier(col.Name), col.DataType)
+		colDef := fmt.Sprintf("    %s %s", util.QuoteIdentifier(col.Name), col.DataType)
 		if col.IsIdentity {
 			switch col.IdentityKind {
 			case "ALWAYS":
@@ -202,7 +203,7 @@ func (r *Renderer) renderAddTable(op *diff.AddTableOp) string {
 			}
 		}
 		if col.Collation != "" {
-			colDef += fmt.Sprintf(" COLLATE %s", quoteIdentifier(col.Collation))
+			colDef += fmt.Sprintf(" COLLATE %s", util.QuoteIdentifier(col.Collation))
 		}
 		if !col.IsNullable {
 			colDef += " NOT NULL"
@@ -242,7 +243,7 @@ func (r *Renderer) renderAddTable(op *diff.AddTableOp) string {
 	}
 
 	sql := fmt.Sprintf("-- op: add_table risk:low\nCREATE TABLE %s (\n%s\n);",
-		quoteQualifiedIdentifier(table.Schema, table.Name),
+		util.QuoteQualifiedIdentifier(table.Schema, table.Name),
 		strings.Join(lines, ",\n"))
 	return sql
 }
@@ -252,13 +253,13 @@ func (r *Renderer) renderDropTable(op *diff.DropTableOp) string {
 	if r.useIfExists {
 		ifExists = "IF EXISTS "
 	}
-	return fmt.Sprintf("-- op: drop_table risk:high\nDROP TABLE %s%s;", ifExists, quoteQualifiedIdentifier(op.Schema, op.Name))
+	return fmt.Sprintf("-- op: drop_table risk:high\nDROP TABLE %s%s;", ifExists, util.QuoteQualifiedIdentifier(op.Schema, op.Name))
 }
 
 func (r *Renderer) renderAddColumn(op *diff.AddColumnOp) string {
 	col := op.Column
 	sql := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s",
-		quoteQualifiedIdentifier(op.Schema, op.Table), quoteIdentifier(col.Name), col.DataType)
+		util.QuoteQualifiedIdentifier(op.Schema, op.Table), util.QuoteIdentifier(col.Name), col.DataType)
 
 	if col.IsIdentity {
 		switch col.IdentityKind {
@@ -270,7 +271,7 @@ func (r *Renderer) renderAddColumn(op *diff.AddColumnOp) string {
 	}
 
 	if col.Collation != "" {
-		sql += fmt.Sprintf(" COLLATE %s", quoteIdentifier(col.Collation))
+		sql += fmt.Sprintf(" COLLATE %s", util.QuoteIdentifier(col.Collation))
 	}
 	if !col.IsNullable {
 		sql += " NOT NULL"
@@ -284,7 +285,7 @@ func (r *Renderer) renderAddColumn(op *diff.AddColumnOp) string {
 
 func (r *Renderer) renderAlterColumnType(op *diff.AlterColumnTypeOp) string {
 	sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s",
-		quoteQualifiedIdentifier(op.Schema, op.Table), quoteIdentifier(op.Column), op.ToType)
+		util.QuoteQualifiedIdentifier(op.Schema, op.Table), util.QuoteIdentifier(op.Column), op.ToType)
 	if op.UsingExpr != "" {
 		sql += " USING " + op.UsingExpr
 	}
@@ -293,13 +294,13 @@ func (r *Renderer) renderAlterColumnType(op *diff.AlterColumnTypeOp) string {
 
 func (r *Renderer) renderSetNotNull(op *diff.SetNotNullOp) string {
 	sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET NOT NULL",
-		quoteQualifiedIdentifier(op.Schema, op.Table), quoteIdentifier(op.Column))
+		util.QuoteQualifiedIdentifier(op.Schema, op.Table), util.QuoteIdentifier(op.Column))
 	return fmt.Sprintf("-- op: set_not_null risk:low\n%s;", sql)
 }
 
 func (r *Renderer) renderDropNotNull(op *diff.DropNotNullOp) string {
 	sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL",
-		quoteQualifiedIdentifier(op.Schema, op.Table), quoteIdentifier(op.Column))
+		util.QuoteQualifiedIdentifier(op.Schema, op.Table), util.QuoteIdentifier(op.Column))
 	return fmt.Sprintf("-- op: drop_not_null risk:low\n%s;", sql)
 }
 
@@ -331,14 +332,14 @@ func (r *Renderer) renderCreateIndex(op *diff.CreateIndexOp) string {
 		}
 	} else if len(idx.Columns) > 0 {
 		for _, c := range idx.Columns {
-			quotedItems = append(quotedItems, quoteIdentifier(c))
+			quotedItems = append(quotedItems, util.QuoteIdentifier(c))
 		}
 	}
 	items := strings.Join(quotedItems, ", ")
 
 	sql := fmt.Sprintf("CREATE %s%s%sINDEX %s ON %s%s (%s)",
-		unique, concurrently, ifNotExists, quoteIdentifier(idx.Name),
-		quoteQualifiedIdentifier(op.Schema, idx.Table), method, items)
+		unique, concurrently, ifNotExists, util.QuoteIdentifier(idx.Name),
+		util.QuoteQualifiedIdentifier(op.Schema, idx.Table), method, items)
 
 	if idx.WhereClause != "" {
 		sql += " WHERE " + idx.WhereClause
@@ -349,12 +350,12 @@ func (r *Renderer) renderCreateIndex(op *diff.CreateIndexOp) string {
 func renderIndexElem(elem model.IndexElem) string {
 	item := ""
 	if elem.Name != "" {
-		item = quoteIdentifier(elem.Name)
+		item = util.QuoteIdentifier(elem.Name)
 	} else if elem.Expr != "" {
 		item = "(" + elem.Expr + ")"
 	}
 	if elem.Collation != "" {
-		item += " COLLATE " + quoteIdentifier(elem.Collation)
+		item += " COLLATE " + util.QuoteIdentifier(elem.Collation)
 	}
 	if elem.Opclass != "" {
 		item += " " + elem.Opclass
@@ -370,7 +371,7 @@ func renderIndexElem(elem model.IndexElem) string {
 
 func (r *Renderer) renderDropIndex(op *diff.DropIndexOp) string {
 	return fmt.Sprintf("-- op: drop_index risk:medium\nDROP INDEX %s%s;",
-		ifExistsPrefix(r.useIfExists), quoteQualifiedIdentifier(op.Schema, op.Name))
+		ifExistsPrefix(r.useIfExists), util.QuoteQualifiedIdentifier(op.Schema, op.Name))
 }
 
 func (r *Renderer) renderAddEnumType(op *diff.AddEnumTypeOp) string {
@@ -379,18 +380,18 @@ func (r *Renderer) renderAddEnumType(op *diff.AddEnumTypeOp) string {
 		labels[i] = quoteString(label)
 	}
 	sql := fmt.Sprintf("CREATE TYPE %s AS ENUM (%s)",
-		quoteQualifiedIdentifier(op.Schema, op.Type.Name), strings.Join(labels, ", "))
+		util.QuoteQualifiedIdentifier(op.Schema, op.Type.Name), strings.Join(labels, ", "))
 	return fmt.Sprintf("-- op: add_enum_type risk:low\n%s;", sql)
 }
 
 func (r *Renderer) renderCreateSchema(op *diff.CreateSchemaOp) string {
 	return fmt.Sprintf("-- op: create_schema risk:low\nCREATE SCHEMA IF NOT EXISTS %s;",
-		quoteIdentifier(op.Schema))
+		util.QuoteIdentifier(op.Schema))
 }
 
 func (r *Renderer) renderDropSchema(op *diff.DropSchemaOp) string {
 	return fmt.Sprintf("-- op: drop_schema risk:high\nDROP SCHEMA IF EXISTS %s;",
-		quoteIdentifier(op.Schema))
+		util.QuoteIdentifier(op.Schema))
 }
 
 func (r *Renderer) renderAlterColumnCollation(op *diff.AlterColumnCollationOp) string {
@@ -400,49 +401,49 @@ func (r *Renderer) renderAlterColumnCollation(op *diff.AlterColumnCollationOp) s
 	// data type (from the op) means the type itself is unchanged but PostgreSQL
 	// will still validate the column data against it.
 	sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET DATA TYPE %s",
-		quoteQualifiedIdentifier(op.Schema, op.Table),
-		quoteIdentifier(op.Column),
+		util.QuoteQualifiedIdentifier(op.Schema, op.Table),
+		util.QuoteIdentifier(op.Column),
 		op.DataType,
 	)
 	if op.ToCollation != "" {
-		sql += fmt.Sprintf(" COLLATE %s", quoteIdentifier(op.ToCollation))
+		sql += fmt.Sprintf(" COLLATE %s", util.QuoteIdentifier(op.ToCollation))
 	}
 	return fmt.Sprintf("-- op: alter_column_collation risk:low\n%s;", sql)
 }
 
 func (r *Renderer) renderDropEnumType(op *diff.DropEnumTypeOp) string {
 	return fmt.Sprintf("-- op: drop_enum_type risk:high\nDROP TYPE %s%s;",
-		ifExistsPrefix(r.useIfExists), quoteQualifiedIdentifier(op.Schema, op.Name))
+		ifExistsPrefix(r.useIfExists), util.QuoteQualifiedIdentifier(op.Schema, op.Name))
 }
 
 func (r *Renderer) renderCreateView(op *diff.CreateViewOp) string {
 	return fmt.Sprintf("-- op: create_view risk:low\nCREATE VIEW %s AS %s;",
-		quoteQualifiedIdentifier(op.Schema, op.View.Name), op.View.Definition)
+		util.QuoteQualifiedIdentifier(op.Schema, op.View.Name), op.View.Definition)
 }
 
 func (r *Renderer) renderReplaceView(op *diff.ReplaceViewOp) string {
 	return fmt.Sprintf("-- op: replace_view risk:medium\nCREATE OR REPLACE VIEW %s AS %s;",
-		quoteQualifiedIdentifier(op.Schema, op.View.Name), op.View.Definition)
+		util.QuoteQualifiedIdentifier(op.Schema, op.View.Name), op.View.Definition)
 }
 
 func (r *Renderer) renderDropView(op *diff.DropViewOp) string {
 	return fmt.Sprintf("-- op: drop_view risk:high\nDROP VIEW %s%s;",
-		ifExistsPrefix(r.useIfExists), quoteQualifiedIdentifier(op.Schema, op.Name))
+		ifExistsPrefix(r.useIfExists), util.QuoteQualifiedIdentifier(op.Schema, op.Name))
 }
 
 func (r *Renderer) renderCreateMaterializedView(op *diff.CreateMaterializedViewOp) string {
 	return fmt.Sprintf("-- op: create_materialized_view risk:low\nCREATE MATERIALIZED VIEW %s AS %s;",
-		quoteQualifiedIdentifier(op.Schema, op.MaterializedView.Name), op.MaterializedView.Definition)
+		util.QuoteQualifiedIdentifier(op.Schema, op.MaterializedView.Name), op.MaterializedView.Definition)
 }
 
 func (r *Renderer) renderDropMaterializedView(op *diff.DropMaterializedViewOp) string {
 	return fmt.Sprintf("-- op: drop_materialized_view risk:high\nDROP MATERIALIZED VIEW %s%s;",
-		ifExistsPrefix(r.useIfExists), quoteQualifiedIdentifier(op.Schema, op.Name))
+		ifExistsPrefix(r.useIfExists), util.QuoteQualifiedIdentifier(op.Schema, op.Name))
 }
 
 func (r *Renderer) renderCreateSequence(op *diff.CreateSequenceOp) string {
 	seq := op.Sequence
-	parts := []string{"CREATE SEQUENCE " + quoteQualifiedIdentifier(op.Schema, seq.Name)}
+	parts := []string{"CREATE SEQUENCE " + util.QuoteQualifiedIdentifier(op.Schema, seq.Name)}
 	if seq.DataType != "" {
 		parts = append(parts, "AS "+seq.DataType)
 	}
@@ -469,12 +470,12 @@ func (r *Renderer) renderCreateSequence(op *diff.CreateSequenceOp) string {
 
 func (r *Renderer) renderDropSequence(op *diff.DropSequenceOp) string {
 	return fmt.Sprintf("-- op: drop_sequence risk:high\nDROP SEQUENCE %s%s;",
-		ifExistsPrefix(r.useIfExists), quoteQualifiedIdentifier(op.Schema, op.Name))
+		ifExistsPrefix(r.useIfExists), util.QuoteQualifiedIdentifier(op.Schema, op.Name))
 }
 
 func (r *Renderer) renderAlterSequence(op *diff.AlterSequenceOp) string {
 	seq := op.To
-	parts := []string{"ALTER SEQUENCE " + quoteQualifiedIdentifier(op.Schema, seq.Name)}
+	parts := []string{"ALTER SEQUENCE " + util.QuoteQualifiedIdentifier(op.Schema, seq.Name)}
 	if seq.DataType != "" && seq.DataType != op.From.DataType {
 		parts = append(parts, "AS "+seq.DataType)
 	}
@@ -504,7 +505,7 @@ func (r *Renderer) renderAlterSequence(op *diff.AlterSequenceOp) string {
 }
 
 func (r *Renderer) renderCreateExtension(op *diff.CreateExtensionOp) string {
-	sql := "CREATE EXTENSION IF NOT EXISTS " + quoteIdentifier(op.Extension.Name)
+	sql := "CREATE EXTENSION IF NOT EXISTS " + util.QuoteIdentifier(op.Extension.Name)
 	if op.Extension.Version != "" {
 		sql += " WITH VERSION " + quoteString(op.Extension.Version)
 	}
@@ -513,24 +514,16 @@ func (r *Renderer) renderCreateExtension(op *diff.CreateExtensionOp) string {
 
 func (r *Renderer) renderDropExtension(op *diff.DropExtensionOp) string {
 	return fmt.Sprintf("-- op: drop_extension risk:high\nDROP EXTENSION %s%s;",
-		ifExistsPrefix(r.useIfExists), quoteIdentifier(op.Name))
+		ifExistsPrefix(r.useIfExists), util.QuoteIdentifier(op.Name))
 }
 
 func (r *Renderer) renderAlterExtensionUpdate(op *diff.AlterExtensionUpdateOp) string {
 	sql := fmt.Sprintf("ALTER EXTENSION %s UPDATE TO %s",
-		quoteIdentifier(op.Extension.Name), quoteString(op.Extension.Version))
+		util.QuoteIdentifier(op.Extension.Name), quoteString(op.Extension.Version))
 	return "-- op: alter_extension_update risk:low\n" + sql + ";"
 }
 
 // Helper functions
-
-func quoteIdentifierList(items []string) string {
-	quoted := make([]string, len(items))
-	for i, item := range items {
-		quoted[i] = quoteIdentifier(item)
-	}
-	return strings.Join(quoted, ", ")
-}
 
 func renderConstraint(c *model.Constraint) string {
 	if c == nil {
@@ -540,7 +533,7 @@ func renderConstraint(c *model.Constraint) string {
 	if definition == "" {
 		return ""
 	}
-	return fmt.Sprintf("CONSTRAINT %s %s", quoteIdentifier(c.Name), definition)
+	return fmt.Sprintf("CONSTRAINT %s %s", util.QuoteIdentifier(c.Name), definition)
 }
 
 func renderConstraintDefinition(c *model.Constraint) string {
@@ -549,12 +542,12 @@ func renderConstraintDefinition(c *model.Constraint) string {
 	}
 	switch c.Type {
 	case "primary_key":
-		return fmt.Sprintf("PRIMARY KEY (%s)", quoteIdentifierList(c.Columns))
+		return fmt.Sprintf("PRIMARY KEY (%s)", util.QuoteIdentifierList(c.Columns))
 	case "foreign_key":
 		sql := fmt.Sprintf("FOREIGN KEY (%s) REFERENCES %s (%s)",
-			quoteIdentifierList(c.Columns),
-			quoteQualifiedIdentifier(c.RefSchema, c.RefTable),
-			quoteIdentifierList(c.RefColumns),
+			util.QuoteIdentifierList(c.Columns),
+			util.QuoteQualifiedIdentifier(c.RefSchema, c.RefTable),
+			util.QuoteIdentifierList(c.RefColumns),
 		)
 		if c.OnDelete != "" {
 			sql += fmt.Sprintf(" ON DELETE %s", c.OnDelete)
@@ -564,7 +557,7 @@ func renderConstraintDefinition(c *model.Constraint) string {
 		}
 		return sql
 	case "unique":
-		return fmt.Sprintf("UNIQUE (%s)", quoteIdentifierList(c.Columns))
+		return fmt.Sprintf("UNIQUE (%s)", util.QuoteIdentifierList(c.Columns))
 	case "check":
 		if c.Expression != "" {
 			return fmt.Sprintf("CHECK (%s)", c.Expression)
@@ -575,16 +568,6 @@ func renderConstraintDefinition(c *model.Constraint) string {
 		return c.Definition
 	}
 	return ""
-}
-
-func quoteIdentifier(id string) string {
-	// Always quote to be safe with reserved words
-	// Escape internal double quotes by doubling them (SQL standard)
-	return `"` + strings.ReplaceAll(id, `"`, `""`) + `"`
-}
-
-func quoteQualifiedIdentifier(schema, identifier string) string {
-	return fmt.Sprintf(`%s.%s`, quoteIdentifier(schema), quoteIdentifier(identifier))
 }
 
 func quoteString(s string) string {
