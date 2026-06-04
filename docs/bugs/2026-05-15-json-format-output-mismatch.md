@@ -8,7 +8,7 @@
 | **严重程度** | Medium |
 | **组件** | `internal/render/render.go` → `RenderJSON()` |
 | **相关文档** | `testdata/README.md` → 场景 2：JSON 格式输出 |
-| **状态** | Fixed |
+| **状态** | 已修复 |
 
 ---
 
