@@ -60,12 +60,28 @@ docs: 更新 README 安装说明
 - 运行 `make test` 确保所有测试通过
 - 优先使用表驱动测试
 - 数据库相关测试使用 `-short` 标志跳过
+- 核心逻辑（`internal/diff/`、`internal/plan/`、`internal/render/`、`internal/parser/`）建议保持 **80%+ 测试覆盖率**
+- 运行 `make test-coverage` 生成覆盖率报告
 
 ### 分支策略
 
 - `main`: 稳定版本，对应最新 release
-- `develop`: 开发分支，PR 合并目标
+- `develop`: 开发分支，**PR 合并目标**
 - 功能分支: `feature/xxx`, `fix/xxx`, `docs/xxx`
+
+> **重要**：所有 Pull Request 请提交到 `develop` 分支，不要直接提交到 `main`。
+
+### 代码审查流程
+
+1. 提交 PR 前，确保 `make ci` 通过所有检查（fmt、vet、lint、test）
+2. PR 描述中请说明变更内容、测试情况和相关 Issue
+3. 至少需要 **1 个 Approve** 才能合并
+4. 审查者会关注：
+   - 代码正确性和边界条件处理
+   - 测试覆盖是否充分
+   - 是否遵循项目架构模式（Handler Registry、DAG 排序等）
+   - 文档是否同步更新
+5. 收到审查意见后，请及时响应和修改
 
 ## 开发环境搭建
 
