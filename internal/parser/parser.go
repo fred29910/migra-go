@@ -7,6 +7,7 @@ package parser
 import (
 	"fmt"
 
+	"github.com/fred29910/migra-go/internal/errors"
 	"github.com/fred29910/migra-go/internal/model"
 	pg_query "github.com/pganalyze/pg_query_go/v6"
 )
@@ -74,7 +75,7 @@ func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
 
 	tree, err := pg_query.Parse(sql)
 	if err != nil {
-		return nil, fmt.Errorf("pg_query parse failed: %w", err)
+		return nil, fmt.Errorf("parse SQL: %w", errors.ErrParseFailed)
 	}
 
 	for _, rawStmt := range tree.Stmts {

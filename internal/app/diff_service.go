@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fred29910/migra-go/internal/diff"
+	"github.com/fred29910/migra-go/internal/errors"
 	"github.com/fred29910/migra-go/internal/model"
 	"github.com/fred29910/migra-go/internal/normalize"
 	"github.com/fred29910/migra-go/internal/plan"
@@ -53,11 +54,11 @@ func (s *diffService) Run(parent context.Context, cfg Config) (string, []string,
 
 	sourceSchema, err := s.deps.LoadSchema(ctx, cfg.Source, cfg.Schemas, cfg.Strict)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to load source: %w", err)
+		return "", nil, fmt.Errorf("load source: %w", errors.ErrLoadFailed)
 	}
 	targetSchema, err := s.deps.LoadSchema(ctx, cfg.Target, cfg.Schemas, cfg.Strict)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to load target: %w", err)
+		return "", nil, fmt.Errorf("load target: %w", errors.ErrLoadFailed)
 	}
 
 	ops, warnings, err := s.deps.Compute(sourceSchema, targetSchema, cfg)
