@@ -1,30 +1,27 @@
 package diff
 
 import (
-	"reflect"
 	"sort"
 
 	"github.com/fred29910/migra-go/internal/model"
+	"github.com/fred29910/migra-go/internal/util"
 )
 
 // diffTables compares tables between two namespaces
 func (c *diffContext) diffTables(source, target *model.Namespace) {
-	// If source is nil, all tables in target are new
 	if source == nil {
 		tableNames := make([]string, 0, len(target.Tables))
 		for name := range target.Tables {
 			tableNames = append(tableNames, name)
 		}
 		sort.Strings(tableNames)
-
 		for _, name := range tableNames {
-			table := target.Tables[name]
-			c.addOp(NewAddTableOp(target.Name, name, table))
+			c.addOp(NewAddTableOp(target.Name, name, target.Tables[name]))
 		}
 		return
 	}
 
-	// Find tables to add (in target but not in source) - sorted for deterministic output
+	// Find tables to add (in target but not in source)
 	addNames := make([]string, 0, len(target.Tables))
 	for name := range target.Tables {
 		if _, exists := source.Tables[name]; !exists {
@@ -33,11 +30,10 @@ func (c *diffContext) diffTables(source, target *model.Namespace) {
 	}
 	sort.Strings(addNames)
 	for _, name := range addNames {
-		table := target.Tables[name]
-		c.addOp(NewAddTableOp(target.Name, name, table))
+		c.addOp(NewAddTableOp(target.Name, name, target.Tables[name]))
 	}
 
-	// Find tables to drop (in source but not in target) - sorted for deterministic output
+	// Find tables to drop (in source but not in target)
 	dropNames := make([]string, 0, len(source.Tables))
 	for name := range source.Tables {
 		if _, exists := target.Tables[name]; !exists {
@@ -49,7 +45,7 @@ func (c *diffContext) diffTables(source, target *model.Namespace) {
 		c.addOp(NewDropTableOp(source.Name, name))
 	}
 
-	// Compare tables that exist in both - sorted for deterministic output
+	// Compare tables that exist in both
 	bothNames := make([]string, 0, len(target.Tables))
 	for name := range target.Tables {
 		if _, exists := source.Tables[name]; exists {
@@ -58,11 +54,9 @@ func (c *diffContext) diffTables(source, target *model.Namespace) {
 	}
 	sort.Strings(bothNames)
 	for _, name := range bothNames {
-		targetTable := target.Tables[name]
-		sourceTable := source.Tables[name]
-		c.diffTableColumns(source.Name, sourceTable, targetTable)
-		c.diffTableIndexes(source.Name, sourceTable, targetTable)
-		c.diffTableConstraints(source.Name, sourceTable, targetTable)
+		c.diffTableColumns(source.Name, source.Tables[name], target.Tables[name])
+		c.diffTableIndexes(source.Name, source.Tables[name], target.Tables[name])
+		c.diffTableConstraints(source.Name, source.Tables[name], target.Tables[name])
 	}
 }
 
@@ -113,14 +107,11 @@ func sameConstraintContent(a, b *model.Constraint) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
-	// Note: Definition is excluded from comparison because it's a derived field
-	// from pg_get_constraintdef (DB introspect only), not set by SQL file parser.
-	// Content equality is determined by structured fields: Type, Columns, Refs, Expression.
 	return a.Type == b.Type &&
-		reflect.DeepEqual(a.Columns, b.Columns) &&
+		util.SameStringSlice(a.Columns, b.Columns) &&
 		a.RefSchema == b.RefSchema &&
 		a.RefTable == b.RefTable &&
-		reflect.DeepEqual(a.RefColumns, b.RefColumns) &&
+		util.SameStringSlice(a.RefColumns, b.RefColumns) &&
 		a.Expression == b.Expression &&
 		a.OnDelete == b.OnDelete &&
 		a.OnUpdate == b.OnUpdate
@@ -137,22 +128,20 @@ func sameConstraintSemantics(a, b *model.Constraint) bool {
 	if a.Type != b.Type {
 		return false
 	}
-	if !reflect.DeepEqual(a.Columns, b.Columns) {
+	if !util.SameStringSlice(a.Columns, b.Columns) {
 		return false
 	}
-	// For foreign keys, also check reference target
 	if a.Type == "foreign_key" {
 		if a.RefSchema != b.RefSchema || a.RefTable != b.RefTable {
 			return false
 		}
-		if !reflect.DeepEqual(a.RefColumns, b.RefColumns) {
+		if !util.SameStringSlice(a.RefColumns, b.RefColumns) {
 			return false
 		}
 		if a.OnDelete != b.OnDelete || a.OnUpdate != b.OnUpdate {
 			return false
 		}
 	}
-	// For check constraints, also check expression
 	if a.Type == "check" && a.Expression != b.Expression {
 		return false
 	}
@@ -190,11 +179,7 @@ func isColumnRenameCandidate(src, tgt *model.Column) bool {
 
 // diffTableColumns compares columns between two tables
 func (c *diffContext) diffTableColumns(schema string, source, target *model.Table) {
-	// Phase 1: Detect column renames via heuristic matching.
-	// For columns that appear "dropped" in source and "added" in target,
-	// check if they match on data type, nullable, and default expression.
-	// If matched, emit RenameColumnOp instead of DropColumnOp + AddColumnOp.
-	sourceOnlyNames := make([]string, 0)
+	sourceOnlyNames := make([]string, 0, len(source.ColumnByName))
 	for name := range source.ColumnByName {
 		if _, exists := target.ColumnByName[name]; !exists {
 			sourceOnlyNames = append(sourceOnlyNames, name)
@@ -202,7 +187,7 @@ func (c *diffContext) diffTableColumns(schema string, source, target *model.Tabl
 	}
 	sort.Strings(sourceOnlyNames)
 
-	targetOnlyNames := make([]string, 0)
+	targetOnlyNames := make([]string, 0, len(target.ColumnByName))
 	for name := range target.ColumnByName {
 		if _, exists := source.ColumnByName[name]; !exists {
 			targetOnlyNames = append(targetOnlyNames, name)
