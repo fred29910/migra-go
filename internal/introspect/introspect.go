@@ -8,6 +8,12 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// Querier abstracts the query capability needed from a database connection.
+// Both *pgx.Conn and pgxmock implement this interface.
+type Querier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
+
 // LoadOptions contains options for loading schema from database
 type LoadOptions struct {
 	Schemas []string // If empty, defaults to []string{"public"}
@@ -28,17 +34,19 @@ func LoadFromDB(ctx context.Context, connStr string, opt LoadOptions) (*model.Sc
 
 // LoadFromDBWithConn reads schema using an existing connection
 func LoadFromDBWithConn(ctx context.Context, conn *pgx.Conn, opt LoadOptions) (*model.Schema, error) {
+	return loadFromQuerier(ctx, conn, opt)
+}
+
+func loadFromQuerier(ctx context.Context, q Querier, opt LoadOptions) (*model.Schema, error) {
 	schema := model.NewSchema()
 
-	// Default to public schema if none specified
 	schemas := opt.Schemas
 	if len(schemas) == 0 {
 		schemas = []string{"public"}
 	}
 
-	// Load each schema
 	for _, schemaName := range schemas {
-		ns, err := loadNamespace(ctx, conn, schemaName)
+		ns, err := loadNamespace(ctx, q, schemaName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load schema %s: %w", schemaName, err)
 		}
@@ -50,47 +58,31 @@ func LoadFromDBWithConn(ctx context.Context, conn *pgx.Conn, opt LoadOptions) (*
 	return schema, nil
 }
 
-// loadNamespace loads a single namespace (schema)
-func loadNamespace(ctx context.Context, conn *pgx.Conn, schemaName string) (*model.Namespace, error) {
+func loadNamespace(ctx context.Context, q Querier, schemaName string) (*model.Namespace, error) {
 	ns := model.NewNamespace(schemaName)
 
-	// Load tables and columns
-	if err := loadTables(ctx, conn, schemaName, ns); err != nil {
+	if err := loadTables(ctx, q, schemaName, ns); err != nil {
 		return nil, fmt.Errorf("failed to load tables: %w", err)
 	}
-
-	// Load constraints (primary keys, unique, check)
-	if err := loadConstraints(ctx, conn, schemaName, ns); err != nil {
+	if err := loadConstraints(ctx, q, schemaName, ns); err != nil {
 		return nil, fmt.Errorf("failed to load constraints: %w", err)
 	}
-
-	// Load foreign key constraints
-	if err := loadForeignKeys(ctx, conn, schemaName, ns); err != nil {
+	if err := loadForeignKeys(ctx, q, schemaName, ns); err != nil {
 		return nil, fmt.Errorf("failed to load foreign keys: %w", err)
 	}
-
-	// Load indexes
-	if err := loadIndexes(ctx, conn, schemaName, ns); err != nil {
+	if err := loadIndexes(ctx, q, schemaName, ns); err != nil {
 		return nil, fmt.Errorf("failed to load indexes: %w", err)
 	}
-
-	// Load enum types
-	if err := loadEnumTypes(ctx, conn, schemaName, ns); err != nil {
+	if err := loadEnumTypes(ctx, q, schemaName, ns); err != nil {
 		return nil, fmt.Errorf("failed to load enum types: %w", err)
 	}
-
-	// Load views
-	if err := loadViews(ctx, conn, schemaName, ns); err != nil {
+	if err := loadViews(ctx, q, schemaName, ns); err != nil {
 		return nil, fmt.Errorf("failed to load views: %w", err)
 	}
-
-	// Load sequences
-	if err := loadSequences(ctx, conn, schemaName, ns); err != nil {
+	if err := loadSequences(ctx, q, schemaName, ns); err != nil {
 		return nil, fmt.Errorf("failed to load sequences: %w", err)
 	}
-
-	// Load extensions
-	if err := loadExtensions(ctx, conn, schemaName, ns); err != nil {
+	if err := loadExtensions(ctx, q, schemaName, ns); err != nil {
 		return nil, fmt.Errorf("failed to load extensions: %w", err)
 	}
 

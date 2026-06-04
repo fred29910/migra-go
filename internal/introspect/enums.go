@@ -5,11 +5,10 @@ import (
 	"fmt"
 
 	"github.com/fred29910/migra-go/internal/model"
-	"github.com/jackc/pgx/v5"
 )
 
 // loadEnumTypes loads enum types from pg_type and pg_enum
-func loadEnumTypes(ctx context.Context, conn *pgx.Conn, schemaName string, ns *model.Namespace) error {
+func loadEnumTypes(ctx context.Context, q Querier, schemaName string, ns *model.Namespace) error {
 	query := `
 	SELECT t.typname, e.enumlabel, e.enumsortorder
 	FROM pg_type t
@@ -18,7 +17,7 @@ func loadEnumTypes(ctx context.Context, conn *pgx.Conn, schemaName string, ns *m
 	WHERE n.nspname = $1 AND t.typtype = 'e'
 	ORDER BY t.typname, e.enumsortorder`
 
-	rows, err := conn.Query(ctx, query, schemaName)
+	rows, err := q.Query(ctx, query, schemaName)
 	if err != nil {
 		return fmt.Errorf("query enum types: %w", err)
 	}
