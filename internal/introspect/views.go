@@ -6,10 +6,9 @@ import (
 	"strings"
 
 	"github.com/fred29910/migra-go/internal/model"
-	"github.com/jackc/pgx/v5"
 )
 
-func loadViews(ctx context.Context, conn *pgx.Conn, schemaName string, ns *model.Namespace) error {
+func loadViews(ctx context.Context, q Querier, schemaName string, ns *model.Namespace) error {
 	query := `
 SELECT viewname, definition, false AS materialized
 FROM pg_views
@@ -18,7 +17,7 @@ UNION ALL
 SELECT matviewname, definition, true AS materialized
 FROM pg_matviews
 WHERE schemaname = $1`
-	rows, err := conn.Query(ctx, query, schemaName)
+	rows, err := q.Query(ctx, query, schemaName)
 	if err != nil {
 		return fmt.Errorf("query views: %w", err)
 	}
