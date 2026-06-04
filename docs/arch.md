@@ -193,6 +193,8 @@ flowchart TD
 
 `create_table`, `add_column`, `create_enum_type`, `create_index`, `drop_column`, `alter_column_type`, `set_not_null`, `drop_not_null`, `set_default`, `drop_default`, `create_schema`, `rename_column`, `add_constraint`, `drop_constraint`
 
+> **注意**：视图（View）、序列（Sequence）和扩展（Extension）作为顶级对象（非表的子属性），其 Mutation 直接通过 Handler 应用到 Schema 层，不经过 AlterTable 路径。
+
 ### 2.6 语义归一化 (`internal/normalize/`)
 
 归一化是**原地修改** schema 对象，减少同义表达导致的误报。
@@ -273,6 +275,16 @@ flowchart TD
 
 SQL 格式覆盖全部 33 种 Operation 渲染：表操作、列操作、索引操作、约束操作、枚举操作、Schema 操作、标识列操作、视图操作、序列操作、扩展操作。
 
+**渲染器文件结构：**
+
+| 文件 | 说明 |
+|------|------|
+| `render.go` | 主渲染器（SQLEngine 接口），覆盖 33+ 操作渲染 |
+| `render_test.go` | 渲染器单元测试 |
+| `rename_render_test.go` | 重命名操作渲染测试 |
+
+> **注意**：视图渲染区分普通 view 和 materialized view。物化视图使用 `CREATE MATERIALIZED VIEW` / `DROP MATERIALIZED VIEW`，不使用 `CREATE OR REPLACE` 语义。扩展渲染使用 `quoteIdentifier(op.Name)` 而非 `quoteQualifiedIdentifier`，因为 PostgreSQL 的 `DROP EXTENSION` 不接受 schema-qualified 名称。
+
 ### 2.10 数据库内省 (`internal/introspect/`)
 
 ```mermaid
@@ -296,7 +308,17 @@ flowchart LR
     X --> Schema
 ```
 
-索引内省使用 `pg_get_indexdef()` 获取完整元素定义，通过 `internal/indexdef` 包解析为结构化 `IndexElem`。
+**内省加载器说明：**
+
+| 加载器 | 文件 | 说明 |
+|--------|------|------|
+| `loadTables` | `tables.go` | 加载表和列信息（含 IDENTITY、COLLATE） |
+| `loadConstraints` | `constraints.go` | 加载主键、外键、唯一、检查约束 |
+| `loadIndexes` | `indexes.go` | 使用 `pg_get_indexdef()` 获取完整元素定义，通过 `internal/indexdef` 包解析为结构化 `IndexElem` |
+| `loadEnumTypes` | `enums.go` | 加载枚举类型及其标签 |
+| `loadViews` | `views.go` | 加载视图定义（含物化视图标记 `materialized`） |
+| `loadSequences` | `sequences.go` | 加载序列属性（类型、start/increment/min/max/cache/cycle） |
+| `loadExtensions` | `extensions.go` | 加载扩展名和已安装版本 |
 
 ### 2.11 索引元素解析 (`internal/indexdef/`)
 
@@ -412,34 +434,51 @@ Pre-deploy（创建）→ Deploy（修改）→ Post-deploy（删除），确保
 │   │   ├── enum_handler.go
 │   │   ├── create_schema_handler.go
 │   │   ├── rename_stmt_handler.go
+│   │   ├── rename_column_mutation.go
 │   │   ├── view_handler.go
 │   │   ├── sequence_handler.go
 │   │   ├── extension_handler.go
+│   │   ├── handler_test.go  # Handler 综合测试
+│   │   ├── index_handler_test.go
+│   │   ├── rename_handler_test.go
+│   │   ├── rename_mutation_test.go
 │   │   └── parserutil/      # 解析辅助
 │   ├── indexdef/            索引元素解析
 │   │   └── parse.go         # pg_get_indexdef 解析
 │   ├── normalize/           语义归一化
 │   ├── diff/                差异比较
-│   │   ├── differ.go        # Differ 核心
-│   │   ├── operation.go     # 33 种 Operation
-│   │   ├── diff_tables.go   # 表级差异
-│   │   ├── diff_columns.go  # 列级差异
+│   │   ├── differ.go        # Differ 核心 + DiffEngine 接口
+│   │   ├── operation.go     # 33 种 Operation 定义
+│   │   ├── diff_tables.go   # 表级差异（列/索引/约束对比）
+│   │   ├── diff_columns.go  # 列级差异（4 阶段管线）
 │   │   ├── context.go       # diffContext
-│   │   └── rename_column_op.go
+│   │   ├── rename_column_op.go # 重命名列操作
+│   │   ├── rename_column_op_test.go
+│   │   ├── diff_objects_test.go # 对象级差异测试
+│   │   ├── diff_rename_column_test.go
+│   │   ├── differ_test.go
+│   │   ├── diff_constraint_test.go
+│   │   ├── diff_index_test.go
+│   │   └── operation_test.go
 │   ├── plan/                执行计划
 │   │   ├── plan.go          # 三阶段 + assignStage
 │   │   └── dag.go           # Kahn 拓扑排序
 │   ├── render/              渲染器
-│   │   └── render.go        # SQL/JSON 渲染
+│   │   ├── render.go        # SQL/JSON 渲染（33+ 操作）
+│   │   ├── render_test.go   # 渲染器测试
+│   │   └── rename_render_test.go # 重命名渲染测试
 │   ├── introspect/          数据库内省
 │   │   ├── introspect.go    # 主入口
-│   │   ├── tables.go        # 表/列加载
-│   │   ├── constraints.go   # 约束加载
-│   │   ├── indexes.go       # 索引加载
+│   │   ├── tables.go        # 表/列加载（含 IDENTITY、COLLATE）
+│   │   ├── constraints.go   # 约束加载（PK/FK/UNIQUE/CHECK）
+│   │   ├── indexes.go       # 索引加载（pg_get_indexdef 解析）
 │   │   ├── enums.go         # 枚举加载
-│   │   ├── views.go         # 视图加载
-│   │   ├── sequences.go     # 序列加载
-│   │   └── extensions.go    # 扩展加载
+│   │   ├── views.go         # 视图加载（含物化视图标记）
+│   │   ├── sequences.go     # 序列加载（类型/start/increment/min/max/cache/cycle）
+│   │   ├── extensions.go    # 扩展加载（名称+版本）
+│   │   ├── tables_test.go
+│   │   ├── indexes_test.go
+│   │   └── enums_test.go
 │   ├── version/             版本信息
 │   └── testutil/            测试工具
 ├── docs/                    文档

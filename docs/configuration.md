@@ -46,6 +46,17 @@ logging:
 
 示例文件：`examples/config.yaml`
 
+### .env 文件
+
+migra 支持通过 `.env` 文件加载环境变量配置（使用 [godotenv](https://github.com/joho/godotenv) 自动加载）：
+
+```bash
+cp examples/.env.example .env
+# 编辑 .env 填入实际配置
+```
+
+`.env` 文件中的变量名与下方「环境变量配置」一节中的名称一致（使用 `MIGRA_` 前缀）。
+
 > **注意**：`diff.timeout` 配置项在代码中**未绑定到 Viper**，因此 YAML 配置文件中的 `diff.timeout` 值不会生效。超时时间只能通过 CLI 标志 `--timeout` 设置（默认 `30s`）。
 
 ### 环境变量配置
@@ -102,7 +113,7 @@ MIGRA_LOGGING_FORMAT=text
 | `-s, --schema` | 指定要比较的 Schema 列表（可指定多个） | `public` |
 | `-f, --format` | 输出格式：`sql` 或 `json` | `sql` |
 | `--unsafe-drop` | 允许输出/执行危险的 DROP 操作 | `false` |
-| `--strict` | 遇到不支持的语句时直接失败退出 | `false` |
+| `--strict` | 遇到不支持的语句时直接失败退出（默认跳过并警告） | `false` |
 | `--timeout` | Schema 加载超时时间（如 `30s`, `2m`） | `30s` |
 | `-o, --output` | 输出到文件（默认输出到 stdout） | — |
 
