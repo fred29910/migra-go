@@ -8,7 +8,7 @@
 | **严重程度** | 🔴 高（功能完全不可用） |
 | **影响范围** | 所有包含 `CREATE SCHEMA` 语句的 SQL 文件/目录 diff |
 | **触发命令** | `./migra diff --schema public --schema auth testdata/diff/multi_schema/v1/ testdata/diff/multi_schema/v2/` |
-| **状态** | Fixed |
+| **状态** | 已修复 |
 
 ---
 
