@@ -137,12 +137,12 @@
 
 | 特性 | 状态 | 说明 |
 |------|------|------|
-| **视图** (`CREATE VIEW`) | ✅ | 支持普通 view 的 parse、diff、render、introspect。物化视图可被内省加载但 diff/render 将其视为普通 view 处理。 |
+|| **视图** (`CREATE VIEW`) | ✅ | 支持普通 view 的 parse、diff、render、introspect。物化视图可被内省加载（标记 `materialized`），渲染时区分 `CREATE MATERIALIZED VIEW` / `DROP MATERIALIZED VIEW`。 |
 | **序列** (`CREATE SEQUENCE`) | ✅ | 完整支持序列的 parse、diff、render、introspect。支持数据类型、start/increment/min/max/cache/cycle 属性变更检测。 |
 | **触发器** (`CREATE TRIGGER`) | ❌ | 不支持 |
 | **规则** (`CREATE RULE`) | ❌ | 不支持 |
 | **行级安全策略** (`CREATE POLICY`) | ❌ | 不支持 |
-| **扩展** (`CREATE EXTENSION`) | ✅ | 完整支持扩展的 parse、diff、render、introspect。支持 create/drop 和 update to version。 |
+|| **扩展** (`CREATE EXTENSION`) | ✅ | 完整支持扩展的 parse、diff、render、introspect。支持 create/drop 和 update to version。渲染使用 `quoteIdentifier`（不含 schema 前缀）。 |
 | **排序规则** (`CREATE COLLATION`) | ❌ | 不支持 |
 | **全文搜索配置** (`CREATE TEXT SEARCH`) | ❌ | 不支持 |
 | **函数 / 过程** (`CREATE FUNCTION/PROCEDURE`) | ❌ | 不支持 |
@@ -223,3 +223,15 @@
 13. **数据库自省的索引信息有限**: DBLoader 现已通过 `pg_get_indexdef(indexrelid, column_no, true)` 按索引元素获取完整定义（表达式、opclass、collation、排序、NULLS），结构化解析为 `model.IndexElem`。`CONCURRENTLY` 标志仍需从 `pg_index` 元组字段提取，当前仅在 SQL 文件解析路径中可用。
 
 14. **`Rename Column` 启发式检测**: 见限制 #8。仅当列属性完全匹配时才判定为重命名，否则回退为 `DROP COLUMN + ADD COLUMN`。
+
+15. **`ALTER COLUMN TYPE ... USING`**: 当前 `AlterColumnTypeOp` 只有 `FromType` / `ToType`，Renderer 不输出 `USING` 表达式。
+
+16. **物化视图渲染**: 物化视图使用 `CREATE MATERIALIZED VIEW` / `DROP MATERIALIZED VIEW`，不使用 `CREATE OR REPLACE` 语义（PostgreSQL 不支持 `CREATE OR REPLACE MATERIALIZED VIEW`）。
+
+17. **序列 CYCLE 渲染**: `ALTER SEQUENCE` 根据目标状态分别渲染 `CYCLE` / `NO CYCLE`。
+
+18. **`strict` 行为一致性**: `SQLFileLoader` 和 `DirectoryLoader` 对 `strict` 参数的处理已统一：非 strict 模式下跳过不支持的语句并输出警告。
+
+19. **push 超时上下文**: push 交互流程已将 schema 加载超时和执行阶段上下文拆分，避免用户在交互确认过程中触发超时。
+
+20. **`DROP EXTENSION` 渲染**: 使用 `quoteIdentifier(op.Name)`，因为 PostgreSQL 的 `DROP EXTENSION` 不接受 schema-qualified 名称。
