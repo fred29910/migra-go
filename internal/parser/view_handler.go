@@ -25,6 +25,28 @@ func (h *CreateViewHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error
 	}}, nil
 }
 
+// CreateMaterializedViewHandler handles CREATE MATERIALIZED VIEW statements.
+// In pg_query, CREATE MATERIALIZED VIEW is represented as a CreateTableAsStmt
+// with Objtype == ObjectType_OBJECT_MATVIEW.
+type CreateMaterializedViewHandler struct{}
+
+func (h *CreateMaterializedViewHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error) {
+	stmt := node.GetCreateTableAsStmt()
+	if stmt == nil {
+		return nil, fmt.Errorf("CreateMaterializedViewHandler: expected CreateTableAsStmt, got %T", node)
+	}
+	if stmt.Objtype != pg_query.ObjectType_OBJECT_MATVIEW {
+		return nil, fmt.Errorf("CreateMaterializedViewHandler: expected OBJECT_MATVIEW, got %v", stmt.Objtype)
+	}
+	rel := stmt.Into.GetRel()
+	name, schemaName := parserutil.ParseRelation(rel)
+	definition := strings.TrimSuffix(parserutil.DeparseNode(stmt.Query), ";")
+	return []SchemaMutation{CreateViewMutation{
+		Schema: schemaName,
+		View:   model.View{Name: name, Definition: definition, Materialized: true},
+	}}, nil
+}
+
 // CreateViewMutation describes creating a view.
 type CreateViewMutation struct {
 	Schema string

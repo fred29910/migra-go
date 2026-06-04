@@ -517,3 +517,42 @@ func TestRenderCreateIndex_WithElementCollation(t *testing.T) {
 		t.Fatalf("expected %q in:\n%s", want, sql)
 	}
 }
+
+func TestRenderCreateMaterializedView(t *testing.T) {
+	r := NewRenderer()
+	op := diff.NewCreateMaterializedViewOp("public", &model.View{
+		Name:       "user_summary",
+		Definition: "SELECT count(*) FROM users",
+		Materialized: true,
+	})
+	sql := r.Render(op)
+	want := `CREATE MATERIALIZED VIEW "public"."user_summary" AS SELECT count(*) FROM users;`
+	if !strings.Contains(sql, want) {
+		t.Fatalf("expected %q in:\n%s", want, sql)
+	}
+}
+
+func TestRenderDropMaterializedView(t *testing.T) {
+	r := NewRenderer()
+	op := diff.NewDropMaterializedViewOp("public", "user_summary")
+	sql := r.Render(op)
+	want := `DROP MATERIALIZED VIEW IF EXISTS "public"."user_summary";`
+	if !strings.Contains(sql, want) {
+		t.Fatalf("expected %q in:\n%s", want, sql)
+	}
+}
+
+func TestRenderDropExtension_NoSchemaPrefix(t *testing.T) {
+	r := NewRenderer()
+	op := diff.NewDropExtensionOp("public", "pgcrypto")
+	sql := r.Render(op)
+	// DROP EXTENSION must NOT include schema prefix
+	notWant := `"public"."pgcrypto"`
+	if strings.Contains(sql, notWant) {
+		t.Fatalf("DROP EXTENSION should not contain schema prefix, got:\n%s", sql)
+	}
+	want := `DROP EXTENSION IF EXISTS "pgcrypto";`
+	if !strings.Contains(sql, want) {
+		t.Fatalf("expected %q in:\n%s", want, sql)
+	}
+}

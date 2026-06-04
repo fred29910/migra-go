@@ -199,7 +199,12 @@ func (c *diffContext) diffViews(source, target *model.Namespace) {
 		}
 		sort.Strings(names)
 		for _, name := range names {
-			c.addOp(NewCreateViewOp(target.Name, target.Views[name]))
+			view := target.Views[name]
+			if view.Materialized {
+				c.addOp(NewCreateMaterializedViewOp(target.Name, view))
+			} else {
+				c.addOp(NewCreateViewOp(target.Name, view))
+			}
 		}
 		return
 	}
@@ -211,15 +216,35 @@ func (c *diffContext) diffViews(source, target *model.Namespace) {
 	}
 	sort.Strings(targetNames)
 	for _, name := range targetNames {
+		tgtView := target.Views[name]
 		if src, ok := source.Views[name]; !ok {
-			c.addOp(NewCreateViewOp(target.Name, target.Views[name]))
-		} else if src.Materialized != target.Views[name].Materialized {
-			drop := NewDropViewOp(source.Name, name)
-			drop.IsRecreate = true
-			c.addOp(drop)
-			c.addOp(NewCreateViewOp(target.Name, target.Views[name]))
-		} else if src.Definition != target.Views[name].Definition {
-			c.addOp(NewReplaceViewOp(target.Name, target.Views[name]))
+			if tgtView.Materialized {
+				c.addOp(NewCreateMaterializedViewOp(target.Name, tgtView))
+			} else {
+				c.addOp(NewCreateViewOp(target.Name, tgtView))
+			}
+		} else if src.Materialized != tgtView.Materialized {
+			// View type changed (regular <-> materialized): drop old, create new
+			if src.Materialized {
+				c.addOp(NewDropMaterializedViewOp(source.Name, name))
+			} else {
+				drop := NewDropViewOp(source.Name, name)
+				drop.IsRecreate = true
+				c.addOp(drop)
+			}
+			if tgtView.Materialized {
+				c.addOp(NewCreateMaterializedViewOp(target.Name, tgtView))
+			} else {
+				c.addOp(NewCreateViewOp(target.Name, tgtView))
+			}
+		} else if src.Definition != tgtView.Definition {
+			if tgtView.Materialized {
+				// Materialized views don't support OR REPLACE; drop + recreate
+				c.addOp(NewDropMaterializedViewOp(source.Name, name))
+				c.addOp(NewCreateMaterializedViewOp(target.Name, tgtView))
+			} else {
+				c.addOp(NewReplaceViewOp(target.Name, tgtView))
+			}
 		}
 	}
 
@@ -231,7 +256,11 @@ func (c *diffContext) diffViews(source, target *model.Namespace) {
 	sort.Strings(sourceNames)
 	for _, name := range sourceNames {
 		if _, ok := target.Views[name]; !ok {
-			c.addOp(NewDropViewOp(source.Name, name))
+			if source.Views[name].Materialized {
+				c.addOp(NewDropMaterializedViewOp(source.Name, name))
+			} else {
+				c.addOp(NewDropViewOp(source.Name, name))
+			}
 		}
 	}
 }

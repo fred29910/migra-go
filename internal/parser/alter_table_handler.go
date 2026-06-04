@@ -164,5 +164,5 @@ func (h *AlterTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error
 
 // extractDefaultExpr extracts default expression from a node
 func extractDefaultExpr(node *pg_query.Node) string {
-	return fmt.Sprintf("%v", node)
+	return parserutil.DeparseNode(node)
 }
