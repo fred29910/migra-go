@@ -2,23 +2,15 @@
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
     "sisyphus": {
-      "model": "opencode/deepseek-v4-flash-free",
+      "model": "opencode/mimo-v2.5-free",
       "variant": "max",
       "fallback_models": [
         {
-          "model": "github-copilot/claude-opus-4.7",
+          "model": "opencode/nemotron-3-super-free",
           "variant": "max"
         },
         {
-          "model": "opencode/claude-opus-4-7",
-          "variant": "max"
-        },
-        {
-          "model": "opencode/kimi-k2.5"
-        },
-        {
-          "model": "openai/gpt-5.5",
-          "variant": "medium"
+          "model": "opencode/minimax-m3-free"
         },
         {
           "model": "opencode/deepseek-v4-flash-free",
@@ -29,23 +21,20 @@
           "variant": "medium"
         },
         {
-          "model": "opencode/qwen3.6-plus-free"
-        },
-        {
           "model": "opencode/big-pickle"
         }
       ]
     },
     "hephaestus": {
-      "model": "openrouter/openrouter/owl-alpha",
+      "model": "opencode/nemotron-3-super-free",
       "variant": "medium",
       "fallback_models": [
         {
-          "model": "opencode/nemotron-3-super-free",
+          "model": "openrouter/openrouter/owl-alpha",
           "variant": "medium"
         },
         {
-          "model": "openrouter/arcee-ai/trinity-large-thinking:free",
+          "model": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
           "variant": "medium"
         },
         {
@@ -59,11 +48,11 @@
       ]
     },
     "oracle": {
-      "model": "anthropic/claude-opus-4-7",
+      "model": "opencode/mimo-v2.5-free",
       "variant": "high",
       "fallback_models": [
         {
-          "model": "openrouter/arcee-ai/trinity-large-thinking:free",
+          "model": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
           "variant": "high"
         },
         {
@@ -79,109 +68,67 @@
           "variant": "high"
         },
         {
-          "model": "github-copilot/gemini-3.1-pro-preview",
-          "variant": "high"
-        },
-        {
-          "model": "opencode/gemini-3.1-pro",
-          "variant": "high"
-        },
-        {
-          "model": "anthropic/claude-opus-4-7",
-          "variant": "max"
-        },
-        {
-          "model": "github-copilot/claude-opus-4.7",
-          "variant": "max"
-        },
-        {
-          "model": "opencode/claude-opus-4-7",
+          "model": "opencode/mimo-v2.5-free",
           "variant": "max"
         }
       ]
     },
     "librarian": {
-      "model": "openrouter/arcee-ai/trinity-large-thinking:free",
+      "model": "opencode/nemotron-3-super-free",
       "fallback_models": [
-         {
-          "model": "opencode/qwen3.6-plus-free",
+        {
+          "model": "opencode/deepseek-v4-flash-free",
           "variant": "high"
         },
         {
-          "model": "anthropic/claude-haiku-4-5"
+          "model": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+          "variant": "high"
         },
         {
-          "model": "opencode/claude-haiku-4-5"
-        },
-        {
-          "model": "openai/gpt-5.4-nano"
-        },
-        {
-          "model": "opencode/gpt-5.4-nano"
+          "model": "opencode/mimo-v2.5-free",
+          "variant": "high"
         }
       ]
     },
     "explore": {
-      "model": "google/antigravity-gemini-3-flash",
+      "model": "opencode/deepseek-v4-flash-free",
       "fallback_models": [
         {
-          "model": "openrouter/arcee-ai/trinity-large-thinking:free"
+          "model": "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
         },
         {
-          "model": "anthropic/claude-haiku-4-5"
-        },
-        {
-          "model": "opencode/claude-haiku-4-5"
-        },
-        {
-          "model": "openai/gpt-5.4-nano"
-        },
-        {
-          "model": "opencode/gpt-5.4-nano"
+          "model": "opencode/mimo-v2.5-free"
         }
       ]
     },
     "multimodal-looker": {
-      "model": "google/antigravity-gemini-3-flash",
+      "model": "opencode/mino-v2.5-free",
       "variant": "medium",
       "fallback_models": [
         {
-          "model": "opencode/qwen3.6-plus-free",
+          "model": "opencode/minimax-m3-free",
           "variant": "medium"
         },
         {
-          "model": "openrouter/arcee-ai/trinity-large-thinking:free",
+          "model": "google/antigravity-gemini-3-flash",
+          "variant": "medium"
+        },
+        {
+          "model": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
           "variant": "high"
-        },
-        {
-          "model": "openai/gpt-5-nano"
-        },
-        {
-          "model": "github-copilot/gpt-5-nano"
-        },
-        {
-          "model": "opencode/gpt-5-nano"
         }
       ]
     },
     "prometheus": {
-      "model": "anthropic/big-pickle",
+      "model": "oepncode/big-pickle",
       "variant": "max",
       "fallback_models": [
         {
-          "model": "github-copilot/claude-opus-4.7",
+          "model": "opencode/mimo-v2.5-free",
           "variant": "max"
         },
         {
-          "model": "opencode/claude-opus-4-7",
-          "variant": "max"
-        },
-        {
-          "model": "openai/gpt-5.5",
-          "variant": "high"
-        },
-        {
-          "model": "openrouter/arcee-ai/trinity-large-thinking:free",
+          "model": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
           "variant": "high"
         },
         {
@@ -194,12 +141,6 @@
         },
         {
           "model": "google/gemini-3.1-pro-preview"
-        },
-        {
-          "model": "github-copilot/gemini-3.1-pro-preview"
-        },
-        {
-          "model": "opencode/gemini-3.1-pro"
         }
       ]
     },
@@ -207,29 +148,14 @@
       "model": "openrouter/openrouter/owl-alpha",
       "fallback_models": [
         {
+          "model": "opencode/mimo-v2.5-free",
+          "variant": "max"
+        },
+        {
           "model": "openrouter/inclusionai/ring-2.6-1t:free"
         },
         {
-          "model": "opencode/claude-sonnet-4-6"
-        },
-        {
-          "model": "anthropic/claude-opus-4-7",
-          "variant": "max"
-        },
-        {
-          "model": "github-copilot/claude-opus-4.7",
-          "variant": "max"
-        },
-        {
-          "model": "opencode/claude-opus-4-7",
-          "variant": "max"
-        },
-        {
-          "model": "openai/gpt-5.5",
-          "variant": "high"
-        },
-        {
-          "model": "openrouter/arcee-ai/trinity-large-thinking:free",
+          "model": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
           "variant": "high"
         },
         {
@@ -243,7 +169,7 @@
       ]
     },
     "momus": {
-      "model": "openrouter/inclusionai/ring-2.6-1t:free",
+      "model": "openrouter/minimax-m3-free",
       "variant": "xhigh",
       "fallback_models": [
         {
@@ -255,54 +181,28 @@
           "variant": "xhigh"
         },
         {
-          "model": "openrouter/arcee-ai/trinity-large-thinking:free",
+          "model": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
           "variant": "high"
         },
         {
-          "model": "anthropic/claude-opus-4-7",
-          "variant": "max"
-        },
-        {
-          "model": "github-copilot/claude-opus-4.7",
-          "variant": "max"
-        },
-        {
-          "model": "opencode/claude-opus-4-7",
+          "model": "opencode/mimo-v2.5-free",
           "variant": "max"
         },
         {
           "model": "google/gemini-3.1-pro-preview",
           "variant": "high"
-        },
-        {
-          "model": "github-copilot/gemini-3.1-pro-preview",
-          "variant": "high"
-        },
-        {
-          "model": "opencode/gemini-3.1-pro",
-          "variant": "high"
         }
       ]
     },
     "atlas": {
-      "model": "openrouter/inclusionai/ring-2.6-1t:free",
+      "model": "openrouter/minimax-m3-free",
       "fallback_models": [
-        {
-          "model": "github-copilot/claude-sonnet-4.6"
-        },
-        {
-          "model": "opencode/claude-sonnet-4-6"
-        },
-        {
-          "model": "openai/gpt-5.5",
-          "variant": "medium"
-        },
         {
           "model": "opencode/deepseek-v4-flash-free",
           "variant": "medium"
         },
         {
-          "model": "openrouter/arcee-ai/trinity-large-thinking:free",
+          "model": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
           "variant": "high"
         },
         {
@@ -312,24 +212,14 @@
       ]
     },
     "sisyphus-junior": {
-      "model": "anthropic/claude-sonnet-4-6",
+      "model": "opencode/mimo-v2.5-free",
       "fallback_models": [
-        {
-          "model": "github-copilot/claude-sonnet-4.6"
-        },
-        {
-          "model": "opencode/claude-sonnet-4-6"
-        },
-        {
-          "model": "openai/gpt-5.5",
-          "variant": "medium"
-        },
         {
           "model": "opencode/deepseek-v4-flash-free",
           "variant": "medium"
         },
         {
-          "model": "openrouter/arcee-ai/trinity-large-thinking:free",
+          "model": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
           "variant": "high"
         },
         {
@@ -354,35 +244,23 @@
       "variant": "high",
       "fallback_models": [
         {
-          "model": "github-copilot/gemini-3.1-pro-preview",
-          "variant": "high"
+          "model": "opencode/minimax-m3-free"
         },
         {
           "model": "opencode/gemini-3.1-pro",
           "variant": "high"
         },
         {
-          "model": "opencode/glm-5"
-        },
-        {
           "model": "openrouter/inclusionai/ring-2.6-1t:free"
         },
         {
-          "model": "anthropic/claude-opus-4-7",
-          "variant": "max"
-        },
-        {
-          "model": "github-copilot/claude-opus-4.7",
-          "variant": "max"
-        },
-        {
-          "model": "opencode/claude-opus-4-7",
+          "model": "opencode/mimo-v2.5-free",
           "variant": "max"
         }
       ]
     },
     "ultrabrain": {
-      "model": "openai/gpt-5.5",
+      "model": "opencode/mimo-v2.5-free",
       "variant": "xhigh",
       "fallback_models": [
         {
@@ -394,31 +272,19 @@
           "variant": "high"
         },
         {
-          "model": "github-copilot/gemini-3.1-pro-preview",
-          "variant": "high"
-        },
-        {
-          "model": "opencode/gemini-3.1-pro",
-          "variant": "high"
-        },
-        {
-          "model": "anthropic/claude-opus-4-7",
-          "variant": "max"
-        },
-        {
-          "model": "github-copilot/claude-opus-4.7",
-          "variant": "max"
-        },
-        {
-          "model": "opencode/claude-opus-4-7",
+          "model": "opencode/mimo-v2.5-free",
           "variant": "max"
         }
       ]
     },
     "deep": {
-      "model":"opencode/deepseek-v4-flash-free",
+      "model": "opencode/deepseek-v4-flash-free",
       "variant": "medium",
       "fallback_models": [
+        {
+          "model": "opencode/mimo-v2.5-free",
+          "variant": "max"
+        },
         {
           "model": "google/gemini-3.1-pro-preview",
           "variant": "medium"
@@ -428,57 +294,22 @@
           "variant": "medium"
         },
         {
-          "model": "anthropic/claude-opus-4-7",
-          "variant": "max"
-        },
-        {
-          "model": "github-copilot/claude-opus-4.7",
-          "variant": "max"
-        },
-        {
-          "model": "opencode/claude-opus-4-7",
-          "variant": "max"
-        },
-        {
           "model": "google/gemini-3.1-pro-preview",
-          "variant": "high"
-        },
-        {
-          "model": "github-copilot/gemini-3.1-pro-preview",
-          "variant": "high"
-        },
-        {
-          "model": "opencode/gemini-3.1-pro",
           "variant": "high"
         }
       ]
     },
     "artistry": {
-      "model": "google/gemini-3.1-pro-preview",
+      "model": "opencode/mimo-v2.5-free",
       "variant": "high",
       "fallback_models": [
         {
-          "model": "github-copilot/gemini-3.1-pro-preview",
+          "model": "google/gemini-3.1-pro-preview",
           "variant": "high"
         },
         {
-          "model": "opencode/gemini-3.1-pro",
-          "variant": "high"
-        },
-        {
-          "model": "anthropic/claude-opus-4-7",
+          "model": "opencode/mimo-v2.5-free",
           "variant": "max"
-        },
-        {
-          "model": "github-copilot/claude-opus-4.7",
-          "variant": "max"
-        },
-        {
-          "model": "opencode/claude-opus-4-7",
-          "variant": "max"
-        },
-        {
-          "model": "openai/gpt-5.5"
         },
         {
           "model": "opencode/deepseek-v4-flash-free"
@@ -489,34 +320,13 @@
       ]
     },
     "quick": {
-      "model": "openai/gpt-5.4-mini",
+      "model": "opencode/mimo-v2.5-free",
       "fallback_models": [
         {
-          "model": "github-copilot/gpt-5.4-mini"
-        },
-        {
-          "model": "opencode/gpt-5.4-mini"
-        },
-        {
-          "model": "anthropic/claude-haiku-4-5"
-        },
-        {
-          "model": "github-copilot/claude-haiku-4.5"
-        },
-        {
-          "model": "opencode/claude-haiku-4-5"
+          "model": "opencode/minimax-m3-free"
         },
         {
           "model": "google/gemini-3-flash-preview"
-        },
-        {
-          "model": "github-copilot/gemini-3-flash-preview"
-        },
-        {
-          "model": "opencode/gemini-3-flash"
-        },
-        {
-          "model": "opencode/gpt-5-nano"
         },
         {
           "model": "opencode/deepseek-v4-flash-free"
@@ -527,31 +337,8 @@
       ]
     },
     "unspecified-low": {
-      "model":"google/gemini-3-flash-preview",
+      "model": "opencode/deepseek-v4-flash-free",
       "fallback_models": [
-        {
-          "model": "github-copilot/claude-sonnet-4.6"
-        },
-        {
-          "model": "opencode/claude-sonnet-4-6"
-        },
-        {
-          "model": "openai/gpt-5.3-codex",
-          "variant": "medium"
-        },
-        {
-          "model": "opencode/gpt-5.3-codex",
-          "variant": "medium"
-        },
-        {
-          "model":  "anthropic/claude-sonnet-4-6"
-        },
-        {
-          "model": "github-copilot/gemini-3-flash-preview"
-        },
-        {
-          "model": "opencode/gemini-3-flash"
-        },
         {
           "model": "opencode/deepseek-v4-flash-free"
         },
@@ -561,21 +348,9 @@
       ]
     },
     "unspecified-high": {
-      "model": "anthropic/claude-opus-4-7",
+      "model": "opencode/mimo-v2.5-free",
       "variant": "max",
       "fallback_models": [
-        {
-          "model": "github-copilot/claude-opus-4.7",
-          "variant": "max"
-        },
-        {
-          "model": "opencode/claude-opus-4-7",
-          "variant": "max"
-        },
-        {
-          "model": "openai/gpt-5.5",
-          "variant": "high"
-        },
         {
           "model": "opencode/deepseek-v4-flash-free",
           "variant": "high"
@@ -585,33 +360,15 @@
           "variant": "high"
         },
         {
-          "model": "opencode/glm-5"
-        },
-        {
-          "model": "opencode/kimi-k2.5"
+          "model": "opencode/minimax-m3-free"
         }
       ]
     },
     "writing": {
-      "model": "google/gemini-3-flash-preview",
+      "model": "opencode/deepseek-v4-flash-free",
       "fallback_models": [
         {
-          "model": "github-copilot/gemini-3-flash-preview"
-        },
-        {
-          "model": "opencode/gemini-3-flash"
-        },
-        {
-          "model": "anthropic/claude-sonnet-4-6"
-        },
-        {
-          "model": "github-copilot/claude-sonnet-4.6"
-        },
-        {
-          "model": "opencode/claude-sonnet-4-6"
-        },
-        {
-          "model": "opencode/deepseek-v4-flash-free"
+          "model": "google/gemini-3-flash-preview"
         },
         {
           "model": "opencode/qwen3.6-plus-free"
