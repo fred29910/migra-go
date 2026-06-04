@@ -23,6 +23,10 @@
 - ⏱️ **超时控制**：支持 `--timeout` 参数控制 Schema 加载超时时间。
 - 📁 **目录作为 Schema 来源**：支持递归扫描目录下所有 `.sql` 文件，合并为完整 schema 参与 diff，自动跳过隐藏文件/目录、支持嵌套子目录。
 - 🔌 **多种连接方式**：支持连接字符串、环境变量、`pg_service.conf`、`.pgpass` 等 PostgreSQL 标准连接方式。
+- 🏷️ **IDENTITY 列支持**：完整支持 `GENERATED ALWAYS/BY DEFAULT AS IDENTITY` 的解析、内省、Diff 和渲染。
+- 🔤 **排序规则支持**：支持列级 COLLATE 的解析、内省和差异检测。
+- 🗂️ **多 Schema 支持**：通过 `--schema` 指定多个 schema（如 `--schema public --schema auth`），支持跨 schema 外键引用。
+- 🔒 **严格模式**：`--strict` 控制在遇到不支持的语句时是直接失败还是跳过并警告。
 
 ## 快速开始
 
@@ -155,11 +159,11 @@ Validation passed: target schema matches expected state
 | `-s, --schema` | diff, push | 指定要比较的 Schema 列表（可指定多个） | `public` |
 | `-f, --format` | diff | 输出格式：`sql` 或 `json` | `sql` |
 | `--unsafe-drop` | diff, push | 允许输出/执行危险的 DROP 操作 | `false` |
-| `--strict` | diff | 遇到不支持的语句时直接失败退出 | `false` |
+| `--strict` | diff | 遇到不支持的语句时直接失败退出（默认跳过并警告） | `false` |
 | `--timeout` | diff, push | Schema 加载超时时间（如 `30s`, `2m`） | `30s` |
 | `-o, --output` | diff | 输出到文件（默认输出到 stdout） | - |
 | `--dry-run` | push | 显示 SQL 预览但不执行 | `false` |
-| `--execute` | push | 跳过交互确认直接执行（不推荐） | `false` |
+| `--execute` | push | 跳过交互确认直接执行（生产环境慎用） | `false` |
 | `--no-verify` | push | 跳过执行后校验 | `false` |
 | `-c, --config` | 全局 | 指定配置文件路径 | `~/.migra.yaml` 或 `./migra.yaml` |
 | `-v, --verbose` | 全局 | 输出详细日志 | `false` |
@@ -188,6 +192,13 @@ export MIGRA_DIFF_SCHEMAS="public,auth"
 export MIGRA_DIFF_FORMAT="sql"
 export MIGRA_DATABASE_SOURCE="postgres://localhost/db1"
 export MIGRA_DATABASE_TARGET="postgres://localhost/db2"
+```
+
+**.env 文件**（可选）：
+通过使用 [godotenv](https://github.com/joho/godotenv) 自动加载 `.env` 文件：
+```bash
+cp examples/.env.example .env
+# 编辑 .env 填入实际配置
 ```
 
 详细配置说明请参考 [docs/configuration.md](docs/configuration.md)。

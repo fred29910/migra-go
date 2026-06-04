@@ -31,17 +31,17 @@ const (
 	KindRenameColumn         Kind = "rename_column"
 
 	// P3 object operations
-	KindCreateView               Kind = "create_view"
-	KindDropView                 Kind = "drop_view"
-	KindReplaceView              Kind = "replace_view"
-	KindCreateMaterializedView   Kind = "create_materialized_view"
-	KindDropMaterializedView     Kind = "drop_materialized_view"
-	KindCreateSequence       Kind = "create_sequence"
-	KindDropSequence         Kind = "drop_sequence"
-	KindAlterSequence        Kind = "alter_sequence"
-	KindCreateExtension      Kind = "create_extension"
-	KindDropExtension        Kind = "drop_extension"
-	KindAlterExtensionUpdate Kind = "alter_extension_update"
+	KindCreateView             Kind = "create_view"
+	KindDropView               Kind = "drop_view"
+	KindReplaceView            Kind = "replace_view"
+	KindCreateMaterializedView Kind = "create_materialized_view"
+	KindDropMaterializedView   Kind = "drop_materialized_view"
+	KindCreateSequence         Kind = "create_sequence"
+	KindDropSequence           Kind = "drop_sequence"
+	KindAlterSequence          Kind = "alter_sequence"
+	KindCreateExtension        Kind = "create_extension"
+	KindDropExtension          Kind = "drop_extension"
+	KindAlterExtensionUpdate   Kind = "alter_extension_update"
 )
 
 // Operation is the interface for all diff operations
@@ -741,7 +741,7 @@ func (op *ReplaceViewOp) IsDestructive() bool { return false }
 // CreateMaterializedViewOp represents creating a new materialized view
 type CreateMaterializedViewOp struct {
 	baseOperation
-	Schema          string
+	Schema           string
 	MaterializedView *model.View
 }
 
@@ -751,7 +751,7 @@ func NewCreateMaterializedViewOp(schema string, view *model.View) *CreateMateria
 			kind:      KindCreateMaterializedView,
 			objectKey: model.NewObjectKey(schema, view.Name, model.KindView),
 		},
-		Schema:          schema,
+		Schema:           schema,
 		MaterializedView: view,
 	}
 }
