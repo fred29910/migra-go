@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -158,5 +160,164 @@ func TestParseDiffConfig_FormatDefaultsToSQLWhenNeitherFlagNorViperSet(t *testin
 	}
 	if cfg.Format != "sql" {
 		t.Errorf("expected default format 'sql', got %q", cfg.Format)
+	}
+}
+
+func TestParseDiffConfig_OneArgWithViperConfig(t *testing.T) {
+	viper.Reset()
+	defer viper.Reset()
+	viper.Set("database.url", "postgres://localhost/configdb")
+
+	cmd := newDiffTestCommand()
+	cfg, err := parseDiffConfig(cmd, []string{"a.sql"})
+	if err != nil {
+		t.Fatalf("parseDiffConfig failed: %v", err)
+	}
+	if cfg.Source != "a.sql" {
+		t.Errorf("expected source 'a.sql', got %q", cfg.Source)
+	}
+	if cfg.Target != "postgres://localhost/configdb" {
+		t.Errorf("expected target from viper config, got %q", cfg.Target)
+	}
+}
+
+func TestParseDiffConfig_OneArgWithoutViperConfig(t *testing.T) {
+	viper.Reset()
+	defer viper.Reset()
+
+	cmd := newDiffTestCommand()
+	_, err := parseDiffConfig(cmd, []string{"a.sql"})
+	if err == nil {
+		t.Fatal("expected error when 1 arg and no database.url config")
+	}
+}
+
+func TestParseDiffConfig_ZeroArgsWithViperConfig(t *testing.T) {
+	viper.Reset()
+	defer viper.Reset()
+	viper.Set("database.source", "postgres://localhost/src")
+	viper.Set("database.target", "postgres://localhost/tgt")
+
+	cmd := newDiffTestCommand()
+	cfg, err := parseDiffConfig(cmd, nil)
+	if err != nil {
+		t.Fatalf("parseDiffConfig failed: %v", err)
+	}
+	if cfg.Source != "postgres://localhost/src" {
+		t.Errorf("expected source from viper, got %q", cfg.Source)
+	}
+	if cfg.Target != "postgres://localhost/tgt" {
+		t.Errorf("expected target from viper, got %q", cfg.Target)
+	}
+}
+
+func TestParseDiffConfig_ZeroArgsWithoutViperConfig(t *testing.T) {
+	viper.Reset()
+	defer viper.Reset()
+
+	cmd := newDiffTestCommand()
+	_, err := parseDiffConfig(cmd, nil)
+	if err == nil {
+		t.Fatal("expected error when 0 args and no database config")
+	}
+}
+
+func TestParseDiffConfig_AllFlags(t *testing.T) {
+	cmd := newDiffTestCommand()
+	_ = cmd.Flags().Set("schema", "public,auth")
+	_ = cmd.Flags().Set("format", "json")
+	_ = cmd.Flags().Set("unsafe-drop", "true")
+	_ = cmd.Flags().Set("strict", "true")
+	_ = cmd.Flags().Set("output", "/tmp/out.sql")
+	_ = cmd.Flags().Set("timeout", "60s")
+
+	cfg, err := parseDiffConfig(cmd, []string{"a.sql", "b.sql"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Source != "a.sql" || cfg.Target != "b.sql" {
+		t.Errorf("unexpected source/target: %s / %s", cfg.Source, cfg.Target)
+	}
+	if cfg.Format != "json" {
+		t.Errorf("expected format 'json', got %q", cfg.Format)
+	}
+	if !cfg.UnsafeDrop {
+		t.Error("expected unsafe-drop=true")
+	}
+	if !cfg.Strict {
+		t.Error("expected strict=true")
+	}
+	if cfg.OutputFile != "/tmp/out.sql" {
+		t.Errorf("expected output '/tmp/out.sql', got %q", cfg.OutputFile)
+	}
+}
+
+func TestWriteOutputToFile(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "output.sql")
+	err := writeOutput("CREATE TABLE t(id int);", tmpFile)
+	if err != nil {
+		t.Fatalf("writeOutput failed: %v", err)
+	}
+	data, err := os.ReadFile(tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "CREATE TABLE t(id int);" {
+		t.Errorf("unexpected file content: %s", string(data))
+	}
+}
+
+func TestWriteOutputToStdout(t *testing.T) {
+	err := writeOutput("some sql", "")
+	if err != nil {
+		t.Fatalf("writeOutput to stdout failed: %v", err)
+	}
+}
+
+func TestInitConfigWithExplicitFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfgFile := filepath.Join(tmpDir, "migra.yaml")
+	if err := os.WriteFile(cfgFile, []byte("database:\n  url: postgres://test/configdb\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	viper.Reset()
+	defer viper.Reset()
+	viper.Set("config", cfgFile)
+
+	initConfig()
+
+	if got := viper.GetString("database.url"); got != "postgres://test/configdb" {
+		t.Errorf("expected database.url from config file, got %q", got)
+	}
+}
+
+func TestInitConfigWithoutExplicitFile(t *testing.T) {
+	viper.Reset()
+	defer viper.Reset()
+
+	initConfig()
+}
+
+func TestRunDiff_SQLFiles(t *testing.T) {
+	srcDir := t.TempDir()
+	tgtDir := t.TempDir()
+
+	srcSQL := "CREATE TABLE users (id SERIAL PRIMARY KEY, name VARCHAR(100) NOT NULL);"
+	tgtSQL := "CREATE TABLE users (id SERIAL PRIMARY KEY, name VARCHAR(100) NOT NULL, email VARCHAR(255));"
+
+	if err := os.WriteFile(filepath.Join(srcDir, "schema.sql"), []byte(srcSQL), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tgtDir, "schema.sql"), []byte(tgtSQL), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := newDiffTestCommand()
+	cmd.SetContext(context.Background())
+
+	err := runDiff(cmd, []string{srcDir, tgtDir})
+	if err != nil {
+		t.Fatalf("runDiff failed: %v", err)
 	}
 }
