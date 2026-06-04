@@ -300,7 +300,7 @@
       ]
     },
     "artistry": {
-      "model": "opencode/mimo-v2.5-free",
+      "model": "opencode/minimax-m3-free",
       "variant": "high",
       "fallback_models": [
         {
@@ -367,6 +367,9 @@
     "writing": {
       "model": "opencode/deepseek-v4-flash-free",
       "fallback_models": [
+        {
+          "model": "opencode/minimax-m3-free"
+        },
         {
           "model": "google/gemini-3-flash-preview"
         },
