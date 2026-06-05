@@ -919,21 +919,21 @@ func TestLoadFromQuerier_FullPipeline(t *testing.T) {
 	q, mock := newMock(t)
 
 	mock.ExpectQuery("SELECT").WithArgs(pgxmock.AnyArg()).WillReturnRows(emptyTableRows().
-			AddRow("posts", "id", "bigint", nil, "NO", "nextval('posts_id_seq'::regclass)", 1, "NO", nil, "").
-			AddRow("posts", "title", "text", nil, "NO", nil, 2, "NO", nil, ""))
+		AddRow("posts", "id", "bigint", nil, "NO", "nextval('posts_id_seq'::regclass)", 1, "NO", nil, "").
+		AddRow("posts", "title", "text", nil, "NO", nil, 2, "NO", nil, ""))
 	mock.ExpectQuery("SELECT").WithArgs(pgxmock.AnyArg()).WillReturnRows(emptyConstraintRows().
-			AddRow("posts_pkey", "p", "posts", []string{"id"}, "PRIMARY KEY (id)"))
+		AddRow("posts_pkey", "p", "posts", []string{"id"}, "PRIMARY KEY (id)"))
 	mock.ExpectQuery("SELECT").WithArgs(pgxmock.AnyArg()).WillReturnRows(emptyFKRows())
 	mock.ExpectQuery("SELECT").WithArgs(pgxmock.AnyArg()).WillReturnRows(emptyIndexRows().
-			AddRow("idx_posts_title", "posts", []string{"title"}, []string{"title"},
-				false, "btree", "CREATE INDEX idx_posts_title ON posts USING btree (title)", ""))
+		AddRow("idx_posts_title", "posts", []string{"title"}, []string{"title"},
+			false, "btree", "CREATE INDEX idx_posts_title ON posts USING btree (title)", ""))
 	mock.ExpectQuery("SELECT").WithArgs(pgxmock.AnyArg()).WillReturnRows(emptyEnumRows().
-			AddRow("post_status", "draft", float32(1)).
-			AddRow("post_status", "published", float32(2)))
+		AddRow("post_status", "draft", float32(1)).
+		AddRow("post_status", "published", float32(2)))
 	mock.ExpectQuery("SELECT").WithArgs(pgxmock.AnyArg()).WillReturnRows(emptyViewRows().
-			AddRow("published_posts", "SELECT * FROM posts WHERE status = 'published';", false))
+		AddRow("published_posts", "SELECT * FROM posts WHERE status = 'published';", false))
 	mock.ExpectQuery("SELECT").WithArgs(pgxmock.AnyArg()).WillReturnRows(emptySequenceRows().
-			AddRow("posts_id_seq", "bigint", int64(1), int64(1), int64(9223372036854775807), int64(1), false, int64(1)))
+		AddRow("posts_id_seq", "bigint", int64(1), int64(1), int64(9223372036854775807), int64(1), false, int64(1)))
 	mock.ExpectQuery("SELECT").WithArgs(pgxmock.AnyArg()).WillReturnRows(emptyExtensionRows())
 
 	schema, err := loadFromQuerier(context.Background(), q, LoadOptions{Schemas: []string{"public"}})
