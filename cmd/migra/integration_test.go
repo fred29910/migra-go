@@ -99,7 +99,7 @@ func TestIntegrationDiffRender(t *testing.T) {
 	}
 
 	// Test JSON rendering
-	jsonStr, err := render.RenderJSON(ops)
+	jsonStr, err := render.NewRenderer().RenderOutput(ops, "json")
 	if err != nil {
 		t.Errorf("RenderJSON failed: %v", err)
 	} else {

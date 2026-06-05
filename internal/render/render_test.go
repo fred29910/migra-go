@@ -321,7 +321,7 @@ func TestRenderCreateIndex_Quoted(t *testing.T) {
 			Columns: []string{"User Name", "id"},
 		},
 	}
-	sql := r.renderCreateIndex(op)
+	sql := renderCreateIndex(r, op)
 	expected := "-- op: add_index risk:low\nCREATE INDEX \"idx_user\" ON \"public\".\"users\" (\"User Name\", \"id\");"
 	if sql != expected {
 		t.Errorf("got %q, want %q", sql, expected)
