@@ -15,18 +15,22 @@ testdata/
 ├── edge_cases.sql                ← 边界 SQL 模式（引号标识符、继承表、分区表）
 │
 └── diff/                         ← 目录型 diff 场景（DirectoryLoader + 全流水线测试）
-├── v1/                       ← 版本 v1：users + posts + 索引 + 枚举
-│   ├── 01_users.sql          ←   拆分多文件：用户表
-│   ├── 02_posts.sql          ←   拆分多文件：文章表
-│   ├── 03_indexes.sql        ←   拆分多文件：索引
-│   └── 04_enums.sql          ←   拆分多文件：枚举
+    ├── v1/                       ← 版本 v1：users + posts + 索引 + 枚举
+    │   ├── 01_users.sql          ←   拆分多文件：用户表
+    │   ├── 02_posts.sql          ←   拆分多文件：文章表
+    │   ├── 03_indexes.sql        ←   拆分多文件：索引
+    │   └── 04_enums.sql          ←   拆分多文件：枚举
     │
-├── v2/                       ← 版本 v2：v1 + age 列 + comments 表 + guest 枚举
-│   └── schema.sql            ←   合并单文件
+    ├── v2/                       ← 版本 v2：v1 + age 列 + comments 表 + guest 枚举
+    │   └── schema.sql            ←   合并单文件
     │
     ├── v3/                       ← 版本 v3：修改/删除场景
     │   ├── schema.sql            ←   删 age 列/comments 表；增 phone 列/categories 表/UNIQUE(email)
     │   └── README.md             ←   场景说明
+    │
+    ├── v4/                       ← 版本 v4：IDENTITY + COLLATE + FK CASCADE
+    │   ├── schema.sql            ←   在 v3 基础上将 id 转为 IDENTITY，引入 COLLATE、CASCADE FK
+    │   └── README.md             ←   变更说明
     │
     ├── snapshot.sql              ← v2 快照（单文件等于 v2/ 目录）
     │
@@ -58,10 +62,6 @@ testdata/
     │   │   └── schema.sql        ←      users(username, age) + idx_users_username
     │   └── v2/                   ←   版本 v2：重命名 + 删列 + 新增 + 改索引
     │       └── schema.sql        ←      users(login_name, phone) + idx_users_login_name
-    │
-    ├── v4/                       ← 版本 v4：IDENTITY + COLLATE + FK CASCADE
-    │   ├── schema.sql            ←   在 v3 基础上将 id 转为 IDENTITY，引入 COLLATE、CASCADE FK
-    │   └── README.md             ←   变更说明
     │
     ├── identity_example/         ← IDENTITY 列检测专用场景
     │   ├── v1/                   ←   版本 v1：SERIAL 基线
@@ -101,18 +101,18 @@ testdata/
 
 | 测试数据文件 | 被哪些测试引用 | 测试场景 |
 |---|---|---|
-| `example_source.sql` + `example_target.sql` | `internal/app/diff_service_test.go:TestDiffService_Run`<br>`cmd/migra/integration_test.go:TestExampleSQLFilesDiffIncludesEnumAndConstraints` | 基础 diff 流水线：增列、增表、枚举加标签 |
-| `diff/v1/schema.sql` → `diff/v2/schema.sql` | `cmd/migra/integration_test.go:TestV3DirectoryDiff` | 目录 vs 目录 diff：相同变更集 |
+| `example_source.sql` + `example_target.sql` | `internal/app/diff_service_test.go:TestDiffService_Run`<br>`cmd/migra/integration_test.go:TestExampleSQLFilesDiffIncludesEnumAndConstraints` | Mock 编排 + 全流水线 diff：增列、增表、枚举加标签 |
+| `diff/v1/` → `diff/v2/` | `cmd/migra/integration_test.go:TestV3DirectoryDiff` | 目录 vs 目录 diff（多文件拆分 vs 单文件） |
 | `diff/v3/schema.sql` | `cmd/migra/integration_test.go:TestV3UnsafeDropDiff_Safe`<br>`cmd/migra/integration_test.go:TestV3UnsafeDropDiff_Unsafe` | 删除/修改场景：删列、删表、改索引名、改枚举 |
 | `diff/nested/` → `diff/nested_target/` | `cmd/migra/integration_test.go:TestNestedDirectoryDiff` | 嵌套子目录 diff |
 | `diff/multi_schema/v1/` → `diff/multi_schema/v2/` | `cmd/migra/integration_test.go:TestMultiSchemaDirectoryDiffStatic` | 多 schema（public + auth）diff |
 | `diff/rename_example/v1/` → `diff/rename_example/v2/` | `cmd/migra/integration_test.go:TestRenameColumnDiff` | RENAME COLUMN 基础场景 |
 | `diff/rename_complex/v1/` → `diff/rename_complex/v2/` | `cmd/migra/integration_test.go:TestRenameColumnComplexDiff` | RENAME COLUMN + 删列 + 新增组合 |
-| `diff/v4/` | 未直接引用（供未来集成测试用） | v3→v4 演进：IDENTITY + COLLATE + FK CASCADE |
+| `diff/v3/schema.sql` → `diff/v4/schema.sql` | `cmd/migra/integration_test.go:TestV3ToV4Diff` | v3→v4 演进：IDENTITY + COLLATE + FK CASCADE |
 | `diff/identity_example/v1/` → `diff/identity_example/v2/` | `cmd/migra/integration_test.go:TestIdentityColumnDiff` | IDENTITY 列检测专用 |
 | `diff/collate_example/v1/` → `diff/collate_example/v2/` | `cmd/migra/integration_test.go:TestCollateClauseDiff` | COLLATE 子句检测专用 |
 | `diff/objects_example/v1/` → `diff/objects_example/v2/` | `cmd/migra/integration_test.go:TestObjectsDiff` | VIEW/SEQUENCE/EXTENSION 检测专用 |
-| `diff/edge/{.hidden.sql,readme.txt,empty/...}` | 未直接引用（DirLoader 测试用 `t.TempDir()` 动态创建数据） | DirectoryLoader 边界条件 |
+| `diff/edge/{.hidden.sql,readme.txt,empty/...}` | `internal/source/dir_loader_test.go`（部分用例用 `t.TempDir()` 动态创建） | DirectoryLoader 边界条件 |
 | `alter_operations.sql` | `internal/parser/handler_test.go:TestParseAlterOperations` | ALTER TABLE 全操作集解析 |
 | `complex_ddl.sql` | `internal/parser/handler_test.go:TestParseComplexDDL` | 复合约束/高级类型解析 |
 | `drop_scenarios.sql` | `internal/parser/handler_test.go:TestParseDropScenarios` | DROP 语义残留状态 |
@@ -144,11 +144,11 @@ v3 (v2 - 删除 + 修改)
 ├── user_role: -'guest', +'moderator'
 │
 v4 (v3 + IDENTITY + COLLATE + FK CASCADE)
-├── users:     id → GENERATED ALWAYS AS IDENTITY (was SERIAL)
-├── posts:     user_id +content COLLATE "en_US"
-├── categories: name COLLATE "en_US"
-├── categories: 新增 UNIQUE(name)
-├── posts:     FK user_id 新增 ON DELETE CASCADE
+├── users:       id → GENERATED ALWAYS AS IDENTITY (was SERIAL)
+├── posts:       user_id + content 增加 COLLATE "en_US"
+├── posts:       FK user_id 新增 ON DELETE CASCADE
+├── categories:  name COLLATE "en_US"
+└── categories:  新增 UNIQUE(name)
 ```
 
 ## 测试流程
@@ -207,12 +207,13 @@ v4 (v3 + IDENTITY + COLLATE + FK CASCADE)
 | `TestIntegrationEnumType` | 代码构造 Schema | 枚举 diff + render |
 | `TestIntegrationDAGSort` | 代码构造 Operation | DAG 顺序：AddTable 先于 AddColumn |
 | `TestExampleSQLFilesDiffIncludesEnumAndConstraints` | `testdata/example_source.sql` + `testdata/example_target.sql` | 增表、增列、枚举加标签、主键 |
-| `TestV3DirectoryDiff` | `testdata/diff/v2/schema.sql` + `testdata/diff/v3/schema.sql` | v2→v3 差异（safe mode） |
+| `TestV3DirectoryDiff` | `testdata/diff/v1/` + `testdata/diff/v2/` | v1 目录（拆分多文件）vs v2 目录（单文件）diff |
 | `TestV2ToV3SafeDiff` | `testdata/diff/v1/` + `testdata/diff/v3/` | v1 目录 vs v3 目录 diff |
 | `TestV3UnsafeDropDiff_Safe` | `testdata/diff/v2/schema.sql` + `testdata/diff/v3/schema.sql` | v2→v3 安全模式（过滤 DROP） |
 | `TestV3UnsafeDropDiff_Unsafe` | `testdata/diff/v2/schema.sql` + `testdata/diff/v3/schema.sql` | v2→v3 unsafe-drop 模式（含 DROP） |
 | `TestNestedDirectoryDiff` | `testdata/diff/nested/` + `testdata/diff/nested_target/` | 嵌套子目录 diff |
-| `TestMultiSchemaDirectoryDiffStatic` | `testdata/diff/multi_schema/v1/` + `testdata/diff/multi_schema/v2/` | 多 schema diff |
+| `TestMultiSchemaDirectoryDiffStatic` | `testdata/diff/multi_schema/v1/` + `testdata/diff/multi_schema/v2/` | 多 schema diff（静态数据） |
+| `TestMultiSchemaDiff` | `t.TempDir()` 动态创建 | 多 schema diff（动态数据，同语义验证） |
 | `TestRenameColumnDiff` | `testdata/diff/rename_example/v1/` + `testdata/diff/rename_example/v2/` | RENAME COLUMN 基础 |
 | `TestRenameColumnComplexDiff` | `testdata/diff/rename_complex/v1/` + `testdata/diff/rename_complex/v2/` | RENAME COLUMN 组合变更 |
 | `TestIdentityColumnDiff` | `testdata/diff/identity_example/v1/` + `testdata/diff/identity_example/v2/` | SERIAL → IDENTITY 变更检测 |
@@ -276,7 +277,7 @@ steps:
   - uses: actions/checkout@v4
   - uses: actions/setup-go@v5
     with:
-      go-version: '1.26'
+      go-version: '1.26.2'
   - run: make build
   - run: go test ./... -v -short    # CI 中使用 -short 跳过需数据库的测试
 ```
@@ -351,7 +352,7 @@ CI 中 `go test -short` 会进一步确保不触发数据库连接。
 
 1. 在 `testdata/` 或 `testdata/diff/` 下创建新 SQL 文件
 2. 遵循既有格式：大写 SQL 关键字、小写标识符、4 空格缩进
-3. 如添加新版本目录，同时在 `diff/v3/` 同级提供 `snapshot.sql` 合并快照
+3. 如添加新版本目录后在 `diff/` 下提供对应的 `snapshot.sql` 合并快照
 4. 在新测试中引用时使用相对于测试文件的路径
 5. 对于 DirectoryLoader 测试，优先使用 `t.TempDir()` 动态创建；静态 testdata 用于集成测试
 
@@ -747,7 +748,7 @@ ALTER TYPE "public"."user_role" ADD VALUE 'guest';
 # 但如果传入的是目录路径，则走 DirectoryLoader
 ```
 
-#### 场景 9：unsafe-drop 安全机制验证
+#### 场景 11：unsafe-drop 安全机制验证
 
 ```bash
 # 无 DROP 场景：正常输出
@@ -768,7 +769,7 @@ ALTER TYPE "public"."user_role" ADD VALUE 'guest';
 | (默认) | 警告：N 个危险操作，跳过，输出中不含 DROP | 正常输出全部 |
 | `--unsafe-drop` | 无警告，DROP 操作包含在输出中 | 同默认 |
 
-#### 场景 10：输出到文件
+#### 场景 12：输出到文件
 
 ```bash
 ./migra diff -o /tmp/diff_output.sql testdata/example_source.sql testdata/example_target.sql
@@ -779,7 +780,7 @@ cat /tmp/diff_output.sql
 - ✅ 输出写入指定文件而非 stdout
 - ✅ 文件内容与 stdout 输出一致
 
-#### 场景 11：strict 模式验证
+#### 场景 13：strict 模式验证
 
 ```bash
 # 对比含非 DDL 语句的 SQL 文件
@@ -790,7 +791,7 @@ cat /tmp/diff_output.sql
 # strict 模式测试需构造含语法错误的 SQL 文件
 ```
 
-#### 场景 12：push dry-run 验证（仅预览）
+#### 场景 14：push dry-run 验证（仅预览）
 
 ```bash
 # push 的 dry-run 模式：显示差异 SQL 但不执行
