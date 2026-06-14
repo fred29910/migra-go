@@ -6,6 +6,24 @@ import (
 	"github.com/fred29910/migra-go/internal/model"
 )
 
+// resolveColumn resolves a column by schema name, table name, and column name.
+// It returns the namespace, table, and column, or an error if any step fails.
+func resolveColumn(schema *model.Schema, schemaName, table, column string) (*model.Namespace, *model.Table, *model.Column, error) {
+	ns := schema.GetNamespace(schemaName)
+	if ns == nil {
+		return nil, nil, nil, fmt.Errorf("schema %s not found", schemaName)
+	}
+	tbl, exists := ns.Tables[table]
+	if !exists {
+		return nil, nil, nil, fmt.Errorf("table %s.%s not found", schemaName, table)
+	}
+	col := tbl.ColumnByName[column]
+	if col == nil {
+		return nil, nil, nil, fmt.Errorf("column %s.%s.%s not found", schemaName, table, column)
+	}
+	return ns, tbl, col, nil
+}
+
 // MutationKind identifies the type of schema mutation.
 type MutationKind string
 
@@ -152,18 +170,11 @@ func (m DropColumnMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
 }
 func (m DropColumnMutation) Apply(schema *model.Schema) error {
-	ns := schema.GetNamespace(m.Schema)
-	if ns == nil {
-		return fmt.Errorf("schema %s not found", m.Schema)
+	_, _, _, err := resolveColumn(schema, m.Schema, m.Table, m.Column)
+	if err != nil {
+		return err
 	}
-	table, exists := ns.Tables[m.Table]
-	if !exists {
-		return fmt.Errorf("table %s.%s not found", m.Schema, m.Table)
-	}
-	if _, exists := table.ColumnByName[m.Column]; !exists {
-		return fmt.Errorf("column %s.%s.%s not found", m.Schema, m.Table, m.Column)
-	}
-	table.RemoveColumn(m.Column)
+	schema.GetNamespace(m.Schema).Tables[m.Table].RemoveColumn(m.Column)
 	return nil
 }
 
@@ -182,17 +193,9 @@ func (m AlterColumnTypeMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
 }
 func (m AlterColumnTypeMutation) Apply(schema *model.Schema) error {
-	ns := schema.GetNamespace(m.Schema)
-	if ns == nil {
-		return fmt.Errorf("schema %s not found", m.Schema)
-	}
-	table, exists := ns.Tables[m.Table]
-	if !exists {
-		return fmt.Errorf("table %s.%s not found", m.Schema, m.Table)
-	}
-	col := table.ColumnByName[m.Column]
-	if col == nil {
-		return fmt.Errorf("column %s.%s.%s not found", m.Schema, m.Table, m.Column)
+	_, _, col, err := resolveColumn(schema, m.Schema, m.Table, m.Column)
+	if err != nil {
+		return err
 	}
 	if m.FromType != "" && col.DataType != m.FromType {
 		return fmt.Errorf("column %s.%s.%s type mismatch: current %s, expected %s",
@@ -214,17 +217,9 @@ func (m SetNotNullMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
 }
 func (m SetNotNullMutation) Apply(schema *model.Schema) error {
-	ns := schema.GetNamespace(m.Schema)
-	if ns == nil {
-		return fmt.Errorf("schema %s not found", m.Schema)
-	}
-	table, exists := ns.Tables[m.Table]
-	if !exists {
-		return fmt.Errorf("table %s.%s not found", m.Schema, m.Table)
-	}
-	col := table.ColumnByName[m.Column]
-	if col == nil {
-		return fmt.Errorf("column %s.%s.%s not found", m.Schema, m.Table, m.Column)
+	_, _, col, err := resolveColumn(schema, m.Schema, m.Table, m.Column)
+	if err != nil {
+		return err
 	}
 	col.IsNullable = false
 	return nil
@@ -242,17 +237,9 @@ func (m DropNotNullMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
 }
 func (m DropNotNullMutation) Apply(schema *model.Schema) error {
-	ns := schema.GetNamespace(m.Schema)
-	if ns == nil {
-		return fmt.Errorf("schema %s not found", m.Schema)
-	}
-	table, exists := ns.Tables[m.Table]
-	if !exists {
-		return fmt.Errorf("table %s.%s not found", m.Schema, m.Table)
-	}
-	col := table.ColumnByName[m.Column]
-	if col == nil {
-		return fmt.Errorf("column %s.%s.%s not found", m.Schema, m.Table, m.Column)
+	_, _, col, err := resolveColumn(schema, m.Schema, m.Table, m.Column)
+	if err != nil {
+		return err
 	}
 	col.IsNullable = true
 	return nil
@@ -271,17 +258,9 @@ func (m SetDefaultMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
 }
 func (m SetDefaultMutation) Apply(schema *model.Schema) error {
-	ns := schema.GetNamespace(m.Schema)
-	if ns == nil {
-		return fmt.Errorf("schema %s not found", m.Schema)
-	}
-	table, exists := ns.Tables[m.Table]
-	if !exists {
-		return fmt.Errorf("table %s.%s not found", m.Schema, m.Table)
-	}
-	col := table.ColumnByName[m.Column]
-	if col == nil {
-		return fmt.Errorf("column %s.%s.%s not found", m.Schema, m.Table, m.Column)
+	_, _, col, err := resolveColumn(schema, m.Schema, m.Table, m.Column)
+	if err != nil {
+		return err
 	}
 	col.DefaultExpr = &m.DefaultExpr
 	return nil
@@ -299,17 +278,9 @@ func (m DropDefaultMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
 }
 func (m DropDefaultMutation) Apply(schema *model.Schema) error {
-	ns := schema.GetNamespace(m.Schema)
-	if ns == nil {
-		return fmt.Errorf("schema %s not found", m.Schema)
-	}
-	table, exists := ns.Tables[m.Table]
-	if !exists {
-		return fmt.Errorf("table %s.%s not found", m.Schema, m.Table)
-	}
-	col := table.ColumnByName[m.Column]
-	if col == nil {
-		return fmt.Errorf("column %s.%s.%s not found", m.Schema, m.Table, m.Column)
+	_, _, col, err := resolveColumn(schema, m.Schema, m.Table, m.Column)
+	if err != nil {
+		return err
 	}
 	col.DefaultExpr = nil
 	return nil

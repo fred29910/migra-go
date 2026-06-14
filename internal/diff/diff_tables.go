@@ -2,6 +2,7 @@ package diff
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/fred29910/migra-go/internal/model"
 	"github.com/fred29910/migra-go/internal/util"
@@ -202,19 +203,22 @@ func (c *diffContext) diffTableColumns(schema string, source, target *model.Tabl
 	renamedSource := make(map[string]bool)
 	renamedTarget := make(map[string]bool)
 
+	// Build a map from column signature to target column name for O(n) lookup.
+	// Signature = dataType + isNullable + defaultExpr + collation
+	targetBySig := make(map[string]string, len(targetOnlyNames))
+	for _, tgtName := range targetOnlyNames {
+		tgtCol := target.ColumnByName[tgtName]
+		sig := columnSignature(tgtCol)
+		targetBySig[sig] = tgtName
+	}
+
 	for _, srcName := range sourceOnlyNames {
 		srcCol := source.ColumnByName[srcName]
-		for _, tgtName := range targetOnlyNames {
-			if renamedTarget[tgtName] {
-				continue
-			}
-			tgtCol := target.ColumnByName[tgtName]
-			if isColumnRenameCandidate(srcCol, tgtCol) {
-				c.addOp(NewRenameColumnOp(schema, target.Name, srcName, tgtName))
-				renamedSource[srcName] = true
-				renamedTarget[tgtName] = true
-				break
-			}
+		sig := columnSignature(srcCol)
+		if tgtName, found := targetBySig[sig]; found && !renamedTarget[tgtName] {
+			c.addOp(NewRenameColumnOp(schema, target.Name, srcName, tgtName))
+			renamedSource[srcName] = true
+			renamedTarget[tgtName] = true
 		}
 	}
 
@@ -286,6 +290,26 @@ func (c *diffContext) diffTableIndexes(schema string, source, target *model.Tabl
 			c.addOp(NewCreateIndexOp(schema, tgtIdx))
 		}
 	}
+}
+
+// columnSignature returns a string that uniquely identifies a column's
+// structural properties used for rename detection.
+func columnSignature(col *model.Column) string {
+	var b strings.Builder
+	b.WriteString(col.DataType)
+	b.WriteByte('|')
+	if col.IsNullable {
+		b.WriteString("true")
+	} else {
+		b.WriteString("false")
+	}
+	b.WriteByte('|')
+	if col.DefaultExpr != nil {
+		b.WriteString(*col.DefaultExpr)
+	}
+	b.WriteByte('|')
+	b.WriteString(col.Collation)
+	return b.String()
 }
 
 // sameIndexContent checks if two indexes have the same content

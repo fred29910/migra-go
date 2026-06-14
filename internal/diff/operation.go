@@ -42,11 +42,16 @@ const (
 	KindAlterExtensionUpdate   Kind = "alter_extension_update"
 )
 
+type RenderContext interface {
+	UseIfExists() bool
+}
+
 type Operation interface {
 	Kind() Kind
 	ObjectKey() model.ObjectKey
 	DependsOn() []model.ObjectKey
 	IsDestructive() bool
+	RenderString(ctx RenderContext) string
 }
 
 type baseOperation struct {
