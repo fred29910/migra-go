@@ -21,6 +21,10 @@ func (c *diffContext) diffTables(source, target *model.Namespace) {
 		return
 	}
 
+	if target == nil {
+		return
+	}
+
 	// Find tables to add (in target but not in source)
 	addNames := make([]string, 0, len(target.Tables))
 	for name := range target.Tables {
