@@ -12,10 +12,13 @@ type CreateIndexMutation struct {
 	Index  model.Index
 }
 
+// Kind returns the mutation kind.
 func (m CreateIndexMutation) Kind() MutationKind { return MutKindCreateIndex }
+// Target returns the ObjectKey of the index to be created.
 func (m CreateIndexMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Index.Name, model.KindIndex)
 }
+// Apply adds the index to the target table in the given schema.
 func (m CreateIndexMutation) Apply(schema *model.Schema) error {
 	ns := schema.GetOrCreateNamespace(m.Schema)
 	table, exists := ns.Tables[m.Index.Table]

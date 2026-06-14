@@ -7,6 +7,7 @@ import (
 	"github.com/fred29910/migra-go/internal/util"
 )
 
+// AddConstraintOp represents an operation to add a constraint to an existing table.
 type AddConstraintOp struct {
 	baseOperation
 	Schema     string
@@ -14,6 +15,7 @@ type AddConstraintOp struct {
 	Constraint *model.Constraint
 }
 
+// NewAddConstraintOp creates a new AddConstraintOp.
 func NewAddConstraintOp(schema, table string, c *model.Constraint) *AddConstraintOp {
 	return &AddConstraintOp{
 		baseOperation: baseOperation{kind: KindAddConstraint, objectKey: model.NewObjectKey(schema, table+"."+c.Name, model.KindConstraint)},
@@ -23,10 +25,12 @@ func NewAddConstraintOp(schema, table string, c *model.Constraint) *AddConstrain
 	}
 }
 
+// IsDestructive returns false; adding a constraint is not destructive.
 func (op *AddConstraintOp) IsDestructive() bool {
 	return false
 }
 
+// RenderString renders the SQL statement for adding a constraint.
 func (op *AddConstraintOp) RenderString(ctx RenderContext) string {
 	definition := renderConstraintDefinition(op.Constraint)
 	if definition == "" {
@@ -39,6 +43,7 @@ func (op *AddConstraintOp) RenderString(ctx RenderContext) string {
 	)
 }
 
+// DependsOn returns the object keys this operation depends on.
 func (op *AddConstraintOp) DependsOn() []model.ObjectKey {
 	return []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
@@ -46,6 +51,7 @@ func (op *AddConstraintOp) DependsOn() []model.ObjectKey {
 	}
 }
 
+// DropConstraintOp represents an operation to drop a constraint from a table.
 type DropConstraintOp struct {
 	baseOperation
 	Schema string
@@ -53,6 +59,7 @@ type DropConstraintOp struct {
 	Name   string
 }
 
+// NewDropConstraintOp creates a new DropConstraintOp.
 func NewDropConstraintOp(schema, table, name string) *DropConstraintOp {
 	return &DropConstraintOp{
 		baseOperation: baseOperation{kind: KindDropConstraint, objectKey: model.NewObjectKey(schema, table+"."+name, model.KindConstraint)},
@@ -62,10 +69,12 @@ func NewDropConstraintOp(schema, table, name string) *DropConstraintOp {
 	}
 }
 
+// IsDestructive returns true; dropping a constraint is considered destructive.
 func (op *DropConstraintOp) IsDestructive() bool {
 	return true
 }
 
+// RenderString renders the SQL statement for dropping a constraint.
 func (op *DropConstraintOp) RenderString(ctx RenderContext) string {
 	return fmt.Sprintf("-- op: drop_constraint risk:medium\nALTER TABLE %s DROP CONSTRAINT %s%s;",
 		util.QuoteQualifiedIdentifier(op.Schema, op.Table),
@@ -74,6 +83,7 @@ func (op *DropConstraintOp) RenderString(ctx RenderContext) string {
 	)
 }
 
+// ifExistsPrefix returns "IF EXISTS " if use is true, otherwise an empty string.
 func ifExistsPrefix(use bool) string {
 	if use {
 		return "IF EXISTS "

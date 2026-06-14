@@ -332,10 +332,10 @@ func TestRender_UnknownOperation(t *testing.T) {
 // mockOperation is a test helper that implements diff.Operation
 type mockOperation struct{}
 
-func (m *mockOperation) Kind() diff.Kind                { return "mock" }
-func (m *mockOperation) ObjectKey() model.ObjectKey     { return model.ObjectKey{} }
-func (m *mockOperation) DependsOn() []model.ObjectKey   { return nil }
-func (m *mockOperation) IsDestructive() bool           { return false }
+func (m *mockOperation) Kind() diff.Kind                            { return "mock" }
+func (m *mockOperation) ObjectKey() model.ObjectKey                 { return model.ObjectKey{} }
+func (m *mockOperation) DependsOn() []model.ObjectKey               { return nil }
+func (m *mockOperation) IsDestructive() bool                        { return false }
 func (m *mockOperation) RenderString(ctx diff.RenderContext) string { return "" }
 
 func TestRenderConstraintDefinition_NilConstraint(t *testing.T) {

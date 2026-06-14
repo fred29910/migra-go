@@ -2,8 +2,10 @@ package diff
 
 import "github.com/fred29910/migra-go/internal/model"
 
+// Kind represents the type of a diff operation.
 type Kind string
 
+// Operation kinds for database schema changes.
 const (
 	KindAddTable             Kind = "add_table"
 	KindDropTable            Kind = "drop_table"
@@ -42,10 +44,12 @@ const (
 	KindAlterExtensionUpdate   Kind = "alter_extension_update"
 )
 
+// RenderContext provides rendering context for operations.
 type RenderContext interface {
 	UseIfExists() bool
 }
 
+// Operation represents a single database schema change operation.
 type Operation interface {
 	Kind() Kind
 	ObjectKey() model.ObjectKey

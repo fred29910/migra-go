@@ -348,7 +348,7 @@ flowchart TD
     Source --> Parser["sql_file_loader.go --> parser/"]
     DI --> Normalize["internal/normalize/"]
     DI --> DiffEngine["internal/diff/ (33 kinds)"]
-    DI --> PlanEngine["internal/plan/"]
+    DI --> Engine["internal/plan/"]
     DI --> RenderEngine["internal/render/"]
 ```
 

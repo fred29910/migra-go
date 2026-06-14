@@ -4,16 +4,26 @@ package model
 type ObjectKind string
 
 const (
-	KindTable      ObjectKind = "table"
-	KindColumn     ObjectKind = "column"
-	KindIndex      ObjectKind = "index"
+	// KindTable represents a table object.
+	KindTable ObjectKind = "table"
+	// KindColumn represents a column object.
+	KindColumn ObjectKind = "column"
+	// KindIndex represents an index object.
+	KindIndex ObjectKind = "index"
+	// KindConstraint represents a constraint object.
 	KindConstraint ObjectKind = "constraint"
-	KindType       ObjectKind = "type"
-	KindView       ObjectKind = "view"
-	KindFunction   ObjectKind = "function"
-	KindSchema     ObjectKind = "schema"
-	KindSequence   ObjectKind = "sequence"
-	KindExtension  ObjectKind = "extension"
+	// KindType represents a user-defined type object.
+	KindType ObjectKind = "type"
+	// KindView represents a view object.
+	KindView ObjectKind = "view"
+	// KindFunction represents a function object.
+	KindFunction ObjectKind = "function"
+	// KindSchema represents a schema object.
+	KindSchema ObjectKind = "schema"
+	// KindSequence represents a sequence object.
+	KindSequence ObjectKind = "sequence"
+	// KindExtension represents an extension object.
+	KindExtension ObjectKind = "extension"
 )
 
 // ObjectKey uniquely identifies a database object

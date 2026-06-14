@@ -8,12 +8,14 @@ import (
 	"github.com/fred29910/migra-go/internal/util"
 )
 
+// CreateIndexOp represents the operation of creating an index.
 type CreateIndexOp struct {
 	baseOperation
 	Schema string
 	Index  *model.Index
 }
 
+// NewCreateIndexOp creates a new CreateIndexOp for the given schema and index.
 func NewCreateIndexOp(schema string, index *model.Index) *CreateIndexOp {
 	return &CreateIndexOp{
 		baseOperation: baseOperation{
@@ -25,16 +27,19 @@ func NewCreateIndexOp(schema string, index *model.Index) *CreateIndexOp {
 	}
 }
 
+// IsDestructive returns whether the operation is destructive.
 func (op *CreateIndexOp) IsDestructive() bool {
 	return false
 }
 
+// DependsOn returns the object keys this operation depends on.
 func (op *CreateIndexOp) DependsOn() []model.ObjectKey {
 	return []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Index.Table, model.KindTable),
 	}
 }
 
+// RenderString renders the operation as a SQL string.
 func (op *CreateIndexOp) RenderString(ctx RenderContext) string {
 	idx := op.Index
 	unique := ""
@@ -78,12 +83,14 @@ func (op *CreateIndexOp) RenderString(ctx RenderContext) string {
 	return fmt.Sprintf("-- op: add_index risk:low\n%s;", sql)
 }
 
+// DropIndexOp represents the operation of dropping an index.
 type DropIndexOp struct {
 	baseOperation
 	Schema string
 	Name   string
 }
 
+// NewDropIndexOp creates a new DropIndexOp for the given schema and index name.
 func NewDropIndexOp(schema, name string) *DropIndexOp {
 	return &DropIndexOp{
 		baseOperation: baseOperation{
@@ -94,10 +101,12 @@ func NewDropIndexOp(schema, name string) *DropIndexOp {
 		Name:   name,
 	}
 }
+// IsDestructive returns whether the operation is destructive.
 func (op *DropIndexOp) IsDestructive() bool {
 	return false
 }
 
+// RenderString renders the operation as a SQL string.
 func (op *DropIndexOp) RenderString(ctx RenderContext) string {
 	return fmt.Sprintf("-- op: drop_index risk:medium\nDROP INDEX %s%s;",
 		ifExistsPrefix(ctx.UseIfExists()), util.QuoteQualifiedIdentifier(op.Schema, op.Name))

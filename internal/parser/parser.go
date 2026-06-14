@@ -29,13 +29,13 @@ func (e *ParseError) Error() string {
 
 // Parser parses SQL statements using pg_query_go and builds a Schema model
 type Parser struct {
-	schema    *model.Schema
-	errors    []error
-	warnings  []string
-	sql       string // Original SQL for extracting statement snippets
-	applier   *MutationApplier
-	registry  *HandlerRegistry
-	warnFn    WarningEmitter
+	schema   *model.Schema
+	errors   []error
+	warnings []string
+	sql      string // Original SQL for extracting statement snippets
+	applier  *MutationApplier
+	registry *HandlerRegistry
+	warnFn   WarningEmitter
 }
 
 // NewParser creates a new SQL parser with default handler registry.

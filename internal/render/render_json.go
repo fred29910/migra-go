@@ -6,6 +6,7 @@ import (
 	"github.com/fred29910/migra-go/internal/diff"
 )
 
+// OpInfo represents a JSON-serializable summary of a diff operation.
 type OpInfo struct {
 	Kind        string `json:"kind"`
 	ObjectKey   string `json:"object_key"`

@@ -376,18 +376,18 @@ func TestIsColumnRenameCandidate_OneNilDefault(t *testing.T) {
 
 func TestSameIndexContent_Identical(t *testing.T) {
 	a := &model.Index{
-		Name:    "idx_users_email",
-		Unique:  true,
-		Method:  "btree",
+		Name:        "idx_users_email",
+		Unique:      true,
+		Method:      "btree",
 		WhereClause: "",
 		Elements: []model.IndexElem{
 			{Name: "email", IndexColName: "email", Collation: "C", Opclass: "text_ops", Ordering: "ASC", NullsOrdering: ""},
 		},
 	}
 	b := &model.Index{
-		Name:    "idx_users_email",
-		Unique:  true,
-		Method:  "btree",
+		Name:        "idx_users_email",
+		Unique:      true,
+		Method:      "btree",
 		WhereClause: "",
 		Elements: []model.IndexElem{
 			{Name: "email", IndexColName: "email", Collation: "C", Opclass: "text_ops", Ordering: "ASC", NullsOrdering: ""},
@@ -588,7 +588,7 @@ func TestDiffTableIndexes_AddIndex(t *testing.T) {
 	if len(ctx.ops) != 1 {
 		t.Fatalf("expected 1 op, got %d", len(ctx.ops))
 	}
-if ctx.ops[0].Kind() != KindAddIndex {
+	if ctx.ops[0].Kind() != KindAddIndex {
 		t.Fatalf("expected KindAddIndex, got %v", ctx.ops[0].Kind())
 	}
 }
@@ -621,7 +621,7 @@ func TestDiffTableIndexes_ChangeIndex(t *testing.T) {
 	if len(ctx.ops) != 2 {
 		t.Fatalf("expected 2 ops (drop+create), got %d", len(ctx.ops))
 	}
-if ctx.ops[0].Kind() != KindDropIndex || ctx.ops[1].Kind() != KindAddIndex {
+	if ctx.ops[0].Kind() != KindDropIndex || ctx.ops[1].Kind() != KindAddIndex {
 		t.Fatalf("expected DropIndex+AddIndex, got %v+%v", ctx.ops[0].Kind(), ctx.ops[1].Kind())
 	}
 }
@@ -1128,7 +1128,7 @@ func TestDiffExtensions_NoChangeWhenVersionEmpty(t *testing.T) {
 // --- sameSequenceContent ---
 
 func TestSameSequenceContent_Identical(t *testing.T) {
-a := &model.Sequence{Name: "s", DataType: "bigint", StartValue: 1, IncrementBy: 1, MinValue: 1, MaxValue: 100, CacheSize: 1, Cycle: false}
+	a := &model.Sequence{Name: "s", DataType: "bigint", StartValue: 1, IncrementBy: 1, MinValue: 1, MaxValue: 100, CacheSize: 1, Cycle: false}
 	b := &model.Sequence{Name: "s", DataType: "bigint", StartValue: 1, IncrementBy: 1, MinValue: 1, MaxValue: 100, CacheSize: 1, Cycle: false}
 	if !sameSequenceContent(a, b) {
 		t.Error("expected identical sequences to be equal")
