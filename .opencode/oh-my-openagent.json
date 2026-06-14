@@ -17,7 +17,7 @@
           "variant": "medium"
         },
         {
-          "model": "opencode/qwen3.6-plus-free",
+          "model": "opencode/nemotron-3-ultra-free",
           "variant": "medium"
         },
         {
@@ -26,7 +26,7 @@
       ]
     },
     "hephaestus": {
-      "model": "opencode/nemotron-3-super-free",
+      "model": "opencode/nemotron-3-ultra-free",
       "variant": "medium",
       "fallback_models": [
         {
@@ -42,7 +42,7 @@
           "variant": "medium"
         },
         {
-          "model": "opencode/qwen3.6-plus-free",
+          "model": "opencode/nemotron-3-super-free",
           "variant": "medium"
         }
       ]
@@ -52,15 +52,15 @@
       "variant": "high",
       "fallback_models": [
         {
+          "model": "opencode/nemotron-3-ultra-free",
+          "variant": "high"
+        },
+        {
           "model": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
           "variant": "high"
         },
         {
           "model": "opencode/deepseek-v4-flash-free",
-          "variant": "high"
-        },
-        {
-          "model": "opencode/qwen3.6-plus-free",
           "variant": "high"
         },
         {
@@ -136,7 +136,7 @@
           "variant": "high"
         },
         {
-          "model": "opencode/qwen3.6-plus-free",
+          "model": "opencode/nemotron-3-ultra-free",
           "variant": "high"
         },
         {
@@ -163,7 +163,7 @@
           "variant": "high"
         },
         {
-          "model": "opencode/qwen3.6-plus-free",
+          "model": "opencode/nemotron-3-ultra-free",
           "variant": "high"
         }
       ]
@@ -177,7 +177,7 @@
           "variant": "xhigh"
         },
         {
-          "model": "opencode/qwen3.6-plus-free",
+          "model": "opencode/nemotron-3-ultra-free",
           "variant": "xhigh"
         },
         {
@@ -206,7 +206,7 @@
           "variant": "high"
         },
         {
-          "model": "opencode/qwen3.6-plus-free",
+          "model": "opencode/nemotron-3-ultra-free",
           "variant": "medium"
         }
       ]
@@ -223,7 +223,7 @@
           "variant": "high"
         },
         {
-          "model": "opencode/qwen3.6-plus-free",
+          "model": "opencode/nemotron-3-ultra-free",
           "variant": "medium"
         },
         {
@@ -264,7 +264,7 @@
       "variant": "xhigh",
       "fallback_models": [
         {
-          "model": "opencode/qwen3.6-plus-free",
+          "model": "opencode/nemotron-3-ultra-free",
           "variant": "xhigh"
         },
         {
@@ -290,7 +290,7 @@
           "variant": "medium"
         },
         {
-          "model": "opencode/qwen3.6-plus-free",
+          "model": "opencode/nemotron-3-ultra-free",
           "variant": "medium"
         },
         {
@@ -315,7 +315,7 @@
           "model": "opencode/deepseek-v4-flash-free"
         },
         {
-          "model": "opencode/qwen3.6-plus-free"
+          "model": "opencode/nemotron-3-ultra-free"
         }
       ]
     },
@@ -332,7 +332,7 @@
           "model": "opencode/deepseek-v4-flash-free"
         },
         {
-          "model": "opencode/qwen3.6-plus-free"
+          "model": "opencode/nemotron-3-ultra-free"
         }
       ]
     },
@@ -343,7 +343,7 @@
           "model": "opencode/deepseek-v4-flash-free"
         },
         {
-          "model": "opencode/qwen3.6-plus-free"
+          "model": "opencode/nemotron-3-ultra-free"
         }
       ]
     },
@@ -356,7 +356,7 @@
           "variant": "high"
         },
         {
-          "model": "opencode/qwen3.6-plus-free",
+          "model": "opencode/nemotron-3-ultra-free",
           "variant": "high"
         },
         {
@@ -374,7 +374,7 @@
           "model": "google/gemini-3-flash-preview"
         },
         {
-          "model": "opencode/qwen3.6-plus-free"
+          "model": "opencode/nemotron-3-ultra-free"
         }
       ]
     }
