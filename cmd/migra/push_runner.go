@@ -16,10 +16,54 @@ import (
 	"github.com/fred29910/migra-go/internal/model"
 	"github.com/fred29910/migra-go/internal/render"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/spf13/cobra"
 )
 
-var stdinReader = bufio.NewReader(os.Stdin)
+// sqlTx wraps the minimal methods we need from a transaction.
+// pgx.Tx satisfies this interface.
+type sqlTx interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Rollback(ctx context.Context) error
+	Commit(ctx context.Context) error
+}
+
+// dbConnector is the minimal interface needed to connect to a database.
+// pgx.Connect returns a *pgx.Conn which satisfies this interface.
+// The Begin method returns a sqlTx (which pgx.Tx satisfies) so that
+// tests can inject a mock transaction.
+type dbConnector interface {
+	Begin(ctx context.Context) (sqlTx, error)
+	Close(ctx context.Context) error
+}
+
+// connectFunc is the function signature for connecting to a database.
+type connectFunc func(ctx context.Context, connString string) (dbConnector, error)
+
+var (
+	stdinReader = bufio.NewReader(os.Stdin)
+	// connectToDB is the default database connector. It can be overridden in tests.
+	connectToDB connectFunc = func(ctx context.Context, connString string) (dbConnector, error) {
+		conn, err := pgx.Connect(ctx, connString)
+		if err != nil {
+			return nil, err
+		}
+		return &pgxConnAdapter{conn: conn}, nil
+	}
+)
+
+// pgxConnAdapter wraps *pgx.Conn so that Begin returns sqlTx (which pgx.Tx satisfies).
+type pgxConnAdapter struct {
+	conn *pgx.Conn
+}
+
+func (a *pgxConnAdapter) Begin(ctx context.Context) (sqlTx, error) {
+	return a.conn.Begin(ctx)
+}
+
+func (a *pgxConnAdapter) Close(ctx context.Context) error {
+	return a.conn.Close(ctx)
+}
 
 func readUserInput() string {
 	input, err := stdinReader.ReadString('\n')
@@ -29,7 +73,7 @@ func readUserInput() string {
 	return strings.ToLower(strings.TrimSpace(input))
 }
 
-func execSQL(tx pgx.Tx, ctx context.Context, sql string, idx int) error {
+func execSQL(ctx context.Context, tx sqlTx, sql string, idx int) error {
 	_, err := tx.Exec(ctx, sql)
 	if err != nil {
 		return fmt.Errorf("error executing SQL #%d: %w", idx, err)
@@ -199,11 +243,11 @@ func runPush(cmd *cobra.Command, args []string) error {
 
 	// Execution phase: uses cmd.Context() directly (no timeout) so interactive
 	// confirmation is not interrupted by the schema-loading timeout.
-	return executeWithConfirmation(cmd.Context(), cfg, sourceSchema, ops, renderer)
+	return executeWithConfirmation(cmd.Context(), cfg, sourceSchema, ops, renderer, connectToDB)
 }
 
-func executeWithConfirmation(ctx context.Context, cfg pushConfig, sourceSchema *model.Schema, ops []diff.Operation, renderer *render.Renderer) error {
-	conn, err := pgx.Connect(ctx, cfg.Target)
+func executeWithConfirmation(ctx context.Context, cfg pushConfig, sourceSchema *model.Schema, ops []diff.Operation, renderer *render.Renderer, connect connectFunc) error {
+	conn, err := connect(ctx, cfg.Target)
 	if err != nil {
 		return fmt.Errorf("failed to connect to target database: %w", err)
 	}
@@ -282,7 +326,7 @@ next:
 			if err := checkInterrupt(); err != nil {
 				return err
 			}
-			if err := execSQL(tx, ctx, sql, i+1); err != nil {
+			if err := execSQL(ctx, tx, sql, i+1); err != nil {
 				fmt.Println("Rolling back transaction...")
 				_ = tx.Rollback(ctx)
 				txActive = false
@@ -311,7 +355,7 @@ next:
 				fmt.Println("Destructive operation requires --unsafe-drop or explicit confirmation")
 				continue
 			}
-			if err := execSQL(tx, ctx, sql, i+1); err != nil {
+			if err := execSQL(ctx, tx, sql, i+1); err != nil {
 				fmt.Println("Rolling back transaction...")
 				_ = tx.Rollback(ctx)
 				txActive = false
