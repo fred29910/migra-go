@@ -1,6 +1,11 @@
 package diff
 
-import "github.com/fred29910/migra-go/internal/model"
+import (
+	"fmt"
+
+	"github.com/fred29910/migra-go/internal/model"
+	"github.com/fred29910/migra-go/internal/util"
+)
 
 type CreateViewOp struct {
 	baseOperation
@@ -20,6 +25,11 @@ func NewCreateViewOp(schema string, view *model.View) *CreateViewOp {
 }
 
 func (op *CreateViewOp) IsDestructive() bool { return false }
+
+func (op *CreateViewOp) RenderString(ctx RenderContext) string {
+	return fmt.Sprintf("-- op: create_view risk:low\nCREATE VIEW %s AS %s;",
+		util.QuoteQualifiedIdentifier(op.Schema, op.View.Name), op.View.Definition)
+}
 
 type DropViewOp struct {
 	baseOperation
@@ -41,6 +51,11 @@ func NewDropViewOp(schema, name string) *DropViewOp {
 
 func (op *DropViewOp) IsDestructive() bool { return !op.IsRecreate }
 
+func (op *DropViewOp) RenderString(ctx RenderContext) string {
+	return fmt.Sprintf("-- op: drop_view risk:high\nDROP VIEW %s%s;",
+		ifExistsPrefix(ctx.UseIfExists()), util.QuoteQualifiedIdentifier(op.Schema, op.Name))
+}
+
 type ReplaceViewOp struct {
 	baseOperation
 	Schema string
@@ -59,6 +74,11 @@ func NewReplaceViewOp(schema string, view *model.View) *ReplaceViewOp {
 }
 
 func (op *ReplaceViewOp) IsDestructive() bool { return false }
+
+func (op *ReplaceViewOp) RenderString(ctx RenderContext) string {
+	return fmt.Sprintf("-- op: replace_view risk:medium\nCREATE OR REPLACE VIEW %s AS %s;",
+		util.QuoteQualifiedIdentifier(op.Schema, op.View.Name), op.View.Definition)
+}
 
 type CreateMaterializedViewOp struct {
 	baseOperation
@@ -79,6 +99,11 @@ func NewCreateMaterializedViewOp(schema string, view *model.View) *CreateMateria
 
 func (op *CreateMaterializedViewOp) IsDestructive() bool { return false }
 
+func (op *CreateMaterializedViewOp) RenderString(ctx RenderContext) string {
+	return fmt.Sprintf("-- op: create_materialized_view risk:low\nCREATE MATERIALIZED VIEW %s AS %s;",
+		util.QuoteQualifiedIdentifier(op.Schema, op.MaterializedView.Name), op.MaterializedView.Definition)
+}
+
 type DropMaterializedViewOp struct {
 	baseOperation
 	Schema string
@@ -97,3 +122,8 @@ func NewDropMaterializedViewOp(schema, name string) *DropMaterializedViewOp {
 }
 
 func (op *DropMaterializedViewOp) IsDestructive() bool { return true }
+
+func (op *DropMaterializedViewOp) RenderString(ctx RenderContext) string {
+	return fmt.Sprintf("-- op: drop_materialized_view risk:high\nDROP MATERIALIZED VIEW %s%s;",
+		ifExistsPrefix(ctx.UseIfExists()), util.QuoteQualifiedIdentifier(op.Schema, op.Name))
+}

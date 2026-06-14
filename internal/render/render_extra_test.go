@@ -319,23 +319,24 @@ func TestRenderAll_WithEmptyRenderResult(t *testing.T) {
 
 func TestRender_UnknownOperation(t *testing.T) {
 	r := NewRenderer()
-	// Create a mock operation that is not handled
+	// mockOperation.RenderString returns empty, so RenderAll would skip it
 	op := &mockOperation{}
 	got := r.Render(op)
 
-	want := "-- Unknown operation: *render.mockOperation"
-	if got != want {
-		t.Errorf("expected %q, got %q", want, got)
+	// mockOperation.RenderString returns empty string
+	if got != "" {
+		t.Errorf("expected empty string for mock operation, got %q", got)
 	}
 }
 
-// mockOperation is a test helper that implements diff.Operation but is not handled by Render
+// mockOperation is a test helper that implements diff.Operation
 type mockOperation struct{}
 
-func (m *mockOperation) Kind() diff.Kind        { return "mock" }
-func (m *mockOperation) ObjectKey() model.ObjectKey       { return model.ObjectKey{} }
-func (m *mockOperation) DependsOn() []model.ObjectKey     { return nil }
-func (m *mockOperation) IsDestructive() bool             { return false }
+func (m *mockOperation) Kind() diff.Kind                { return "mock" }
+func (m *mockOperation) ObjectKey() model.ObjectKey     { return model.ObjectKey{} }
+func (m *mockOperation) DependsOn() []model.ObjectKey   { return nil }
+func (m *mockOperation) IsDestructive() bool           { return false }
+func (m *mockOperation) RenderString(ctx diff.RenderContext) string { return "" }
 
 func TestRenderConstraintDefinition_NilConstraint(t *testing.T) {
 	got := renderConstraintDefinition(nil)
@@ -742,15 +743,13 @@ func TestRenderJSON_MultipleOps(t *testing.T) {
 	}
 }
 
-func TestRenderSingle(t *testing.T) {
+func TestRender_DropIndex(t *testing.T) {
 	r := NewRenderer()
 	op := diff.NewDropIndexOp("public", "idx_test")
 
-	got1 := r.Render(op)
-	got2 := r.RenderSingle(op)
-
-	if got1 != got2 {
-		t.Errorf("Render and RenderSingle should return same result, got:\nRender: %q\nRenderSingle: %q", got1, got2)
+	got := r.Render(op)
+	if got == "" {
+		t.Error("expected non-empty render result for DropIndexOp")
 	}
 }
 

@@ -228,7 +228,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("\n=== Diff Preview ===")
 	for i, op := range ops {
-		sql := renderer.RenderSingle(op)
+		sql := renderer.Render(op)
 		destructive := ""
 		if op.IsDestructive() {
 			destructive = " [DESTRUCTIVE]"
@@ -304,7 +304,7 @@ next:
 			return err
 		}
 
-		sql := renderer.RenderSingle(op)
+		sql := renderer.Render(op)
 		if sql == "" || strings.HasPrefix(sql, "-- Unknown") {
 			continue
 		}

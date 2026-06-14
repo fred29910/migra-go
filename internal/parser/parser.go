@@ -6,11 +6,15 @@ package parser
 
 import (
 	"fmt"
+	"runtime"
 
 	"github.com/fred29910/migra-go/internal/errors"
 	"github.com/fred29910/migra-go/internal/model"
 	pg_query "github.com/pganalyze/pg_query_go/v6"
 )
+
+// WarningEmitter is a callback for emitting non-fatal warnings during parsing.
+type WarningEmitter func(format string, args ...any)
 
 // ParseError represents a parsing error with position information
 type ParseError struct {
@@ -25,11 +29,13 @@ func (e *ParseError) Error() string {
 
 // Parser parses SQL statements using pg_query_go and builds a Schema model
 type Parser struct {
-	schema   *model.Schema
-	errors   []error
-	sql      string // Original SQL for extracting statement snippets
-	applier  *MutationApplier
-	registry *HandlerRegistry
+	schema    *model.Schema
+	errors    []error
+	warnings  []string
+	sql       string // Original SQL for extracting statement snippets
+	applier   *MutationApplier
+	registry  *HandlerRegistry
+	warnFn    WarningEmitter
 }
 
 // NewParser creates a new SQL parser with default handler registry.
@@ -37,6 +43,7 @@ func NewParser() *Parser {
 	return &Parser{
 		schema:   model.NewSchema(),
 		errors:   make([]error, 0),
+		warnings: make([]string, 0),
 		applier:  &MutationApplier{},
 		registry: DefaultRegistry(),
 	}
@@ -53,8 +60,30 @@ func NewParserWith(registry *HandlerRegistry, applier *MutationApplier) *Parser 
 	return &Parser{
 		schema:   model.NewSchema(),
 		errors:   make([]error, 0),
+		warnings: make([]string, 0),
 		applier:  applier,
 		registry: registry,
+	}
+}
+
+// SetWarningEmitter sets the warning emitter callback.
+func (p *Parser) SetWarningEmitter(fn WarningEmitter) {
+	p.warnFn = fn
+}
+
+// Warnings returns parsing warnings (defensive copy).
+func (p *Parser) Warnings() []string {
+	out := make([]string, len(p.warnings))
+	copy(out, p.warnings)
+	return out
+}
+
+// warnf emits a non-fatal warning.
+func (p *Parser) warnf(format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	p.warnings = append(p.warnings, msg)
+	if p.warnFn != nil {
+		p.warnFn("%s", msg)
 	}
 }
 
@@ -71,6 +100,7 @@ func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
 	// Reset parser state for each ParseSQL call
 	p.schema = model.NewSchema()
 	p.errors = p.errors[:0]
+	p.warnings = p.warnings[:0]
 	p.sql = sql
 
 	tree, err := pg_query.Parse(sql)
@@ -96,14 +126,21 @@ func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
 func (p *Parser) visitNode(stmt *pg_query.Node, pos int) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
+			buf := make([]byte, 4096)
+			n := runtime.Stack(buf, false)
 			err = &ParseError{
-				Message:  fmt.Sprintf("recovered from panic: %v", r),
+				Message:  fmt.Sprintf("recovered from panic: %v\nstack trace:\n%s", r, buf[:n]),
 				Position: -1,
 			}
 		}
 	}()
 
 	handler, found := p.registry.Dispatch(stmt)
+	if found {
+		if we, ok := handler.(interface{ SetWarningEmitter(WarningEmitter) }); ok {
+			we.SetWarningEmitter(p.warnFn)
+		}
+	}
 	if !found {
 		return &ParseError{
 			Message:   fmt.Sprintf("unsupported statement type: %T", stmt),

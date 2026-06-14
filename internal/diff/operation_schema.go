@@ -1,6 +1,11 @@
 package diff
 
-import "github.com/fred29910/migra-go/internal/model"
+import (
+	"fmt"
+
+	"github.com/fred29910/migra-go/internal/model"
+	"github.com/fred29910/migra-go/internal/util"
+)
 
 type CreateSchemaOp struct {
 	baseOperation
@@ -21,6 +26,11 @@ func (op *CreateSchemaOp) IsDestructive() bool {
 	return false
 }
 
+func (op *CreateSchemaOp) RenderString(ctx RenderContext) string {
+	return fmt.Sprintf("-- op: create_schema risk:low\nCREATE SCHEMA IF NOT EXISTS %s;",
+		util.QuoteIdentifier(op.Schema))
+}
+
 type DropSchemaOp struct {
 	baseOperation
 	Schema string
@@ -38,4 +48,9 @@ func NewDropSchemaOp(schema string) *DropSchemaOp {
 
 func (op *DropSchemaOp) IsDestructive() bool {
 	return true
+}
+
+func (op *DropSchemaOp) RenderString(ctx RenderContext) string {
+	return fmt.Sprintf("-- op: drop_schema risk:high\nDROP SCHEMA IF EXISTS %s;",
+		util.QuoteIdentifier(op.Schema))
 }
