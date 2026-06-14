@@ -11,6 +11,7 @@ import (
 // CreateExtensionHandler handles CREATE EXTENSION statements.
 type CreateExtensionHandler struct{}
 
+// Handle converts a pg_query CreateExtensionStmt into extension mutations.
 func (h *CreateExtensionHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error) {
 	stmt := node.GetCreateExtensionStmt()
 	if stmt == nil {
@@ -43,14 +44,17 @@ type CreateExtensionMutation struct {
 	Extension model.Extension
 }
 
+// Kind returns the mutation kind.
 func (m CreateExtensionMutation) Kind() MutationKind {
 	return MutationKind("create_extension")
 }
 
+// Target returns the ObjectKey of the extension to be created.
 func (m CreateExtensionMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Extension.Name, model.KindExtension)
 }
 
+// Apply adds the extension to the given schema.
 func (m CreateExtensionMutation) Apply(schema *model.Schema) error {
 	ns := schema.GetOrCreateNamespace(m.Schema)
 	ext := m.Extension

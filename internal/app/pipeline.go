@@ -10,6 +10,8 @@ import (
 	"github.com/fred29910/migra-go/internal/render"
 )
 
+// FilterNamespaces filters the source and target schemas to only include the specified namespace names.
+// It returns a slice of warning messages if no schemas matched the filter.
 func FilterNamespaces(source, target *model.Schema, schemas []string) []string {
 	if len(schemas) == 0 {
 		return nil
@@ -37,6 +39,7 @@ func FilterNamespaces(source, target *model.Schema, schemas []string) []string {
 	return nil
 }
 
+// NormalizeSchemas canonicalizes both source and target schemas for consistent comparison.
 func NormalizeSchemas(source, target *model.Schema) error {
 	if err := normalize.CanonicalizeSchema(source); err != nil {
 		return fmt.Errorf("failed to normalize source schema: %w", err)
@@ -47,6 +50,8 @@ func NormalizeSchemas(source, target *model.Schema) error {
 	return nil
 }
 
+// FilterDestructiveOps filters out destructive operations unless unsafeDrop is true.
+// It returns the filtered operations and a list of warnings about skipped destructive operations.
 func FilterDestructiveOps(ops []diff.Operation, unsafeDrop bool) ([]diff.Operation, []string) {
 	if unsafeDrop {
 		return ops, nil
@@ -77,6 +82,9 @@ func FilterDestructiveOps(ops []diff.Operation, unsafeDrop bool) ([]diff.Operati
 	return filtered, warnings
 }
 
+// BuildExecutionPlan creates an ordered execution plan from operations.
+// Operations are grouped into pre-deploy, deploy, and post-deploy stages,
+// then topologically sorted within each stage.
 func BuildExecutionPlan(ops []diff.Operation, unsafeDrop bool) ([]diff.Operation, error) {
 	planner := plan.NewPlanner(unsafeDrop)
 	stages := planner.Plan(ops)
@@ -103,6 +111,8 @@ func BuildExecutionPlan(ops []diff.Operation, unsafeDrop bool) ([]diff.Operation
 	return allOps, nil
 }
 
+// ComputeDiff performs the full diff computation between source and target schemas,
+// including normalization, filtering, and execution plan building.
 func ComputeDiff(source, target *model.Schema, cfg Config) ([]diff.Operation, []string, error) {
 	if err := NormalizeSchemas(source, target); err != nil {
 		return nil, nil, err
@@ -125,6 +135,7 @@ func ComputeDiff(source, target *model.Schema, cfg Config) ([]diff.Operation, []
 	return sortedOps, warnings, nil
 }
 
+// RenderOutput renders a list of operations into the specified format.
 func RenderOutput(ops []diff.Operation, format string) (string, error) {
 	renderer := render.NewRenderer()
 	return renderer.RenderOutput(ops, format)

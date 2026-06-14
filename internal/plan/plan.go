@@ -9,9 +9,12 @@ import (
 type Stage string
 
 const (
-	StagePreDeploy  Stage = "pre-deploy"  // Create objects
-	StageDeploy     Stage = "deploy"      // Alter objects
-	StagePostDeploy Stage = "post-deploy" // Drop objects (dangerous)
+	// StagePreDeploy is the stage for creating new objects.
+	StagePreDeploy Stage = "pre-deploy"
+	// StageDeploy is the stage for altering existing objects.
+	StageDeploy Stage = "deploy"
+	// StagePostDeploy is the stage for dropping objects (dangerous).
+	StagePostDeploy Stage = "post-deploy"
 )
 
 // PlannedOp wraps an operation with its stage
@@ -20,28 +23,29 @@ type PlannedOp struct {
 	Stage Stage
 }
 
-// PlanEngine defines the interface for execution plan creation.
-type PlanEngine interface {
+// Engine defines the interface for execution plan creation.
+// Implementations group diff operations into stages for ordered execution.
+type Engine interface {
 	Plan(ops []diff.Operation) map[Stage][]diff.Operation
 }
 
-// Compile-time check: Planner must satisfy PlanEngine.
-var _ PlanEngine = (*Planner)(nil)
+// Compile-time check: Planner must satisfy Engine.
+var _ Engine = (*Planner)(nil)
 
 // Planner creates execution plans from diff operations
 type Planner struct {
 	unsafeDrops bool
 }
 
-// NewPlanner creates a new Planner
+// NewPlanner creates a new Planner with the given unsafe drops setting.
 func NewPlanner(unsafeDrops bool) *Planner {
 	return &Planner{
 		unsafeDrops: unsafeDrops,
 	}
 }
 
-// Plan creates an execution plan from operations
-// Returns operations grouped by stage
+// Plan creates an execution plan from operations.
+// It returns operations grouped by stage (pre-deploy, deploy, post-deploy).
 func (p *Planner) Plan(ops []diff.Operation) map[Stage][]diff.Operation {
 	stages := make(map[Stage][]diff.Operation)
 	stages[StagePreDeploy] = make([]diff.Operation, 0)
@@ -58,7 +62,7 @@ func (p *Planner) Plan(ops []diff.Operation) map[Stage][]diff.Operation {
 	return stages
 }
 
-// assignStage assigns an operation to a stage
+// assignStage assigns an operation to the appropriate execution stage.
 func (p *Planner) assignStage(op diff.Operation) Stage {
 	kind := op.Kind()
 
@@ -100,13 +104,14 @@ func (p *Planner) assignStage(op diff.Operation) Stage {
 	return StageDeploy
 }
 
-// TopoSort performs topological sort on operations using DAG
+// TopoSort performs topological sort on operations using a DAG.
+// It returns operations in dependency-resolved execution order.
 func TopoSort(ops []diff.Operation) ([]diff.Operation, error) {
 	dag := BuildDAG(ops)
 	return dag.GetExecutionOrder()
 }
 
-// GetObjectKey extracts object key from operation for dependency tracking
+// GetObjectKey extracts the object key from an operation for dependency tracking.
 func GetObjectKey(op diff.Operation) model.ObjectKey {
 	return op.ObjectKey()
 }

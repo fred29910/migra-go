@@ -240,10 +240,10 @@ git commit -m "refactor: 重命名 diff.Engine 为 diff.DiffEngine（问题7-2�
 ### Task 5: 重命名 internal/plan 的 Engine 接口（问题 7 - 第三部分）
 
 **Files:**
-- Modify: `internal/plan/plan.go:23` (Engine → PlanEngine)
+- Modify: `internal/plan/plan.go:23` (Engine → Engine)
 - Modify: 所有引用 Engine 的地方
 
-**Step 1: 重命名 Engine → PlanEngine**
+**Step 1: 重命名 Engine → Engine**
 
 在 `internal/plan/plan.go` 中:
 
@@ -252,7 +252,7 @@ git commit -m "refactor: 重命名 diff.Engine 为 diff.DiffEngine（问题7-2�
 // type Engine interface { ... }
 
 // 新代码:
-type PlanEngine interface {
+type Engine interface {
     GeneratePlan(ctx context.Context, schema *model.Schema, ops []diff.Operation) (*model.Schema, []string, error)
 }
 ```
@@ -282,7 +282,7 @@ Expected: PASS
 
 ```bash
 git add internal/plan/plan.go internal/plan/plan_test.go
-git commit -m "refactor: 重命名 plan.Engine 为 plan.PlanEngine（问题7-3）"
+git commit -m "refactor: 重命名 plan.Engine 为 plan.Engine（问题7-3）"
 ```
 
 ---

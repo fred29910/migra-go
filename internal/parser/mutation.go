@@ -28,23 +28,38 @@ func resolveColumn(schema *model.Schema, schemaName, table, column string) (*mod
 type MutationKind string
 
 const (
-	MutKindCreateTable     MutationKind = "create_table"
-	MutKindAddColumn       MutationKind = "add_column"
-	MutKindCreateEnumType  MutationKind = "create_enum_type"
-	MutKindCreateIndex     MutationKind = "create_index"
-	MutKindDropColumn      MutationKind = "drop_column"
+	// MutKindCreateTable represents creating a new table.
+	MutKindCreateTable MutationKind = "create_table"
+	// MutKindAddColumn represents adding a column to a table.
+	MutKindAddColumn MutationKind = "add_column"
+	// MutKindCreateEnumType represents creating an enum type.
+	MutKindCreateEnumType MutationKind = "create_enum_type"
+	// MutKindCreateIndex represents creating an index.
+	MutKindCreateIndex MutationKind = "create_index"
+	// MutKindDropColumn represents dropping a column from a table.
+	MutKindDropColumn MutationKind = "drop_column"
+	// MutKindAlterColumnType represents changing a column's data type.
 	MutKindAlterColumnType MutationKind = "alter_column_type"
-	MutKindSetNotNull      MutationKind = "set_not_null"
-	MutKindDropNotNull     MutationKind = "drop_not_null"
-	MutKindSetDefault      MutationKind = "set_default"
-	MutKindDropDefault     MutationKind = "drop_default"
-	MutKindCreateSchema    MutationKind = "create_schema"
-	MutKindRenameColumn    MutationKind = "rename_column"
-	MutKindAddConstraint   MutationKind = "add_constraint"
-	MutKindDropConstraint  MutationKind = "drop_constraint"
+	// MutKindSetNotNull represents setting a column to NOT NULL.
+	MutKindSetNotNull MutationKind = "set_not_null"
+	// MutKindDropNotNull represents dropping NOT NULL from a column.
+	MutKindDropNotNull MutationKind = "drop_not_null"
+	// MutKindSetDefault represents setting a default expression on a column.
+	MutKindSetDefault MutationKind = "set_default"
+	// MutKindDropDefault represents dropping a default expression from a column.
+	MutKindDropDefault MutationKind = "drop_default"
+	// MutKindCreateSchema represents creating a schema.
+	MutKindCreateSchema MutationKind = "create_schema"
+	// MutKindRenameColumn represents renaming a column.
+	MutKindRenameColumn MutationKind = "rename_column"
+	// MutKindAddConstraint represents adding a constraint to a table.
+	MutKindAddConstraint MutationKind = "add_constraint"
+	// MutKindDropConstraint represents dropping a constraint from a table.
+	MutKindDropConstraint MutationKind = "drop_constraint"
 )
 
 // SchemaMutation is a self-describing and self-applying schema change.
+// Implementations represent DDL operations that can modify a model.Schema.
 type SchemaMutation interface {
 	Kind() MutationKind
 	Target() model.ObjectKey
@@ -60,7 +75,9 @@ type CreateTableMutation struct {
 	Constraints []model.Constraint
 }
 
+// Kind returns the mutation kind.
 func (m CreateTableMutation) Kind() MutationKind { return MutKindCreateTable }
+// Target returns the ObjectKey of the table to be created.
 func (m CreateTableMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Name, model.KindTable)
 }
@@ -77,6 +94,7 @@ func applyTableMetadata(table *model.Table, primaryKey *model.PrimaryKey, constr
 	}
 }
 
+// Apply creates or merges the table in the given schema.
 func (m CreateTableMutation) Apply(schema *model.Schema) error {
 	ns := schema.GetOrCreateNamespace(m.Schema)
 	table, exists := ns.Tables[m.Name]
@@ -120,10 +138,13 @@ type AddColumnMutation struct {
 	Column model.Column
 }
 
+// Kind returns the mutation kind.
 func (m AddColumnMutation) Kind() MutationKind { return MutKindAddColumn }
+// Target returns the ObjectKey of the column to be added.
 func (m AddColumnMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column.Name, model.KindColumn)
 }
+// Apply adds the column to the target table, creating a placeholder table if needed.
 func (m AddColumnMutation) Apply(schema *model.Schema) error {
 	ns := schema.GetOrCreateNamespace(m.Schema)
 	table, exists := ns.Tables[m.Table]
@@ -145,10 +166,13 @@ type CreateEnumTypeMutation struct {
 	Labels []string
 }
 
+// Kind returns the mutation kind.
 func (m CreateEnumTypeMutation) Kind() MutationKind { return MutKindCreateEnumType }
+// Target returns the ObjectKey of the enum type to be created.
 func (m CreateEnumTypeMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Name, model.KindType)
 }
+// Apply creates the enum type in the given schema.
 func (m CreateEnumTypeMutation) Apply(schema *model.Schema) error {
 	ns := schema.GetOrCreateNamespace(m.Schema)
 	if _, exists := ns.Types[m.Name]; exists {
@@ -165,10 +189,13 @@ type DropColumnMutation struct {
 	Column string
 }
 
+// Kind returns the mutation kind.
 func (m DropColumnMutation) Kind() MutationKind { return MutKindDropColumn }
+// Target returns the ObjectKey of the column to be dropped.
 func (m DropColumnMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
 }
+// Apply removes the column from the target table.
 func (m DropColumnMutation) Apply(schema *model.Schema) error {
 	_, _, _, err := resolveColumn(schema, m.Schema, m.Table, m.Column)
 	if err != nil {
@@ -188,10 +215,13 @@ type AlterColumnTypeMutation struct {
 	UsingExpr string
 }
 
+// Kind returns the mutation kind.
 func (m AlterColumnTypeMutation) Kind() MutationKind { return MutKindAlterColumnType }
+// Target returns the ObjectKey of the column whose type is being altered.
 func (m AlterColumnTypeMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
 }
+// Apply changes the data type of the target column.
 func (m AlterColumnTypeMutation) Apply(schema *model.Schema) error {
 	_, _, col, err := resolveColumn(schema, m.Schema, m.Table, m.Column)
 	if err != nil {
@@ -212,10 +242,13 @@ type SetNotNullMutation struct {
 	Column string
 }
 
+// Kind returns the mutation kind.
 func (m SetNotNullMutation) Kind() MutationKind { return MutKindSetNotNull }
+// Target returns the ObjectKey of the column to set NOT NULL.
 func (m SetNotNullMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
 }
+// Apply sets the target column to NOT NULL.
 func (m SetNotNullMutation) Apply(schema *model.Schema) error {
 	_, _, col, err := resolveColumn(schema, m.Schema, m.Table, m.Column)
 	if err != nil {
@@ -232,10 +265,13 @@ type DropNotNullMutation struct {
 	Column string
 }
 
+// Kind returns the mutation kind.
 func (m DropNotNullMutation) Kind() MutationKind { return MutKindDropNotNull }
+// Target returns the ObjectKey of the column to drop NOT NULL.
 func (m DropNotNullMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
 }
+// Apply drops the NOT NULL constraint from the target column.
 func (m DropNotNullMutation) Apply(schema *model.Schema) error {
 	_, _, col, err := resolveColumn(schema, m.Schema, m.Table, m.Column)
 	if err != nil {
@@ -253,10 +289,13 @@ type SetDefaultMutation struct {
 	DefaultExpr string
 }
 
+// Kind returns the mutation kind.
 func (m SetDefaultMutation) Kind() MutationKind { return MutKindSetDefault }
+// Target returns the ObjectKey of the column to set default.
 func (m SetDefaultMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
 }
+// Apply sets the default expression on the target column.
 func (m SetDefaultMutation) Apply(schema *model.Schema) error {
 	_, _, col, err := resolveColumn(schema, m.Schema, m.Table, m.Column)
 	if err != nil {
@@ -273,10 +312,13 @@ type DropDefaultMutation struct {
 	Column string
 }
 
+// Kind returns the mutation kind.
 func (m DropDefaultMutation) Kind() MutationKind { return MutKindDropDefault }
+// Target returns the ObjectKey of the column to drop default.
 func (m DropDefaultMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.Column, model.KindColumn)
 }
+// Apply removes the default expression from the target column.
 func (m DropDefaultMutation) Apply(schema *model.Schema) error {
 	_, _, col, err := resolveColumn(schema, m.Schema, m.Table, m.Column)
 	if err != nil {
@@ -293,10 +335,13 @@ type AddConstraintMutation struct {
 	Constraint model.Constraint
 }
 
+// Kind returns the mutation kind.
 func (m AddConstraintMutation) Kind() MutationKind { return MutKindAddConstraint }
+// Target returns the ObjectKey of the constraint to be added.
 func (m AddConstraintMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.Constraint.Name, model.KindConstraint)
 }
+// Apply adds the constraint to the target table.
 func (m AddConstraintMutation) Apply(schema *model.Schema) error {
 	ns := schema.GetNamespace(m.Schema)
 	if ns == nil {
@@ -321,10 +366,13 @@ type DropConstraintMutation struct {
 	Name   string
 }
 
+// Kind returns the mutation kind.
 func (m DropConstraintMutation) Kind() MutationKind { return MutKindDropConstraint }
+// Target returns the ObjectKey of the constraint to be dropped.
 func (m DropConstraintMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.Name, model.KindConstraint)
 }
+// Apply removes the constraint from the target table.
 func (m DropConstraintMutation) Apply(schema *model.Schema) error {
 	ns := schema.GetNamespace(m.Schema)
 	if ns == nil {

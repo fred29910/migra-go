@@ -8,12 +8,14 @@ import (
 	"github.com/fred29910/migra-go/internal/util"
 )
 
+// CreateSequenceOp represents the operation of creating a sequence.
 type CreateSequenceOp struct {
 	baseOperation
 	Schema   string
 	Sequence *model.Sequence
 }
 
+// NewCreateSequenceOp creates a new CreateSequenceOp for the given schema and sequence.
 func NewCreateSequenceOp(schema string, seq *model.Sequence) *CreateSequenceOp {
 	return &CreateSequenceOp{
 		baseOperation: baseOperation{
@@ -25,8 +27,10 @@ func NewCreateSequenceOp(schema string, seq *model.Sequence) *CreateSequenceOp {
 	}
 }
 
+// IsDestructive returns whether the operation is destructive.
 func (op *CreateSequenceOp) IsDestructive() bool { return false }
 
+// RenderString renders the operation as a SQL string.
 func (op *CreateSequenceOp) RenderString(ctx RenderContext) string {
 	seq := op.Sequence
 	parts := []string{"CREATE SEQUENCE " + util.QuoteQualifiedIdentifier(op.Schema, seq.Name)}
@@ -54,12 +58,14 @@ func (op *CreateSequenceOp) RenderString(ctx RenderContext) string {
 	return "-- op: create_sequence risk:low\n" + strings.Join(parts, " ") + ";"
 }
 
+// DropSequenceOp represents the operation of dropping a sequence.
 type DropSequenceOp struct {
 	baseOperation
 	Schema string
 	Name   string
 }
 
+// NewDropSequenceOp creates a new DropSequenceOp for the given schema and sequence name.
 func NewDropSequenceOp(schema, name string) *DropSequenceOp {
 	return &DropSequenceOp{
 		baseOperation: baseOperation{
@@ -71,13 +77,16 @@ func NewDropSequenceOp(schema, name string) *DropSequenceOp {
 	}
 }
 
+// IsDestructive returns whether the operation is destructive.
 func (op *DropSequenceOp) IsDestructive() bool { return true }
 
+// RenderString renders the operation as a SQL string.
 func (op *DropSequenceOp) RenderString(ctx RenderContext) string {
 	return fmt.Sprintf("-- op: drop_sequence risk:high\nDROP SEQUENCE %s%s;",
 		ifExistsPrefix(ctx.UseIfExists()), util.QuoteQualifiedIdentifier(op.Schema, op.Name))
 }
 
+// AlterSequenceOp represents the operation of altering a sequence.
 type AlterSequenceOp struct {
 	baseOperation
 	Schema string
@@ -85,6 +94,7 @@ type AlterSequenceOp struct {
 	To     *model.Sequence
 }
 
+// NewAlterSequenceOp creates a new AlterSequenceOp that changes a sequence from "from" to "to".
 func NewAlterSequenceOp(schema string, from, to *model.Sequence) *AlterSequenceOp {
 	return &AlterSequenceOp{
 		baseOperation: baseOperation{
@@ -97,8 +107,10 @@ func NewAlterSequenceOp(schema string, from, to *model.Sequence) *AlterSequenceO
 	}
 }
 
+// IsDestructive returns whether the operation is destructive.
 func (op *AlterSequenceOp) IsDestructive() bool { return false }
 
+// RenderString renders the operation as a SQL string.
 func (op *AlterSequenceOp) RenderString(ctx RenderContext) string {
 	seq := op.To
 	parts := []string{"ALTER SEQUENCE " + util.QuoteQualifiedIdentifier(op.Schema, seq.Name)}

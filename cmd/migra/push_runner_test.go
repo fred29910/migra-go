@@ -246,15 +246,14 @@ func TestNewDefaultDeps_RenderUnsupportedFormat(t *testing.T) {
 	assert.Contains(t, err.Error(), "unsupported format")
 }
 
-
 // ─── render.Single operation tests ──────────────────────────────────────────
 
 func TestRender_AllOperationTypes(t *testing.T) {
 	r := render.NewRenderer()
 
 	tests := []struct {
-		name string
-		op   diff.Operation
+		name           string
+		op             diff.Operation
 		expectContains string
 	}{
 		{
@@ -268,63 +267,63 @@ func TestRender_AllOperationTypes(t *testing.T) {
 			expectContains: "CREATE TABLE",
 		},
 		{
-			name: "DropTable",
-			op:   diff.NewDropTableOp("public", "old_table"),
+			name:           "DropTable",
+			op:             diff.NewDropTableOp("public", "old_table"),
 			expectContains: "DROP TABLE",
 		},
 		{
-			name: "AddColumn",
-			op:   diff.NewAddColumnOp("public", "users", &model.Column{Name: "email", DataType: "varchar"}),
+			name:           "AddColumn",
+			op:             diff.NewAddColumnOp("public", "users", &model.Column{Name: "email", DataType: "varchar"}),
 			expectContains: "ADD COLUMN",
 		},
 		{
-			name: "DropColumn",
-			op:   diff.NewDropColumnOp("public", "users", "old_col"),
+			name:           "DropColumn",
+			op:             diff.NewDropColumnOp("public", "users", "old_col"),
 			expectContains: "DROP COLUMN",
 		},
 		{
-			name: "SetNotNull",
-			op:   diff.NewSetNotNullOp("public", "users", "name"),
+			name:           "SetNotNull",
+			op:             diff.NewSetNotNullOp("public", "users", "name"),
 			expectContains: "SET NOT NULL",
 		},
 		{
-			name: "DropNotNull",
-			op:   diff.NewDropNotNullOp("public", "users", "name"),
+			name:           "DropNotNull",
+			op:             diff.NewDropNotNullOp("public", "users", "name"),
 			expectContains: "DROP NOT NULL",
 		},
 		{
-			name: "AlterColumnType",
-			op:   diff.NewAlterColumnTypeOp("public", "users", "name", "varchar", "text"),
+			name:           "AlterColumnType",
+			op:             diff.NewAlterColumnTypeOp("public", "users", "name", "varchar", "text"),
 			expectContains: "ALTER COLUMN",
 		},
 		{
-			name: "SetDefault",
-			op:   diff.NewSetDefaultOp("public", "users", "name", "'unknown'"),
+			name:           "SetDefault",
+			op:             diff.NewSetDefaultOp("public", "users", "name", "'unknown'"),
 			expectContains: "SET DEFAULT",
 		},
 		{
-			name: "DropDefault",
-			op:   diff.NewDropDefaultOp("public", "users", "name"),
+			name:           "DropDefault",
+			op:             diff.NewDropDefaultOp("public", "users", "name"),
 			expectContains: "DROP DEFAULT",
 		},
 		{
-			name: "SetIdentity",
-			op:   diff.NewSetIdentityOp("public", "users", "id", "ALWAYS"),
+			name:           "SetIdentity",
+			op:             diff.NewSetIdentityOp("public", "users", "id", "ALWAYS"),
 			expectContains: "GENERATED",
 		},
 		{
-			name: "DropIdentity",
-			op:   diff.NewDropIdentityOp("public", "users", "id"),
+			name:           "DropIdentity",
+			op:             diff.NewDropIdentityOp("public", "users", "id"),
 			expectContains: "IDENTITY",
 		},
 		{
-			name: "AddIdentity",
-			op:   diff.NewAddIdentityOp("public", "users", "id", "ALWAYS"),
+			name:           "AddIdentity",
+			op:             diff.NewAddIdentityOp("public", "users", "id", "ALWAYS"),
 			expectContains: "IDENTITY",
 		},
 		{
-			name: "AlterColumnCollation",
-			op:   diff.NewAlterColumnCollationOp("public", "users", "name", "varchar", "en_US", "en_US"),
+			name:           "AlterColumnCollation",
+			op:             diff.NewAlterColumnCollationOp("public", "users", "name", "varchar", "en_US", "en_US"),
 			expectContains: "COLLATE",
 		},
 	}
@@ -492,9 +491,9 @@ func (m *mockConn) Close(ctx context.Context) error {
 }
 
 type mockTx struct {
-	execCalls  int
-	execErr    error
-	commitErr  error
+	execCalls   int
+	execErr     error
+	commitErr   error
 	rollbackErr error
 }
 

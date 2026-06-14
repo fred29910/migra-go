@@ -14,10 +14,13 @@ type RenameColumnMutation struct {
 	NewName string
 }
 
+// Kind returns the mutation kind.
 func (m RenameColumnMutation) Kind() MutationKind { return MutKindRenameColumn }
+// Target returns the ObjectKey of the renamed column.
 func (m RenameColumnMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Table+"."+m.NewName, model.KindColumn)
 }
+// Apply renames the column in the target table.
 func (m RenameColumnMutation) Apply(schema *model.Schema) error {
 	ns := schema.GetOrCreateNamespace(m.Schema)
 	table, exists := ns.Tables[m.Table]

@@ -7,6 +7,7 @@ import (
 	"github.com/fred29910/migra-go/internal/util"
 )
 
+// AddColumnOp represents an operation to add a new column to an existing table.
 type AddColumnOp struct {
 	baseOperation
 	Schema string
@@ -14,6 +15,7 @@ type AddColumnOp struct {
 	Column *model.Column
 }
 
+// NewAddColumnOp creates a new AddColumnOp.
 func NewAddColumnOp(schema, table string, col *model.Column) *AddColumnOp {
 	return &AddColumnOp{
 		baseOperation: baseOperation{
@@ -26,16 +28,19 @@ func NewAddColumnOp(schema, table string, col *model.Column) *AddColumnOp {
 	}
 }
 
+// IsDestructive returns false; adding a column is not a destructive operation.
 func (op *AddColumnOp) IsDestructive() bool {
 	return false
 }
 
+// DependsOn returns the object keys this operation depends on.
 func (op *AddColumnOp) DependsOn() []model.ObjectKey {
 	return []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
 	}
 }
 
+// RenderString renders the SQL statement for adding a column.
 func (op *AddColumnOp) RenderString(ctx RenderContext) string {
 	col := op.Column
 	sql := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s",
@@ -63,6 +68,7 @@ func (op *AddColumnOp) RenderString(ctx RenderContext) string {
 	return fmt.Sprintf("-- op: add_column risk:low\n%s;", sql)
 }
 
+// RenderString renders the SQL statement for altering a column type.
 func (op *AlterColumnTypeOp) RenderString(ctx RenderContext) string {
 	sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s",
 		util.QuoteQualifiedIdentifier(op.Schema, op.Table), util.QuoteIdentifier(op.Column), op.ToType)
@@ -72,18 +78,21 @@ func (op *AlterColumnTypeOp) RenderString(ctx RenderContext) string {
 	return fmt.Sprintf("-- op: alter_column_type risk:high\n%s;", sql)
 }
 
+// RenderString renders the SQL statement for setting a column to NOT NULL.
 func (op *SetNotNullOp) RenderString(ctx RenderContext) string {
 	sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET NOT NULL",
 		util.QuoteQualifiedIdentifier(op.Schema, op.Table), util.QuoteIdentifier(op.Column))
 	return fmt.Sprintf("-- op: set_not_null risk:low\n%s;", sql)
 }
 
+// RenderString renders the SQL statement for dropping NOT NULL from a column.
 func (op *DropNotNullOp) RenderString(ctx RenderContext) string {
 	sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL",
 		util.QuoteQualifiedIdentifier(op.Schema, op.Table), util.QuoteIdentifier(op.Column))
 	return fmt.Sprintf("-- op: drop_not_null risk:low\n%s;", sql)
 }
 
+// RenderString renders the SQL statement for setting a column default.
 func (op *SetDefaultOp) RenderString(ctx RenderContext) string {
 	return fmt.Sprintf("-- op: set_default risk:low\nALTER TABLE %s ALTER COLUMN %s SET DEFAULT %s;",
 		util.QuoteQualifiedIdentifier(op.Schema, op.Table),
@@ -92,6 +101,7 @@ func (op *SetDefaultOp) RenderString(ctx RenderContext) string {
 	)
 }
 
+// RenderString renders the SQL statement for dropping a column default.
 func (op *DropDefaultOp) RenderString(ctx RenderContext) string {
 	return fmt.Sprintf("-- op: drop_default risk:low\nALTER TABLE %s ALTER COLUMN %s DROP DEFAULT;",
 		util.QuoteQualifiedIdentifier(op.Schema, op.Table),
@@ -99,6 +109,7 @@ func (op *DropDefaultOp) RenderString(ctx RenderContext) string {
 	)
 }
 
+// RenderString renders the SQL statement for altering a column collation.
 func (op *AlterColumnCollationOp) RenderString(ctx RenderContext) string {
 	sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET DATA TYPE %s",
 		util.QuoteQualifiedIdentifier(op.Schema, op.Table),
@@ -111,6 +122,7 @@ func (op *AlterColumnCollationOp) RenderString(ctx RenderContext) string {
 	return fmt.Sprintf("-- op: alter_column_collation risk:low\n%s;", sql)
 }
 
+// RenderString renders the SQL statement for dropping a column.
 func (op *DropColumnOp) RenderString(ctx RenderContext) string {
 	return fmt.Sprintf("-- op: drop_column risk:high\nALTER TABLE %s DROP COLUMN IF EXISTS %s;",
 		util.QuoteQualifiedIdentifier(op.Schema, op.Table),
@@ -118,6 +130,7 @@ func (op *DropColumnOp) RenderString(ctx RenderContext) string {
 	)
 }
 
+// RenderString renders the SQL statement for adding an identity to a column.
 func (op *AddIdentityOp) RenderString(ctx RenderContext) string {
 	return fmt.Sprintf("-- op: add_identity risk:low\nALTER TABLE %s ALTER COLUMN %s ADD GENERATED %s AS IDENTITY;",
 		util.QuoteQualifiedIdentifier(op.Schema, op.Table),
@@ -126,6 +139,7 @@ func (op *AddIdentityOp) RenderString(ctx RenderContext) string {
 	)
 }
 
+// RenderString renders the SQL statement for setting an identity on a column.
 func (op *SetIdentityOp) RenderString(ctx RenderContext) string {
 	return fmt.Sprintf("-- op: set_identity risk:low\nALTER TABLE %s ALTER COLUMN %s SET GENERATED %s;",
 		util.QuoteQualifiedIdentifier(op.Schema, op.Table),
@@ -134,6 +148,7 @@ func (op *SetIdentityOp) RenderString(ctx RenderContext) string {
 	)
 }
 
+// RenderString renders the SQL statement for dropping an identity from a column.
 func (op *DropIdentityOp) RenderString(ctx RenderContext) string {
 	return fmt.Sprintf("-- op: drop_identity risk:medium\nALTER TABLE %s ALTER COLUMN %s DROP IDENTITY;",
 		util.QuoteQualifiedIdentifier(op.Schema, op.Table),
@@ -141,6 +156,7 @@ func (op *DropIdentityOp) RenderString(ctx RenderContext) string {
 	)
 }
 
+// RenderString renders the SQL statement for renaming a column.
 func (op *RenameColumnOp) RenderString(ctx RenderContext) string {
 	return fmt.Sprintf("-- op: rename_column risk:low\nALTER TABLE %s RENAME COLUMN %s TO %s;",
 		util.QuoteQualifiedIdentifier(op.Schema, op.Table),
@@ -149,6 +165,7 @@ func (op *RenameColumnOp) RenderString(ctx RenderContext) string {
 	)
 }
 
+// AlterColumnTypeOp represents an operation to change a column's data type.
 type AlterColumnTypeOp struct {
 	baseOperation
 	Schema    string
@@ -159,6 +176,7 @@ type AlterColumnTypeOp struct {
 	UsingExpr string
 }
 
+// NewAlterColumnTypeOp creates a new AlterColumnTypeOp.
 func NewAlterColumnTypeOp(schema, table, column, fromType, toType string) *AlterColumnTypeOp {
 	return &AlterColumnTypeOp{
 		baseOperation: baseOperation{
@@ -173,16 +191,19 @@ func NewAlterColumnTypeOp(schema, table, column, fromType, toType string) *Alter
 	}
 }
 
+// IsDestructive returns true; altering a column type can cause data loss.
 func (op *AlterColumnTypeOp) IsDestructive() bool {
 	return true
 }
 
+// DependsOn returns the object keys this operation depends on.
 func (op *AlterColumnTypeOp) DependsOn() []model.ObjectKey {
 	return []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
 	}
 }
 
+// SetNotNullOp represents an operation to set a column to NOT NULL.
 type SetNotNullOp struct {
 	baseOperation
 	Schema string
@@ -190,6 +211,7 @@ type SetNotNullOp struct {
 	Column string
 }
 
+// NewSetNotNullOp creates a new SetNotNullOp.
 func NewSetNotNullOp(schema, table, column string) *SetNotNullOp {
 	return &SetNotNullOp{
 		baseOperation: baseOperation{
@@ -202,16 +224,19 @@ func NewSetNotNullOp(schema, table, column string) *SetNotNullOp {
 	}
 }
 
+// IsDestructive returns false; setting NOT NULL is not destructive.
 func (op *SetNotNullOp) IsDestructive() bool {
 	return false
 }
 
+// DependsOn returns the object keys this operation depends on.
 func (op *SetNotNullOp) DependsOn() []model.ObjectKey {
 	return []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
 	}
 }
 
+// DropNotNullOp represents an operation to drop NOT NULL from a column.
 type DropNotNullOp struct {
 	baseOperation
 	Schema string
@@ -219,6 +244,7 @@ type DropNotNullOp struct {
 	Column string
 }
 
+// NewDropNotNullOp creates a new DropNotNullOp.
 func NewDropNotNullOp(schema, table, column string) *DropNotNullOp {
 	return &DropNotNullOp{
 		baseOperation: baseOperation{
@@ -231,16 +257,19 @@ func NewDropNotNullOp(schema, table, column string) *DropNotNullOp {
 	}
 }
 
+// IsDestructive returns false; dropping NOT NULL is not destructive.
 func (op *DropNotNullOp) IsDestructive() bool {
 	return false
 }
 
+// DependsOn returns the object keys this operation depends on.
 func (op *DropNotNullOp) DependsOn() []model.ObjectKey {
 	return []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
 	}
 }
 
+// DropColumnOp represents an operation to drop a column from a table.
 type DropColumnOp struct {
 	baseOperation
 	Schema string
@@ -248,6 +277,7 @@ type DropColumnOp struct {
 	Column string
 }
 
+// NewDropColumnOp creates a new DropColumnOp.
 func NewDropColumnOp(schema, table, column string) *DropColumnOp {
 	return &DropColumnOp{
 		baseOperation: baseOperation{
@@ -260,16 +290,19 @@ func NewDropColumnOp(schema, table, column string) *DropColumnOp {
 	}
 }
 
+// IsDestructive returns true; dropping a column causes data loss.
 func (op *DropColumnOp) IsDestructive() bool {
 	return true
 }
 
+// DependsOn returns the object keys this operation depends on.
 func (op *DropColumnOp) DependsOn() []model.ObjectKey {
 	return []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
 	}
 }
 
+// SetDefaultOp represents an operation to set a default expression on a column.
 type SetDefaultOp struct {
 	baseOperation
 	Schema      string
@@ -278,6 +311,7 @@ type SetDefaultOp struct {
 	DefaultExpr string
 }
 
+// NewSetDefaultOp creates a new SetDefaultOp.
 func NewSetDefaultOp(schema, table, column, defaultExpr string) *SetDefaultOp {
 	return &SetDefaultOp{
 		baseOperation: baseOperation{
@@ -291,16 +325,19 @@ func NewSetDefaultOp(schema, table, column, defaultExpr string) *SetDefaultOp {
 	}
 }
 
+// IsDestructive returns false; setting a default is not destructive.
 func (op *SetDefaultOp) IsDestructive() bool {
 	return false
 }
 
+// DependsOn returns the object keys this operation depends on.
 func (op *SetDefaultOp) DependsOn() []model.ObjectKey {
 	return []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
 	}
 }
 
+// DropDefaultOp represents an operation to drop a default expression from a column.
 type DropDefaultOp struct {
 	baseOperation
 	Schema string
@@ -308,6 +345,7 @@ type DropDefaultOp struct {
 	Column string
 }
 
+// NewDropDefaultOp creates a new DropDefaultOp.
 func NewDropDefaultOp(schema, table, column string) *DropDefaultOp {
 	return &DropDefaultOp{
 		baseOperation: baseOperation{
@@ -320,16 +358,19 @@ func NewDropDefaultOp(schema, table, column string) *DropDefaultOp {
 	}
 }
 
+// IsDestructive returns false; dropping a default is not destructive.
 func (op *DropDefaultOp) IsDestructive() bool {
 	return false
 }
 
+// DependsOn returns the object keys this operation depends on.
 func (op *DropDefaultOp) DependsOn() []model.ObjectKey {
 	return []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
 	}
 }
 
+// SetIdentityOp represents an operation to set the identity generation option on a column.
 type SetIdentityOp struct {
 	baseOperation
 	Schema       string
@@ -338,6 +379,7 @@ type SetIdentityOp struct {
 	IdentityKind string
 }
 
+// NewSetIdentityOp creates a new SetIdentityOp.
 func NewSetIdentityOp(schema, table, column, identityKind string) *SetIdentityOp {
 	return &SetIdentityOp{
 		baseOperation: baseOperation{
@@ -351,16 +393,19 @@ func NewSetIdentityOp(schema, table, column, identityKind string) *SetIdentityOp
 	}
 }
 
+// IsDestructive returns false; setting an identity is not destructive.
 func (op *SetIdentityOp) IsDestructive() bool {
 	return false
 }
 
+// DependsOn returns the object keys this operation depends on.
 func (op *SetIdentityOp) DependsOn() []model.ObjectKey {
 	return []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
 	}
 }
 
+// DropIdentityOp represents an operation to drop the identity property from a column.
 type DropIdentityOp struct {
 	baseOperation
 	Schema string
@@ -368,6 +413,7 @@ type DropIdentityOp struct {
 	Column string
 }
 
+// NewDropIdentityOp creates a new DropIdentityOp.
 func NewDropIdentityOp(schema, table, column string) *DropIdentityOp {
 	return &DropIdentityOp{
 		baseOperation: baseOperation{
@@ -380,16 +426,19 @@ func NewDropIdentityOp(schema, table, column string) *DropIdentityOp {
 	}
 }
 
+// IsDestructive returns true; dropping an identity can be destructive.
 func (op *DropIdentityOp) IsDestructive() bool {
 	return true
 }
 
+// DependsOn returns the object keys this operation depends on.
 func (op *DropIdentityOp) DependsOn() []model.ObjectKey {
 	return []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
 	}
 }
 
+// AddIdentityOp represents an operation to add an identity property to an existing column.
 type AddIdentityOp struct {
 	baseOperation
 	Schema       string
@@ -398,6 +447,7 @@ type AddIdentityOp struct {
 	IdentityKind string
 }
 
+// NewAddIdentityOp creates a new AddIdentityOp.
 func NewAddIdentityOp(schema, table, column, identityKind string) *AddIdentityOp {
 	return &AddIdentityOp{
 		baseOperation: baseOperation{
@@ -411,12 +461,15 @@ func NewAddIdentityOp(schema, table, column, identityKind string) *AddIdentityOp
 	}
 }
 
+// IsDestructive returns false; adding an identity is not destructive.
 func (op *AddIdentityOp) IsDestructive() bool { return false }
 
+// DependsOn returns the object keys this operation depends on.
 func (op *AddIdentityOp) DependsOn() []model.ObjectKey {
 	return []model.ObjectKey{model.NewObjectKey(op.Schema, op.Table, model.KindTable)}
 }
 
+// AlterColumnCollationOp represents an operation to change a column's collation.
 type AlterColumnCollationOp struct {
 	baseOperation
 	Schema        string
@@ -427,6 +480,7 @@ type AlterColumnCollationOp struct {
 	ToCollation   string
 }
 
+// NewAlterColumnCollationOp creates a new AlterColumnCollationOp.
 func NewAlterColumnCollationOp(schema, table, column, dataType, fromCollation, toCollation string) *AlterColumnCollationOp {
 	return &AlterColumnCollationOp{
 		baseOperation: baseOperation{
@@ -442,10 +496,12 @@ func NewAlterColumnCollationOp(schema, table, column, dataType, fromCollation, t
 	}
 }
 
+// IsDestructive returns false; altering collation is not destructive.
 func (op *AlterColumnCollationOp) IsDestructive() bool {
 	return false
 }
 
+// DependsOn returns the object keys this operation depends on.
 func (op *AlterColumnCollationOp) DependsOn() []model.ObjectKey {
 	return []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Table, model.KindTable),

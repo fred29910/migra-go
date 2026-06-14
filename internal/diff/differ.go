@@ -7,24 +7,24 @@ import (
 	"github.com/fred29910/migra-go/internal/util"
 )
 
-// DiffEngine defines the interface for schema diff computation.
-type DiffEngine interface {
+// Engine defines the interface for schema diff computation.
+type Engine interface {
 	Diff(source, target *model.Schema) ([]Operation, []string)
 }
 
-// Compile-time check: Differ must satisfy DiffEngine.
-var _ DiffEngine = (*Differ)(nil)
+// Compile-time check: Differ must satisfy Engine.
+var _ Engine = (*Differ)(nil)
 
 // Differ performs diff between two schemas.
 // Note: Differ is not safe for concurrent use.
-type Differ struct{}
+type Differ struct {}
 
-// NewDiffer creates a new Differ
+// NewDiffer creates a new Differ.
 func NewDiffer() *Differ {
 	return &Differ{}
 }
 
-// Diff compares two schemas and returns operations and warnings
+// Diff compares two schemas and returns operations and warnings.
 func (d *Differ) Diff(source, target *model.Schema) ([]Operation, []string) {
 	ctx := &diffContext{ops: make([]Operation, 0, 16), warnings: make([]string, 0, 4)}
 	ctx.diffSchemas(source, target)

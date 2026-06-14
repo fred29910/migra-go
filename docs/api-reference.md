@@ -71,10 +71,10 @@ type Operation interface {
 
 差异操作接口，所有 33 种操作类型都实现此接口。
 
-### plan.PlanEngine
+### plan.Engine
 
 ```go
-type PlanEngine interface {
+type Engine interface {
     Plan(ops []Operation) map[Stage][]Operation
 }
 ```

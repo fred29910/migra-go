@@ -10,6 +10,7 @@ import (
 	"github.com/fred29910/migra-go/internal/model"
 )
 
+// Config holds configuration for a diff operation.
 type Config struct {
 	Source     string
 	Target     string
@@ -21,10 +22,12 @@ type Config struct {
 	Timeout    time.Duration
 }
 
+// DiffService defines the interface for running schema diff operations.
 type DiffService interface {
 	Run(ctx context.Context, cfg Config) (output string, warnings []string, err error)
 }
 
+// RunnerDeps holds the dependencies for the diff service.
 type RunnerDeps struct {
 	LoadSchema func(ctx context.Context, source string, schemas []string, strict bool) (*model.Schema, error)
 	Compute    func(source, target *model.Schema, cfg Config) ([]diff.Operation, []string, error)
@@ -35,6 +38,7 @@ type diffService struct {
 	deps RunnerDeps
 }
 
+// NewDiffService creates a new DiffService with the given dependencies.
 func NewDiffService(deps RunnerDeps) DiffService {
 	return &diffService{deps: deps}
 }

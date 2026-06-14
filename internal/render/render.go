@@ -7,6 +7,8 @@ import (
 	"github.com/fred29910/migra-go/internal/diff"
 )
 
+// SQLEngine defines the interface for SQL rendering.
+// Implementations can render diff operations into SQL statements.
 type SQLEngine interface {
 	RenderAll(ops []diff.Operation) string
 }
@@ -18,6 +20,7 @@ type Renderer struct {
 	useIfExists bool
 }
 
+// NewRenderer creates a new Renderer with default settings.
 func NewRenderer() *Renderer {
 	return &Renderer{
 		useIfExists: true,
@@ -29,6 +32,7 @@ func (r *Renderer) UseIfExists() bool {
 	return r.useIfExists
 }
 
+// RenderOutput renders all operations in the specified format ("sql" or "json").
 func (r *Renderer) RenderOutput(ops []diff.Operation, format string) (string, error) {
 	switch format {
 	case "sql":
@@ -40,6 +44,7 @@ func (r *Renderer) RenderOutput(ops []diff.Operation, format string) (string, er
 	}
 }
 
+// RenderAll renders all operations as a single SQL string.
 func (r *Renderer) RenderAll(ops []diff.Operation) string {
 	var b strings.Builder
 	for _, op := range ops {
@@ -62,7 +67,7 @@ func (r *Renderer) RenderAll(ops []diff.Operation) string {
 	return b.String()
 }
 
-// Render delegates rendering to the operation's own RenderString method.
+// Render renders a single operation as SQL by delegating to the operation's RenderString method.
 func (r *Renderer) Render(op diff.Operation) string {
 	return op.RenderString(r)
 }

@@ -12,6 +12,7 @@ import (
 // CreateViewHandler handles CREATE VIEW statements.
 type CreateViewHandler struct{}
 
+// Handle converts a pg_query ViewStmt into view mutations.
 func (h *CreateViewHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error) {
 	stmt := node.GetViewStmt()
 	if stmt == nil {
@@ -30,6 +31,7 @@ func (h *CreateViewHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error
 // with Objtype == ObjectType_OBJECT_MATVIEW.
 type CreateMaterializedViewHandler struct{}
 
+// Handle converts a pg_query CreateTableAsStmt (matview) into view mutations.
 func (h *CreateMaterializedViewHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error) {
 	stmt := node.GetCreateTableAsStmt()
 	if stmt == nil {
@@ -53,14 +55,17 @@ type CreateViewMutation struct {
 	View   model.View
 }
 
+// Kind returns the mutation kind.
 func (m CreateViewMutation) Kind() MutationKind {
 	return MutationKind("create_view")
 }
 
+// Target returns the ObjectKey of the view to be created.
 func (m CreateViewMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.View.Name, model.KindView)
 }
 
+// Apply adds the view to the given schema.
 func (m CreateViewMutation) Apply(schema *model.Schema) error {
 	ns := schema.GetOrCreateNamespace(m.Schema)
 	view := m.View

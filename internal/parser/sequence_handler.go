@@ -12,6 +12,7 @@ import (
 // CreateSequenceHandler handles CREATE SEQUENCE statements.
 type CreateSequenceHandler struct{}
 
+// Handle converts a pg_query CreateSeqStmt into sequence mutations.
 func (h *CreateSequenceHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error) {
 	stmt := node.GetCreateSeqStmt()
 	if stmt == nil {
@@ -84,14 +85,17 @@ type CreateSequenceMutation struct {
 	Sequence model.Sequence
 }
 
+// Kind returns the mutation kind.
 func (m CreateSequenceMutation) Kind() MutationKind {
 	return MutationKind("create_sequence")
 }
 
+// Target returns the ObjectKey of the sequence to be created.
 func (m CreateSequenceMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, m.Sequence.Name, model.KindSequence)
 }
 
+// Apply adds the sequence to the given schema.
 func (m CreateSequenceMutation) Apply(schema *model.Schema) error {
 	ns := schema.GetOrCreateNamespace(m.Schema)
 	seq := m.Sequence
