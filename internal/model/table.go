@@ -6,6 +6,7 @@ type Table struct {
 	Name          string
 	Columns       []*Column          // Preserve order for column ordering strategies
 	ColumnByName  map[string]*Column `json:"-"` // Index for quick lookup by name, excluded from JSON
+	ColumnIndex   map[string]int     `json:"-"` // Index of each column in Columns slice, for O(1) removal
 	PrimaryKey    *PrimaryKey
 	Constraints   map[string]*Constraint
 	Indexes       map[string]*Index
@@ -56,6 +57,7 @@ func NewTable(schema, name string) *Table {
 		Name:          name,
 		Columns:       make([]*Column, 0),
 		ColumnByName:  make(map[string]*Column),
+		ColumnIndex:   make(map[string]int),
 		Constraints:   make(map[string]*Constraint),
 		Indexes:       make(map[string]*Index),
 		IsPlaceholder: false,
@@ -69,17 +71,25 @@ func (t *Table) GetColumn(name string) *Column {
 
 // AddColumn adds a column to the table and maintains the ColumnByName index
 func (t *Table) AddColumn(col *Column) {
+	t.ColumnIndex[col.Name] = len(t.Columns)
 	t.Columns = append(t.Columns, col)
 	t.ColumnByName[col.Name] = col
 }
 
-// RemoveColumn removes a column by name from the table
+// RemoveColumn removes a column by name from the table.
+// Uses ColumnIndex for O(1) lookup of the column's position in the slice.
 func (t *Table) RemoveColumn(name string) {
-	delete(t.ColumnByName, name)
-	for i, col := range t.Columns {
-		if col.Name == name {
-			t.Columns = append(t.Columns[:i], t.Columns[i+1:]...)
-			return
-		}
+	idx, ok := t.ColumnIndex[name]
+	if !ok {
+		return
 	}
+	delete(t.ColumnByName, name)
+	delete(t.ColumnIndex, name)
+	// Remove from slice by swapping with last element and truncating
+	last := len(t.Columns) - 1
+	if idx != last {
+		t.Columns[idx] = t.Columns[last]
+		t.ColumnIndex[t.Columns[idx].Name] = idx
+	}
+	t.Columns = t.Columns[:last]
 }

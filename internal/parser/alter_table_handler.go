@@ -2,14 +2,26 @@ package parser
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/fred29910/migra-go/internal/parser/parserutil"
 	pg_query "github.com/pganalyze/pg_query_go/v6"
 )
 
 // AlterTableHandler handles ALTER TABLE statements.
-type AlterTableHandler struct{}
+type AlterTableHandler struct {
+	warnFn WarningEmitter
+}
+
+// SetWarningEmitter sets the warning emitter for this handler.
+func (h *AlterTableHandler) SetWarningEmitter(fn WarningEmitter) {
+	h.warnFn = fn
+}
+
+func (h *AlterTableHandler) warnf(format string, args ...any) {
+	if h.warnFn != nil {
+		h.warnFn(format, args...)
+	}
+}
 
 // Handle converts a pg_query AlterTableStmt into schema mutations.
 func (h *AlterTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error) {
@@ -41,7 +53,7 @@ func (h *AlterTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error
 		case pg_query.AlterTableType_AT_DropColumn:
 			colName := cmd.Name
 			if colName == "" {
-				fmt.Fprintf(os.Stderr, "warning: DROP COLUMN missing column name\n")
+				h.warnf("warning: DROP COLUMN missing column name")
 				continue
 			}
 			mutations = append(mutations, DropColumnMutation{
@@ -53,7 +65,7 @@ func (h *AlterTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error
 		case pg_query.AlterTableType_AT_AlterColumnType:
 			colName := cmd.Name
 			if colName == "" || cmd.Def == nil {
-				fmt.Fprintf(os.Stderr, "warning: ALTER COLUMN TYPE missing column name or type\n")
+				h.warnf("warning: ALTER COLUMN TYPE missing column name or type")
 				continue
 			}
 			if colDef := cmd.Def.GetColumnDef(); colDef != nil {
@@ -78,7 +90,7 @@ func (h *AlterTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error
 		case pg_query.AlterTableType_AT_SetNotNull:
 			colName := cmd.Name
 			if colName == "" {
-				fmt.Fprintf(os.Stderr, "warning: SET NOT NULL missing column name\n")
+				h.warnf("warning: SET NOT NULL missing column name")
 				continue
 			}
 			mutations = append(mutations, SetNotNullMutation{
@@ -90,7 +102,7 @@ func (h *AlterTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error
 		case pg_query.AlterTableType_AT_DropNotNull:
 			colName := cmd.Name
 			if colName == "" {
-				fmt.Fprintf(os.Stderr, "warning: DROP NOT NULL missing column name\n")
+				h.warnf("warning: DROP NOT NULL missing column name")
 				continue
 			}
 			mutations = append(mutations, DropNotNullMutation{
@@ -102,7 +114,7 @@ func (h *AlterTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error
 		case pg_query.AlterTableType_AT_ColumnDefault:
 			colName := cmd.Name
 			if colName == "" {
-				fmt.Fprintf(os.Stderr, "warning: ALTER COLUMN DEFAULT missing column name\n")
+				h.warnf("warning: ALTER COLUMN DEFAULT missing column name")
 				continue
 			}
 			if cmd.Def != nil {
@@ -133,7 +145,7 @@ func (h *AlterTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error
 			}
 			constraint, ok := parseTableConstraint(tableName, c)
 			if !ok {
-				fmt.Fprintf(os.Stderr, "warning: unsupported ADD CONSTRAINT type: %v\n", c.Contype)
+				h.warnf("warning: unsupported ADD CONSTRAINT type: %v", c.Contype)
 				continue
 			}
 			mutations = append(mutations, AddConstraintMutation{
@@ -142,7 +154,7 @@ func (h *AlterTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error
 
 		case pg_query.AlterTableType_AT_DropConstraint:
 			if cmd.Name == "" {
-				fmt.Fprintf(os.Stderr, "warning: DROP CONSTRAINT missing constraint name\n")
+				h.warnf("warning: DROP CONSTRAINT missing constraint name")
 				continue
 			}
 			mutations = append(mutations, DropConstraintMutation{
@@ -155,8 +167,7 @@ func (h *AlterTableHandler) Handle(node *pg_query.Node) ([]SchemaMutation, error
 			// If you encounter an unhandled subtype here, check whether the statement
 			// type is handled by a dedicated handler (e.g., RenameStmtHandler) or if
 			// a new handler needs to be registered in registry.go.
-			fmt.Fprintf(os.Stderr, "warning: unsupported ALTER TABLE subcommand (subtype=%v). "+
-				"This may be handled by a different top-level statement handler.\n", cmd.Subtype)
+			h.warnf("warning: unsupported ALTER TABLE subcommand (subtype=%v). This may be handled by a different top-level statement handler.", cmd.Subtype)
 		}
 	}
 	return mutations, nil

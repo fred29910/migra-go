@@ -22,7 +22,7 @@ func renderJSON(ops []diff.Operation) (string, error) {
 			Kind:        string(op.Kind()),
 			ObjectKey:   obj.Schema + "." + obj.Name,
 			Destructive: op.IsDestructive(),
-			SQL:         r.RenderSingle(op),
+			SQL:         r.Render(op),
 		}
 	}
 

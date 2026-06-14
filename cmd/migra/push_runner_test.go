@@ -249,7 +249,7 @@ func TestNewDefaultDeps_RenderUnsupportedFormat(t *testing.T) {
 
 // ─── render.Single operation tests ──────────────────────────────────────────
 
-func TestRenderSingle_AllOperationTypes(t *testing.T) {
+func TestRender_AllOperationTypes(t *testing.T) {
 	r := render.NewRenderer()
 
 	tests := []struct {
@@ -331,13 +331,13 @@ func TestRenderSingle_AllOperationTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sql := r.RenderSingle(tt.op)
+			sql := r.Render(tt.op)
 			assert.Contains(t, sql, tt.expectContains)
 		})
 	}
 }
 
-func TestRenderSingle_DestructiveFlag(t *testing.T) {
+func TestRender_DestructiveFlag(t *testing.T) {
 	tests := []struct {
 		name     string
 		op       diff.Operation
@@ -360,7 +360,7 @@ func TestRenderSingle_DestructiveFlag(t *testing.T) {
 	}
 }
 
-func TestRenderSingle_ObjectKey(t *testing.T) {
+func TestRender_ObjectKey(t *testing.T) {
 	op := diff.NewAddTableOp("public", "users", &model.Table{Schema: "public", Name: "users"})
 	key := op.ObjectKey()
 	assert.Equal(t, "public", key.Schema)
