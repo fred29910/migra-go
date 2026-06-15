@@ -9,6 +9,62 @@ import (
 	"github.com/fred29910/migra-go/internal/util"
 )
 
+func renderConstraint(c *model.Constraint) string {
+	if c == nil {
+		return ""
+	}
+	definition := renderConstraintDefinition(c)
+	if definition == "" {
+		return ""
+	}
+	return fmt.Sprintf("CONSTRAINT %s %s", util.QuoteIdentifier(c.Name), definition)
+}
+
+func renderConstraintDefinition(c *model.Constraint) string {
+	if c == nil {
+		return ""
+	}
+	switch c.Type {
+	case "primary_key":
+		return fmt.Sprintf("PRIMARY KEY (%s)", util.QuoteIdentifierList(c.Columns))
+	case "foreign_key":
+		sql := fmt.Sprintf("FOREIGN KEY (%s) REFERENCES %s (%s)",
+			util.QuoteIdentifierList(c.Columns),
+			util.QuoteQualifiedIdentifier(c.RefSchema, c.RefTable),
+			util.QuoteIdentifierList(c.RefColumns),
+		)
+		if c.OnDelete != "" {
+			sql += fmt.Sprintf(" ON DELETE %s", c.OnDelete)
+		}
+		if c.OnUpdate != "" {
+			sql += fmt.Sprintf(" ON UPDATE %s", c.OnUpdate)
+		}
+		return sql
+	case "unique":
+		return fmt.Sprintf("UNIQUE (%s)", util.QuoteIdentifierList(c.Columns))
+	case "check":
+		if c.Expression != "" {
+			return fmt.Sprintf("CHECK (%s)", c.Expression)
+		}
+		return ""
+	}
+	if c.Definition != "" {
+		return c.Definition
+	}
+	return ""
+}
+
+func quoteString(s string) string {
+	return `'` + strings.ReplaceAll(s, `'`, `''`) + `'`
+}
+
+func ifExistsPrefix(use bool) string {
+	if use {
+		return "IF EXISTS "
+	}
+	return ""
+}
+
 func renderCreateIndex(r *Renderer, op *diff.CreateIndexOp) string {
 	idx := op.Index
 	unique := ""
@@ -72,9 +128,4 @@ func renderIndexElem(elem model.IndexElem) string {
 		item += " NULLS " + elem.NullsOrdering
 	}
 	return item
-}
-
-func renderDropIndex(r *Renderer, op *diff.DropIndexOp) string {
-	return fmt.Sprintf("-- op: drop_index risk:medium\nDROP INDEX %s%s;",
-		ifExistsPrefix(r.useIfExists), util.QuoteQualifiedIdentifier(op.Schema, op.Name))
 }

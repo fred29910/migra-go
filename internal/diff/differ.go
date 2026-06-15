@@ -17,7 +17,7 @@ var _ Engine = (*Differ)(nil)
 
 // Differ performs diff between two schemas.
 // Note: Differ is not safe for concurrent use.
-type Differ struct {}
+type Differ struct{}
 
 // NewDiffer creates a new Differ.
 func NewDiffer() *Differ {
