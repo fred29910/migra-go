@@ -273,7 +273,7 @@ func TestMutationApplier_Apply_ResetsErrorsBetweenCalls(t *testing.T) {
 	schema := model.NewSchema()
 
 	// First call with error
-	a.Apply(schema, []SchemaMutation{
+	_ = a.Apply(schema, []SchemaMutation{
 		DropColumnMutation{Schema: "public", Table: "missing", Column: "col"},
 	})
 	assert.Len(t, a.errors, 1)

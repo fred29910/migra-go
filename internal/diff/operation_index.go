@@ -101,6 +101,7 @@ func NewDropIndexOp(schema, name string) *DropIndexOp {
 		Name:   name,
 	}
 }
+
 // IsDestructive returns whether the operation is destructive.
 func (op *DropIndexOp) IsDestructive() bool {
 	return false

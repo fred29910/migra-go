@@ -33,10 +33,12 @@ type CreateSchemaMutation struct {
 
 // Kind returns the mutation kind.
 func (m CreateSchemaMutation) Kind() MutationKind { return MutKindCreateSchema }
+
 // Target returns the ObjectKey of the schema to be created.
 func (m CreateSchemaMutation) Target() model.ObjectKey {
 	return model.NewObjectKey(m.Schema, "", model.KindSchema)
 }
+
 // Apply creates the namespace in the given schema.
 func (m CreateSchemaMutation) Apply(schema *model.Schema) error {
 	schema.GetOrCreateNamespace(m.Schema)

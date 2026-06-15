@@ -78,15 +78,6 @@ func (p *Parser) Warnings() []string {
 	return out
 }
 
-// warnf emits a non-fatal warning.
-func (p *Parser) warnf(format string, args ...any) {
-	msg := fmt.Sprintf(format, args...)
-	p.warnings = append(p.warnings, msg)
-	if p.warnFn != nil {
-		p.warnFn("%s", msg)
-	}
-}
-
 // ParseSQL parses SQL string and returns the schema
 func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
 	// Ensure dependencies are initialized even if created via struct literal
