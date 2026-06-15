@@ -1986,7 +1986,7 @@ func TestParseSQL_LongSQL(t *testing.T) {
 		if i > 0 {
 			sb.WriteString(", ")
 		}
-		sb.WriteString(fmt.Sprintf("col_%d integer", i))
+		fmt.Fprintf(&sb, "col_%d integer", i)
 	}
 	sb.WriteString(");")
 
