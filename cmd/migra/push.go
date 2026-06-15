@@ -3,6 +3,12 @@ package main
 import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/fred29910/migra-go/internal/app"
+	"github.com/fred29910/migra-go/internal/diff"
+	"github.com/fred29910/migra-go/internal/model"
+	"github.com/fred29910/migra-go/internal/render"
+	"github.com/fred29910/migra-go/internal/app/push"
 )
 
 var pushCmd = &cobra.Command{
@@ -22,8 +28,8 @@ Examples:
 func init() {
 	rootCmd.AddCommand(pushCmd)
 
-	pushCmd.Flags().StringSliceP("schema", "s", viper.GetStringSlice("diff.schemas"), "schemas to compare (can be multiple)")
-	pushCmd.Flags().Bool("unsafe-drop", viper.GetBool("diff.unsafe_drop"), "skip confirmation for destructive DROP operations")
+	pushCmd.Flags().StringSliceP("schema", "s", []string{"public"}, "schemas to compare (can be multiple)")
+	pushCmd.Flags().Bool("unsafe-drop", false, "skip confirmation for destructive DROP operations")
 	pushCmd.Flags().Bool("dry-run", false, "show SQL without executing (default: false)")
 	pushCmd.Flags().Bool("execute", false, "execute SQL without confirmation (not recommended)")
 	pushCmd.Flags().Bool("no-verify", false, "skip post-execution validation")
