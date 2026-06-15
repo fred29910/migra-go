@@ -1,7 +1,7 @@
 # PostgreSQL DDL 特性支持矩阵
 
-> **项目**: migra-go — 基于 `pg_query_go` 的 PostgreSQL  schema diff 工具  
-> **最后更新**: 2026-06-03  
+> **项目**: migra-go — 基于 `pg_query_go` 的 PostgreSQL schema diff 工具  
+> **最后更新**: 2026-06-15  
 > **Legend**: ✅ 完全支持 | ⚠️ 部分支持 (含多种情况: a) pg_query 可解析但下游不处理; b) 部分子特性支持; c) 能检测但不生成修复 DDL) | ❌ 暂不支持
 
 ---
@@ -137,12 +137,12 @@
 
 | 特性 | 状态 | 说明 |
 |------|------|------|
-|| **视图** (`CREATE VIEW`) | ✅ | 支持普通 view 的 parse、diff、render、introspect。物化视图可被内省加载（标记 `materialized`），渲染时区分 `CREATE MATERIALIZED VIEW` / `DROP MATERIALIZED VIEW`。 |
+| **视图** (`CREATE VIEW`) | ✅ | 支持普通 view 和物化视图的 parse、diff、render、introspect。物化视图作为独立 Op 类型（`create_materialized_view` / `drop_materialized_view`），渲染时区分 `CREATE MATERIALIZED VIEW` / `DROP MATERIALIZED VIEW`。 |
 | **序列** (`CREATE SEQUENCE`) | ✅ | 完整支持序列的 parse、diff、render、introspect。支持数据类型、start/increment/min/max/cache/cycle 属性变更检测。 |
+| **扩展** (`CREATE EXTENSION`) | ✅ | 完整支持扩展的 parse、diff、render、introspect。支持 create/drop 和 update to version。渲染使用 `quoteIdentifier`（不含 schema 前缀）。 |
 | **触发器** (`CREATE TRIGGER`) | ❌ | 不支持 |
 | **规则** (`CREATE RULE`) | ❌ | 不支持 |
 | **行级安全策略** (`CREATE POLICY`) | ❌ | 不支持 |
-|| **扩展** (`CREATE EXTENSION`) | ✅ | 完整支持扩展的 parse、diff、render、introspect。支持 create/drop 和 update to version。渲染使用 `quoteIdentifier`（不含 schema 前缀）。 |
 | **排序规则** (`CREATE COLLATION`) | ❌ | 不支持 |
 | **全文搜索配置** (`CREATE TEXT SEARCH`) | ❌ | 不支持 |
 | **函数 / 过程** (`CREATE FUNCTION/PROCEDURE`) | ❌ | 不支持 |
@@ -181,16 +181,16 @@
 
 | 阶段 | 包含操作 | 状态 |
 |------|---------|------|
-| **Pre-deploy** (创建) | `CREATE SCHEMA`, `ADD TABLE`, `ADD COLUMN`, `ADD INDEX`, `ADD CONSTRAINT`, `ADD ENUM TYPE`, `CREATE VIEW`, `CREATE SEQUENCE`, `CREATE EXTENSION` | ✅ |
+| **Pre-deploy** (创建) | `CREATE SCHEMA`, `ADD TABLE`, `ADD COLUMN`, `ADD INDEX`, `ADD CONSTRAINT`, `ADD ENUM TYPE`, `CREATE VIEW`, `CREATE MATERIALIZED VIEW`, `CREATE SEQUENCE`, `CREATE EXTENSION` | ✅ |
 | **Deploy** (修改) | `ALTER COLUMN TYPE`, `SET/DROP NOT NULL`, `SET/DROP DEFAULT`, `SET/DROP IDENTITY`, `ADD IDENTITY`, `ADD ENUM LABEL`, `RENAME COLUMN`, `ALTER COLUMN COLLATION`, `REPLACE VIEW`, `ALTER SEQUENCE`, `ALTER EXTENSION UPDATE` | ✅ |
-| **Post-deploy** (删除, 需 `--unsafe-drop`) | `DROP SCHEMA`, `DROP TABLE`, `DROP COLUMN`, `DROP INDEX`, `DROP CONSTRAINT`, `DROP ENUM TYPE`, `DROP IDENTITY`, `DROP VIEW`, `DROP SEQUENCE`, `DROP EXTENSION` | ✅ |
+| **Post-deploy** (删除, 需 `--unsafe-drop`) | `DROP SCHEMA`, `DROP TABLE`, `DROP COLUMN`, `DROP INDEX`, `DROP CONSTRAINT`, `DROP ENUM TYPE`, `DROP IDENTITY`, `DROP VIEW`, `DROP MATERIALIZED VIEW`, `DROP SEQUENCE`, `DROP EXTENSION` | ✅ |
 
 依赖排序使用 **Kahn 拓扑排序** 算法，确保:
 - 外键引用的表先于引用它的表创建
 - 删除操作先于创建操作执行 (同约束名)
 - 列的添加先于索引创建
 
-> **注意**: `CREATE SCHEMA`/`DROP SCHEMA` 已在 `assignStage()` 中显式分配为 Pre-deploy/Post-deploy。`alter_column_collation`, `set_identity`, `drop_identity`, `add_identity`, `replace_view`, `alter_sequence`, `alter_extension_update` 等均已在 `assignStage()` 中显式匹配到对应阶段。
+> **注意**: `CREATE SCHEMA`/`DROP SCHEMA` 已在 `assignStage()` 中显式分配为 Pre-deploy/Post-deploy。物化视图的 `CreateMaterializedViewOp`/`DropMaterializedViewOp` 分别属于 Pre-deploy/Post-deploy。`alter_column_collation`, `set_identity`, `drop_identity`, `add_identity`, `replace_view`, `alter_sequence`, `alter_extension_update` 等均已在 `assignStage()` 中显式匹配到对应阶段。
 
 ---
 
@@ -212,7 +212,7 @@
 
 8. **重命名列启发式检测的限制**: Diff 引擎通过比较 `DataType`、`IsNullable`、`DefaultExpr`、`Collation` 来推断列重命名。此启发式方法可能产生误报——例如用户删除了具有属性 X 的列并新增了具有相同属性的列（但语义不同）。未来可通过 SQL 注释声明 (`-- @rename from_col to_col`) 来显式声明重命名，消除误报。
 
-9. **约束名称冲突处理**: 当同一条 ALTER TABLE 语句中同时存在 DROP CONSTRAINT 和 ADD CONSTRAINT 且名称相同时，pg_query_go 会将其拆分为独立的 AST 节点。当前处理方式先生成 Drop 再生成 Add，DAG 排序确保 Drop 先执行。但某些复杂场景（如递归生成引用自身的约束）可能导致排序问题。
+9. **约束名称冲突处理**: 当同一条 ALTER TABLE 语句中同时存在 DROP CONSTRAINT 和 ADD CONSTRAINT 且名称相同时，pg_query_go 会将其拆分为独立的 AST 节点。DAG 排序通过 `findNodeByObjectKey` 优先匹配 DropConstraint 确保 Drop 先执行。
 
 10. **`ONLY` 子句 (表继承)**: `CREATE TABLE ... INHERITS (...)` 被 pg_query 解析但 diff/renderer 不处理继承关系。
 
@@ -220,13 +220,13 @@
 
 12. **存储参数**: `WITH (fillfactor=70)` 等存储参数被 pg_query 解析但 diff/renderer 不处理。
 
-13. **数据库自省的索引信息有限**: DBLoader 现已通过 `pg_get_indexdef(indexrelid, column_no, true)` 按索引元素获取完整定义（表达式、opclass、collation、排序、NULLS），结构化解析为 `model.IndexElem`。`CONCURRENTLY` 标志仍需从 `pg_index` 元组字段提取，当前仅在 SQL 文件解析路径中可用。
+13. **数据库自省的索引信息**: DBLoader 现已通过 `pg_get_indexdef(indexrelid, column_no, true)` 按索引元素获取完整定义（表达式、opclass、collation、排序、NULLS），结构化解析为 `model.IndexElem`。`CONCURRENTLY` 标志仍需从 `pg_index` 元组字段提取，当前仅在 SQL 文件解析路径中可用。
 
 14. **`Rename Column` 启发式检测**: 见限制 #8。仅当列属性完全匹配时才判定为重命名，否则回退为 `DROP COLUMN + ADD COLUMN`。
 
 15. **`ALTER COLUMN TYPE ... USING`**: 当前 `AlterColumnTypeOp` 只有 `FromType` / `ToType`，Renderer 不输出 `USING` 表达式。
 
-16. **物化视图渲染**: 物化视图使用 `CREATE MATERIALIZED VIEW` / `DROP MATERIALIZED VIEW`，不使用 `CREATE OR REPLACE` 语义（PostgreSQL 不支持 `CREATE OR REPLACE MATERIALIZED VIEW`）。
+16. **物化视图渲染**: 物化视图使用独立的 `CreateMaterializedViewOp` / `DropMaterializedViewOp` 类型，渲染为 `CREATE MATERIALIZED VIEW` / `DROP MATERIALIZED VIEW`，不使用 `CREATE OR REPLACE` 语义（PostgreSQL 不支持 `CREATE OR REPLACE MATERIALIZED VIEW`）。
 
 17. **序列 CYCLE 渲染**: `ALTER SEQUENCE` 根据目标状态分别渲染 `CYCLE` / `NO CYCLE`。
 
@@ -235,3 +235,5 @@
 19. **push 超时上下文**: push 交互流程已将 schema 加载超时和执行阶段上下文拆分，避免用户在交互确认过程中触发超时。
 
 20. **`DROP EXTENSION` 渲染**: 使用 `quoteIdentifier(op.Name)`，因为 PostgreSQL 的 `DROP EXTENSION` 不接受 schema-qualified 名称。
+
+21. **物化视图作为独立 Op 类型**: v0.3.0 起，物化视图不再与普通视图共享 Op 类型，而是独立的 `create_materialized_view` / `drop_materialized_view`，共 34 种 Operation。

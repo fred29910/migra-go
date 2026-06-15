@@ -1,6 +1,6 @@
 # MIGRA-Go 架构文档
 
-> 最后更新：2026-06-03
+> 最后更新：2026-06-15
 
 ## 概述
 
@@ -12,6 +12,7 @@ MIGRA-Go 是一个用 Go 编写的 PostgreSQL Schema 差异比较工具。它采
 - **OCP（开闭原则）**：新增 DDL 类型只需实现 Handler + Mutation 并注册，无需改动核心解析器
 - **依赖注入**：通过 `RunnerDeps` 将核心依赖注入到应用服务层，便于测试
 - **策略模式**：Source 加载层通过 Registry 自动匹配来源类型
+- **多态分发**：渲染器通过 `op.RenderString(ctx)` 多态分发，而非巨型 switch
 
 ---
 
@@ -34,7 +35,7 @@ flowchart LR
 | 1 | Source | `internal/source/` | 路径/URL 字符串 | `*model.Schema` |
 | 2 | Parser | `internal/parser/` | SQL 文本 | `*model.Schema` |
 | 3 | Normalize | `internal/normalize/` | `*model.Schema` | 归一化的 `*model.Schema` |
-| 4 | Diff | `internal/diff/` | `source, target *model.Schema` | `[]Operation` (33 种) |
+| 4 | Diff | `internal/diff/` | `source, target *model.Schema` | `[]Operation` (34 种) |
 | 5 | Plan + Render | `internal/plan/` + `internal/render/` | `[]Operation` | SQL / JSON |
 
 ---
@@ -51,6 +52,7 @@ flowchart TD
     end
     subgraph App["internal/app/ (应用服务)"]
         diff_svc[diff_service.go]
+        pipeline[pipeline.go]
     end
     subgraph Source["internal/source/ (Schema 来源)"]
         registry[registry.go]
@@ -72,10 +74,11 @@ flowchart TD
     end
     subgraph Other["内部其他模块"]
         normalize_impl[normalize/]
-        diff_impl[diff/ 33种Op]
+        diff_impl[diff/ 34种Op]
         plan_impl[plan/ 三阶段+DAG]
-        render_impl[render/]
+        render_impl[render/ 多态分发]
         introspect_impl[introspect/]
+        errors_impl[errors/]
         version_impl[version/]
     end
     CLI --> App
@@ -113,11 +116,12 @@ cmd/migra/
 - **依赖注入** (`diff_runner.go:86-98`)：`newDefaultDeps()` 返回 `app.RunnerDeps`，包含 `LoadSchema`、`Compute`、`Render` 三个函数
 - **diff 参数模式**：支持 0/1/2 个参数
 - **push 交互流程**：Load schema → ComputeDiff → Diff Preview → 逐条确认(y/n/a/s) → 事务提交 → 执行后校验
+- **push 中断处理**：使用 `context.WithCancel` + signal handling（SIGINT/SIGTERM），不再使用 `os.Exit(1)`
 - **版本信息**：`--version` / `-v` 通过 `internal/version` 包读取构建时注入的信息
 
 ### 2.2 应用服务层 (`internal/app/`)
 
-`diff_service.go` 是整个流水线的编排者。
+`diff_service.go` + `pipeline.go` 是整个流水线的编排者。
 
 ```go
 type DiffService interface {
@@ -125,10 +129,10 @@ type DiffService interface {
 }
 ```
 
-`ComputeDiff` (行 176-197) 是核心管线：
+`pipeline.go` 中的 `ComputeDiff` (行 116-136) 是核心管线：
 
 ```
-FilterNamespaces → NormalizeSchemas → Differ.Diff → FilterDestructiveOps → BuildExecutionPlan
+NormalizeSchemas → Differ.Diff → FilterNamespaces → FilterDestructiveOps → BuildExecutionPlan
 ```
 
 ### 2.3 Source 层 (`internal/source/`)
@@ -174,6 +178,20 @@ flowchart TD
 ### 2.5 解析器层 (`internal/parser/`)
 
 基于 **pg_query_go**，采用 **Handler Registry + 访问者模式**实现 OCP。
+
+解析器通过 **WarningEmitter** 回调函数（而非 `os.Stderr` 硬编码）发射警告，所有 Handler 统一通过 `SetWarningEmitter` 注入。
+
+parser.go 中的 `recover()` 已**改进**：在捕获 panic 时记录完整 stack trace，便于调试。
+
+```mermaid
+flowchart TD
+    SQL["SQL DDL"] --> Parse["pg_query_go.Parse"]
+    Parse --> Visit["visitNode<br/>+ defer recover with stack trace"]
+    Visit --> Dispatch["HandlerRegistry.Dispatch<br/>reflect.Type 路由"]
+    Dispatch --> Handler["Handler.Handle"]
+    Handler --> Mutations["[]SchemaMutation"]
+    Mutations --> Apply["MutationApplier.Apply<br/>→ model.Schema"]
+```
 
 **已有的 Handler（9 种）：**
 
@@ -232,7 +250,7 @@ flowchart TD
     colDiff --> Phase4["Phase 4: 逐属性比较"]
 ```
 
-**Operation 类型（33 种）：**
+**Operation 类型（34 种）：**
 
 | Kind | 是否破坏性 |
 |------|-----------|
@@ -252,10 +270,13 @@ flowchart TD
 | `set_identity` / `drop_identity` / `add_identity` | ❌ / ✅ / ❌ |
 | `rename_column` | ❌ |
 | `create_view` / `drop_view` / `replace_view` | ❌ / ✅ / ❌ |
+| `create_materialized_view` / `drop_materialized_view` | ❌ / ✅ |
 | `create_sequence` / `drop_sequence` / `alter_sequence` | ❌ / ✅ / ❌ |
 | `create_extension` / `drop_extension` / `alter_extension_update` | ❌ / ✅ / ❌ |
 
 **约束比较策略**：`sameConstraintContent` 比较结构化字段 → `sameConstraintSemantics` 作为第二道防线，避免不必要的 DROP+ADD 循环。
+
+**渲染多态分发**：每个 Operation 实现 `RenderString(ctx RenderContext) string` 方法，共 34 个实现（69 行渲染代码分散在各 Op 文件中）。
 
 ### 2.8 执行计划 (`internal/plan/`)
 
@@ -263,25 +284,50 @@ flowchart TD
 
 | 阶段 | 包含的操作 |
 |------|-----------|
-| `StagePreDeploy` | `create_schema`, `add_table`, `add_column`, `add_index`, `add_constraint`, `add_enum_type`, `create_view`, `create_sequence`, `create_extension` |
+| `StagePreDeploy` | `create_schema`, `add_table`, `add_column`, `add_index`, `add_constraint`, `add_enum_type`, `create_view`, `create_materialized_view`, `create_sequence`, `create_extension` |
 | `StageDeploy` | `alter_column_type`, `set_not_null`, `drop_not_null`, `set_default`, `drop_default`, `add_enum_label`, `rename_column`, `add_identity`, `set_identity`, `alter_column_collation`, `replace_view`, `alter_sequence`, `alter_extension_update` |
-| `StagePostDeploy` | `drop_schema`, `drop_table`, `drop_column`, `drop_index`, `drop_constraint`, `drop_enum_type`, `drop_identity`, `drop_view`, `drop_sequence`, `drop_extension` |
+| `StagePostDeploy` | `drop_schema`, `drop_table`, `drop_column`, `drop_index`, `drop_constraint`, `drop_enum_type`, `drop_identity`, `drop_view`, `drop_materialized_view`, `drop_sequence`, `drop_extension` |
 
 基于 **Kahn 算法**的 DAG 拓扑排序保证执行顺序。
 
+**DAG 依赖解析流程：**
+
+```mermaid
+flowchart TD
+    Ops["[]Operation"] --> Build["BuildDAG"]
+    Build --> Pass1["Pass 1: 创建所有 Node"]
+    Build --> Pass2["Pass 2: 解析 DependsOn"]
+    Pass2 --> Sort["Kahn TopoSort"]
+    Pass2 --> Resolve["findNodeByObjectKey<br/>优先匹配 DropConstraint"]
+    Sort --> Ordered["有序 []Operation"]
+    Resolve --> Ordered
+```
+
 ### 2.9 渲染器 (`internal/render/`)
 
-支持 **SQL** 和 **JSON** 两种输出格式。
+渲染器采用**多态分发**模式：每个 Operation 类型实现 `RenderString(ctx RenderContext) string` 方法。Renderer 通过接口调用而非巨型 switch 来渲染。
 
-SQL 格式覆盖全部 33 种 Operation 渲染：表操作、列操作、索引操作、约束操作、枚举操作、Schema 操作、标识列操作、视图操作、序列操作、扩展操作。
+```
+internal/render/
+├── render.go             # SQLEngine 接口 + RenderAll 编排（73 行）
+├── render_helpers.go     # 渲染辅助函数（131 行）
+├── render_json.go        # JSON 格式渲染（36 行）
+├── render_test.go        # 渲染器单元测试
+├── render_extra_test.go  # 渲染器额外测试
+└── rename_render_test.go # 重命名操作渲染测试
+```
 
-**渲染器文件结构：**
+渲染流程：
 
-| 文件 | 说明 |
-|------|------|
-| `render.go` | 主渲染器（SQLEngine 接口），覆盖 33+ 操作渲染 |
-| `render_test.go` | 渲染器单元测试 |
-| `rename_render_test.go` | 重命名操作渲染测试 |
+```mermaid
+flowchart TD
+    RenderOutput["RenderOutput ops, format"] --> Switch{format}
+    Switch -->|"sql"| RenderAll["RenderAll<br/>遍历 ops"]
+    Switch -->|"json"| JSON["renderJSON<br/>MarshalIndent"]
+    RenderAll --> Render["Render op"]
+    Render --> Poly["op.RenderString r<br/>多态分发"]
+    Poly --> Specific["具体 Op 的渲染逻辑<br/>render_helpers.go"]
+```
 
 > **注意**：视图渲染区分普通 view 和 materialized view。物化视图使用 `CREATE MATERIALIZED VIEW` / `DROP MATERIALIZED VIEW`，不使用 `CREATE OR REPLACE` 语义。扩展渲染使用 `quoteIdentifier(op.Name)` 而非 `quoteQualifiedIdentifier`，因为 PostgreSQL 的 `DROP EXTENSION` 不接受 schema-qualified 名称。
 
@@ -326,9 +372,13 @@ flowchart LR
 
 ### 2.12 版本信息 (`internal/version/`)
 
-通过 `-ldflags "-X"` 在构建时注入 Version、BuildTime、GitCommit。
+通过 `-ldflags "-X"` 在构建时注入 Version、BuildTime、GitCommit。提供 `Short()` 和 `Info()` 两个格式化方法。
 
-### 2.13 测试工具 (`internal/testutil/`)
+### 2.13 错误处理 (`internal/errors/`)
+
+提供**双重错误体系**：结构化 `Error` 类型（Code/Message/Cause，支持 `Unwrap`）+ 哨兵错误（向后兼容）。
+
+### 2.14 测试工具 (`internal/testutil/`)
 
 提供 Golden 文件测试、JSON schema 比较等辅助函数。
 
@@ -341,13 +391,13 @@ flowchart TD
     CLI["cmd/migra/main.go"]
     CLI --> DiffCmd["diff.go"]
     CLI --> PushCmd["push.go"]
-    CLI --> Runner["diff_runner.go"]
+    CLI --> Runner["diff_runner.go & push_runner.go"]
     Runner --> DI["app.RunnerDeps"]
     DI --> Source["internal/source/"]
     Source --> DB["db_loader.go --> introspect/"]
     Source --> Parser["sql_file_loader.go --> parser/"]
     DI --> Normalize["internal/normalize/"]
-    DI --> DiffEngine["internal/diff/ (33 kinds)"]
+    DI --> DiffEngine["internal/diff/ (34 kinds)"]
     DI --> Engine["internal/plan/"]
     DI --> RenderEngine["internal/render/"]
 ```
@@ -370,7 +420,7 @@ flowchart TD
 
 ### 4.4 DAG 拓扑排序
 
-Kahn 算法保证外键依赖等复杂关系正确排序，并能检测循环依赖。
+Kahn 算法保证外键依赖等复杂关系正确排序，并能检测循环依赖。`findNodeByObjectKey` 在同名约束时优先匹配 DropConstraint，确保 Drop→Add 顺序正确。
 
 ### 4.5 重命名列启发式检测
 
@@ -378,7 +428,15 @@ Kahn 算法保证外键依赖等复杂关系正确排序，并能检测循环依
 
 ### 4.6 三阶段执行计划
 
-Pre-deploy（创建）→ Deploy（修改）→ Post-deploy（删除），确保操作顺序安全。
+Pre-deploy（创建）→ Deploy（修改）→ Post-deploy（删除），确保操作顺序安全。物化视图的 `CreateMaterializedViewOp` 属于 Pre-deploy，`DropMaterializedViewOp` 属于 Post-deploy。
+
+### 4.7 渲染多态分发
+
+每个 Operation 自己实现 `RenderString` 方法，消除巨型 switch，提升可扩展性。新增 Op 类型时只需在对应文件中添加渲染函数，无需修改渲染器核心代码。
+
+### 4.8 错误处理双轨制
+
+结构化错误（带 Code/Wrapping）用于新代码路径，哨兵错误用于向后兼容，逐步迁移。
 
 ---
 
@@ -389,8 +447,8 @@ Pre-deploy（创建）→ Deploy（修改）→ Post-deploy（删除），确保
 1. 创建 Handler（实现 `Handler` 接口）
 2. 创建 Mutation（实现 `SchemaMutation` 接口）
 3. 注册到 `DefaultRegistry()`
-4. 添加对应的渲染逻辑
-5. 添加对应的 Operation Kind
+4. 在对应的 `operation_*.go` 中定义 Op 类型并实现 `RenderString`
+5. 在 `operation.go` 中添加对应的 Kind 常量
 6. 在 `assignStage` 中添加阶段分配
 7. 编写单元测试
 
@@ -408,6 +466,8 @@ Pre-deploy（创建）→ Deploy（修改）→ Post-deploy（删除），确保
 ├── cmd/migra/               CLI 入口
 ├── internal/
 │   ├── app/                 应用服务（流水线编排）
+│   │   ├── diff_service.go  # DiffService 接口 + diffService 实现
+│   │   └── pipeline.go      # Filter/Normalize/FilterOps/BuildPlan/ComputeDiff/RenderOutput
 │   ├── model/               数据模型
 │   │   ├── schema.go        # Schema / Namespace / EnumType
 │   │   ├── table.go         # Table / PrimaryKey / Index / Constraint
@@ -428,6 +488,7 @@ Pre-deploy（创建）→ Deploy（修改）→ Post-deploy（删除），确保
 │   │   ├── registry.go      # Handler Registry
 │   │   ├── mutation.go      # Mutation 接口与基础类型
 │   │   ├── applier.go       # Mutation 应用器
+│   │   ├── parser.go        # Parser 主逻辑（含 WarningEmitter + recover with stack）
 │   │   ├── create_table_handler.go
 │   │   ├── alter_table_handler.go
 │   │   ├── index_handler.go
@@ -438,7 +499,7 @@ Pre-deploy（创建）→ Deploy（修改）→ Post-deploy（删除），确保
 │   │   ├── view_handler.go
 │   │   ├── sequence_handler.go
 │   │   ├── extension_handler.go
-│   │   ├── handler_test.go  # Handler 综合测试
+│   │   ├── handler_test.go
 │   │   ├── index_handler_test.go
 │   │   ├── rename_handler_test.go
 │   │   ├── rename_mutation_test.go
@@ -446,39 +507,43 @@ Pre-deploy（创建）→ Deploy（修改）→ Post-deploy（删除），确保
 │   ├── indexdef/            索引元素解析
 │   │   └── parse.go         # pg_get_indexdef 解析
 │   ├── normalize/           语义归一化
+│   ├── errors/              错误处理
+│   │   └── errors.go        # Error 结构体 + 哨兵错误
 │   ├── diff/                差异比较
+│   │   ├── operation.go     # Operation 接口 + 34 种 Kind + RenderContext + baseOperation
 │   │   ├── differ.go        # Differ 核心 + DiffEngine 接口
-│   │   ├── operation.go     # 33 种 Operation 定义
+│   │   ├── operation_table.go    # AddTableOp / DropTableOp
+│   │   ├── operation_column.go   # 11 种列操作
+│   │   ├── operation_constraint.go # AddConstraintOp / DropConstraintOp
+│   │   ├── operation_index.go    # CreateIndexOp / DropIndexOp
+│   │   ├── operation_enum.go    # AddEnumTypeOp / DropEnumTypeOp / AddEnumLabelOp
+│   │   ├── operation_view.go    # CreateViewOp / DropViewOp / ReplaceViewOp / CreateMaterializedViewOp / DropMaterializedViewOp
+│   │   ├── operation_schema.go  # CreateSchemaOp / DropSchemaOp
+│   │   ├── operation_sequence.go # CreateSequenceOp / DropSequenceOp / AlterSequenceOp
+│   │   ├── operation_extension.go # CreateExtensionOp / DropExtensionOp / AlterExtensionUpdateOp
+│   │   ├── rename_column_op.go  # RenameColumnOp
 │   │   ├── diff_tables.go   # 表级差异（列/索引/约束对比）
 │   │   ├── diff_columns.go  # 列级差异（4 阶段管线）
 │   │   ├── context.go       # diffContext
-│   │   ├── rename_column_op.go # 重命名列操作
-│   │   ├── rename_column_op_test.go
-│   │   ├── diff_objects_test.go # 对象级差异测试
-│   │   ├── diff_rename_column_test.go
-│   │   ├── differ_test.go
-│   │   ├── diff_constraint_test.go
-│   │   ├── diff_index_test.go
-│   │   └── operation_test.go
+│   │   └── *_test.go        # 各模块测试
 │   ├── plan/                执行计划
 │   │   ├── plan.go          # 三阶段 + assignStage
-│   │   └── dag.go           # Kahn 拓扑排序
+│   │   └── dag.go           # Kahn 拓扑排序 + BuildDAG
 │   ├── render/              渲染器
-│   │   ├── render.go        # SQL/JSON 渲染（33+ 操作）
-│   │   ├── render_test.go   # 渲染器测试
-│   │   └── rename_render_test.go # 重命名渲染测试
+│   │   ├── render.go        # SQLEngine + RenderAll + Render（多态分发）
+│   │   ├── render_helpers.go # 各 Op 渲染辅助函数
+│   │   ├── render_json.go   # JSON 渲染
+│   │   └── *_test.go        # 渲染器测试
 │   ├── introspect/          数据库内省
 │   │   ├── introspect.go    # 主入口
 │   │   ├── tables.go        # 表/列加载（含 IDENTITY、COLLATE）
 │   │   ├── constraints.go   # 约束加载（PK/FK/UNIQUE/CHECK）
-│   │   ├── indexes.go       # 索引加载（pg_get_indexdef 解析）
+│   │   ├── indexes.go       # 索引加载
 │   │   ├── enums.go         # 枚举加载
 │   │   ├── views.go         # 视图加载（含物化视图标记）
-│   │   ├── sequences.go     # 序列加载（类型/start/increment/min/max/cache/cycle）
-│   │   ├── extensions.go    # 扩展加载（名称+版本）
-│   │   ├── tables_test.go
-│   │   ├── indexes_test.go
-│   │   └── enums_test.go
+│   │   ├── sequences.go     # 序列加载
+│   │   ├── extensions.go    # 扩展加载
+│   │   └── *_test.go        # 内省测试
 │   ├── version/             版本信息
 │   └── testutil/            测试工具
 ├── docs/                    文档

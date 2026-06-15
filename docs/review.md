@@ -1,8 +1,8 @@
 # migra-go 代码质量评审报告
 
-> 评审日期：2026-06-14
-> 分支：develop
-> 评审范围：全量代码（79 源文件 + 47 测试文件，~17,700 行）
+> 评审日期：2026-06-15
+> 分支：main (v0.3.1)
+> 评审范围：全量代码（118 Go 文件，含 47 个测试文件，~18,000 行）
 
 ---
 
@@ -10,9 +10,9 @@
 
 | 指标 | 数值 |
 |------|------|
-| 源文件 (非测试) | 79 个 |
+| Go 文件总数 | 118 个 |
 | 测试文件 | 47 个 |
-| 总代码行数 | ~17,700 行 |
+| 总代码行数 | ~18,000 行 |
 | Go 版本 | 1.26.2 |
 | 测试通过 | ✅ 全部通过 |
 | go vet | ✅ 无警告 |
@@ -45,6 +45,7 @@
 - `Mutation` 模式设计优雅：每种 DDL 变更都是自描述、自应用的 `SchemaMutation`，新增 DDL 类型只需添加 Handler + Mutation + 注册
 - `HandlerRegistry` 实现了解耦的路由机制
 - `source.Loader` 接口 + `Registry` 模式支持多数据源（DB / SQL 文件 / 目录）
+- 渲染器采用多态分发（`op.RenderString`），消除巨型 switch
 
 ### 2. 测试覆盖出色
 
@@ -59,50 +60,25 @@
 
 ### 4. 错误处理有层次
 
-- 定义了 `ParseError` 带位置信息
-- 使用 `errors.Is` 兼容的 sentinel errors
+- 定义了结构化 `Error` 类型（Code/Message/Cause），支持 `Unwrap`
+- 保留哨兵错误（`errors.New`）向后兼容
 - `Mutation.Apply` 返回具体错误而非 panic
+- Parser 通过 `WarningEmitter` 回调发射警告，不再硬编码 `os.Stderr`
+
+### 5. 渲染器已重构
+
+- 从巨型 switch（28+ case）重构为多态分发模式
+- 每个 Operation 自己实现 `RenderString` 方法
+- 渲染逻辑拆分为 `render.go`（73 行）+ `render_helpers.go`（131 行）+ `render_json.go`（36 行）
+
+### 6. Push 中断处理改进
+
+- 使用 `context.WithCancel` + signal handling（SIGINT/SIGTERM）
+- 不再使用 `os.Exit(1)`，改为优雅回滚
 
 ---
 
 ## ⚠️ 问题与优化方向
-
-### P0：`alter_table_handler.go` 直接写 `os.Stderr`（7 处）
-
-**文件**：`internal/parser/alter_table_handler.go`
-
-**问题**：直接写 stderr，无法测试、无法重定向、在生产环境中可能污染输出。
-
-```go
-// 当前：直接写 stderr，无法测试、无法重定向
-fmt.Fprintf(os.Stderr, "warning: DROP COLUMN missing column name\n")
-```
-
-**影响**：可测试性、可维护性
-
-**建议**：通过回调函数或 `io.Writer` 注入，将警告收集到统一通道中，由调用方决定如何处理。
-
----
-
-### P0：`parser.go` 中裸 `recover()` 过于宽泛
-
-**文件**：`internal/parser/parser.go:96-104`
-
-**问题**：捕获了所有 panic（包括真正的编程错误如 nil pointer、index out of range），会掩盖 bug。
-
-```go
-defer func() {
-    if r := recover(); r != nil {
-        err = &ParseError{Message: fmt.Sprintf("recovered from panic: %v", r), Position: -1}
-    }
-}()
-```
-
-**影响**：正确性
-
-**建议**：在 recover 后至少打印 stack trace 用于调试，或只捕获预期的 panic。
-
----
 
 ### P1：`mutation.go` 中大量重复的 Apply 错误检查模式
 
@@ -125,28 +101,6 @@ func (m XxxMutation) Apply(schema *model.Schema) error {
 **影响**：可维护性
 
 **建议**：提取通用的 `resolveColumn(schema, schemaName, table, column string) (*model.Namespace, *model.Table, *model.Column, error)` 辅助函数。
-
----
-
-### P1：`render.go` 中 `Render` 方法的 type switch 有 28 个 case
-
-**文件**：`internal/render/render.go`
-
-**问题**：巨型 switch 语句，每次新增 Operation 类型都需要修改此处。
-
-```go
-func (r *Renderer) Render(op diff.Operation) string {
-    switch v := op.(type) {
-    case *diff.AddTableOp:    return renderAddTable(r, v)
-    case *diff.DropTableOp:   return renderDropTable(r, v)
-    // ... 26 more cases
-    }
-}
-```
-
-**影响**：可扩展性
-
-**建议**：让 `Operation` 接口增加一个 `Render(r Renderer) string` 方法，每个 Operation 自己实现渲染逻辑。
 
 ---
 
@@ -213,19 +167,28 @@ type Index struct {
 
 ---
 
-### P3：`errors/errors.go` 缺乏上下文
+### P3：`parser.go` 中裸 `recover()` 仍存在（已改进）
 
-**文件**：`internal/errors/errors.go`
+**文件**：`internal/parser/parser.go:118-127`
 
-**问题**：使用 `errors.New` 创建的错误无法携带上下文信息。
+**当前状态**：已改进——在 recover 时记录完整 stack trace，便于调试。
 
 ```go
-var ErrNotFound = errors.New("resource not found")
+defer func() {
+    if r := recover(); r != nil {
+        buf := make([]byte, 4096)
+        n := runtime.Stack(buf, false)
+        err = &ParseError{
+            Message: fmt.Sprintf("recovered from panic: %v\nstack trace:\n%s", r, buf[:n]),
+            Position: -1,
+        }
+    }
+}()
 ```
 
-**影响**：可观测性
+**影响**：低（已改进）
 
-**建议**：考虑使用自定义 error 类型，支持 wrapping 和 context。
+**建议**：未来可考虑只捕获预期的 panic，或添加 panic 来源标记。
 
 ---
 
@@ -233,27 +196,36 @@ var ErrNotFound = errors.New("resource not found")
 
 | 优先级 | 问题 | 影响 |
 |--------|------|------|
-| **P0** | `os.Stderr` 硬编码警告输出 | 可测试性、可维护性 |
-| **P0** | 裸 `recover()` 掩盖 bug | 正确性 |
 | **P1** | Mutation.Apply 重复代码 | 可维护性 |
-| **P1** | Render 巨型 switch | 可扩展性 |
 | **P2** | 列重命名 O(n²) | 性能 |
 | **P2** | RemoveColumn O(n) | 性能 |
 | **P3** | Index.Columns deprecated 清理 | 技术债 |
-| **P3** | errors 缺乏上下文 | 可观测性 |
+| **P3** | parser recover 来源标记 | 可调试性 |
 
 ---
 
 ## 🏗️ 架构改进建议
 
 1. **引入结构化日志**：用 `slog` 替代 `fmt.Fprintf(os.Stderr)`，统一警告和错误输出
-2. **Operation 自渲染**：将渲染逻辑从 `Renderer` 的巨型 switch 分散到各个 `Operation` 类型
-3. **泛型辅助函数**：Go 1.26 支持泛型，可以用泛型简化一些重复的集合操作
-4. **增加 fuzz testing**：对 parser 和 normalize 做 fuzz 测试，提高鲁棒性
-5. **考虑 `context` 传递**：部分函数链（如 `Mutation.Apply`）缺少 context 传递，不利于未来添加超时/取消支持
+2. **泛型辅助函数**：Go 1.26 支持泛型，可以用泛型简化一些重复的集合操作
+3. **增加 fuzz testing**：对 parser 和 normalize 做 fuzz 测试，提高鲁棒性
+4. **考虑 `context` 传递**：部分函数链（如 `Mutation.Apply`）缺少 context 传递，不利于未来添加超时/取消支持
+5. **提取 resolveColumn 辅助函数**：消除 mutation.go 中的重复代码
+
+---
+
+## 已修复的历史问题
+
+| 问题 | 修复版本 | 说明 |
+|------|---------|------|
+| `os.Stderr` 硬编码警告输出 | v0.3.0 | 改为 WarningEmitter 回调 |
+| Render 巨型 switch（28+ case） | v0.3.0 | 重构为多态分发 |
+| push 中断使用 `os.Exit(1)` | v0.2.1 | 改为 context.WithCancel + signal handling |
+| errors 缺乏上下文 | v0.3.0 | 新增结构化 Error 类型 |
+| recover() 无 stack trace | v0.3.0 | 添加 runtime.Stack 记录 |
 
 ---
 
 ## 总结
 
-这是一个**架构设计优秀、测试覆盖充分**的项目。核心数据流（SQL → Parse → Model → Diff → Render → SQL）清晰合理，Mutation 模式是亮点。主要改进点集中在：消除重复代码、替换硬编码的 stderr 输出、以及将巨型 switch 重构为多态分发。整体代码质量在同类开源项目中属于**中上水平**。
+这是一个**架构设计优秀、测试覆盖充分**的项目。核心数据流（SQL → Parse → Model → Diff → Render → SQL）清晰合理，Mutation 模式和渲染多态分发是亮点。v0.3.0 以来的重构解决了大部分历史遗留问题（os.Stderr 硬编码、巨型 switch、错误处理）。主要改进点集中在：消除重复代码（Mutation.Apply）、优化算法复杂度（列重命名 O(n²)）、以及清理技术债（Index.Columns deprecated）。整体代码质量在同类开源项目中属于**中上水平**。

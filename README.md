@@ -27,10 +27,10 @@
 - 🛡️ **安全保护**：DROP 操作默认拦截告警，可选 `--unsafe-drop` 放行
 - 🎯 **语义归一化**：同义类型名（如 `int4` → `integer`）自动映射，减少误报
 - 🚀 **DAG 拓扑排序**：基于 Kahn 算法对有向无环图进行排序，保证执行顺序正确且高效
-- ⚙️ **三阶段执行计划**：自动将操作分为 Pre-deploy（创建）、Deploy（修改）、Post-deploy（删除）三个阶段，覆盖全部 33 种操作
+|- ⚙️ **三阶段执行计划**：自动将操作分为 Pre-deploy（创建）、Deploy（修改）、Post-deploy（删除）三个阶段，覆盖全部 34 种操作
 - 🔧 **可扩展解析器**：基于 HandlerRegistry + 访问者模式的 OCP 设计，已支持 9 种 DDL，新增 DDL 只需实现 Handler + Mutation 并注册
-- 🧩 **丰富的差异检测**：支持表、列、类型、默认值、非空约束、索引内容、约束、视图、序列、扩展的全量对比，共 33 种差异操作
-- 📊 **多格式输出**：支持 SQL 和 JSON 两种输出格式
+|- 🧩 **丰富的差异检测**：支持表、列、类型、默认值、非空约束、索引内容、约束、视图、物化视图、序列、扩展的全量对比，共 34 种差异操作
+|- 📊 **多格式输出**：支持 SQL 和 JSON 两种输出格式
 - ⏱️ **超时控制**：支持 `--timeout` 参数控制 Schema 加载超时时间
 - 📁 **目录作为 Schema 来源**：支持递归扫描目录下所有 `.sql` 文件，合并为完整 schema 参与 diff
 - 🔌 **多种连接方式**：支持连接字符串、环境变量、`pg_service.conf`、`.pgpass` 等 PostgreSQL 标准连接方式
@@ -233,15 +233,15 @@ flowchart LR
     end
 ```
 
-### 支持的差异操作（33 种）
+### 支持的差异操作（34 种）
 
 ```mermaid
 mindmap
   root((Diff 操作))
-    表操作
+    表操作 2种
       add_table
       drop_table
-    列操作
+    列操作 11种
       add_column
       drop_column
       alter_column_type
@@ -254,30 +254,30 @@ mindmap
       set_identity
       drop_identity
       alter_column_collation
-    约束操作
+    约束操作 2种
       add_constraint
       drop_constraint
-    索引操作
+    索引操作 2种
       add_index
       drop_index
-    枚举操作
+    枚举操作 3种
       add_enum_type
       drop_enum_type
       add_enum_label
-    视图操作
+    视图操作 5种
       create_view
       drop_view
       replace_view
       create_materialized_view
       drop_materialized_view
-    模式操作
+    模式操作 2种
       create_schema
       drop_schema
-    序列操作
+    序列操作 3种
       create_sequence
       drop_sequence
       alter_sequence
-    扩展操作
+    扩展操作 3种
       create_extension
       drop_extension
       alter_extension_update
@@ -327,9 +327,9 @@ graph TD
         PARSER["parser/<br/>SQL 解析 (pg_query_go)<br/>OCP Handler 架构"]
         INTR["introspect/<br/>数据库内省<br/>pg_catalog 全量加载"]
         NORM["normalize/<br/>语义归一化<br/>同义类型映射"]
-        DIFF["diff/<br/>差异比较引擎<br/>33 种 Operation"]
+        DIFF["diff/<br/>差异比较引擎<br/>34 种 Operation"]
         PLAN["plan/<br/>执行计划<br/>DAG 拓扑排序 + 三阶段"]
-        RENDER["render/<br/>SQL / JSON 渲染器"]
+        RENDER["render/<br/>SQL / JSON 渲染器<br/>多态分发"]
     end
     TESTDATA["testdata/<br/>单元测试 + 集成测试用例"]
     DOCS["docs/<br/>架构设计 / 配置 / DDL 矩阵"]
@@ -370,9 +370,9 @@ graph TD
 │   │   └── parserutil/     # 解析器辅助函数
 │   ├── introspect/         # 数据库内省（pg_catalog 全量加载）
 │   ├── normalize/          # 语义归一化（同义类型映射）
-│   ├── diff/               # 差异比较引擎（33 种 Operation）
+│   ├── diff/               # 差异比较引擎（34 种 Operation）
 │   ├── plan/               # 执行计划与拓扑排序（DAG）
-│   ├── render/             # SQL / JSON 渲染器
+│   ├── render/             # SQL / JSON 渲染器（多态分发）
 │   └── testutil/           # 测试工具集
 ├── testdata/               # 单元测试与集成测试用例
 ├── docs/                   # 架构设计、配置文档、DDL 矩阵
