@@ -4,6 +4,7 @@
     "superpowers@git+https://github.com/jnMetaCode/superpowers-zh.git",
     "oh-my-openagent@latest"
   ],
+  "lsp": true,
   "instructions": [
     "AGENTS.md",
     ".opencode/CONVENTIONS.md"
