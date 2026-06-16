@@ -5,6 +5,7 @@ import (
 
 	"github.com/fred29910/migra-go/internal/model"
 	"github.com/fred29910/migra-go/internal/util"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestCanonicalizeIndex_DBIntrospectColumnsPopulatedAsElements tests that when an index
@@ -193,4 +194,88 @@ func TestCanonicalizeSchema_InPlace(t *testing.T) {
 	if afterPtr.DataType != "integer" {
 		t.Fatalf("expected normalized type integer, got %s", afterPtr.DataType)
 	}
+}
+
+func TestNormalizeIdentifier_UnquotedLowersCase(t *testing.T) {
+	assert.Equal(t, "users", normalizeIdentifier("USERS"))
+	assert.Equal(t, "users", normalizeIdentifier("Users"))
+	assert.Equal(t, "users", normalizeIdentifier("users"))
+}
+
+func TestNormalizeIdentifier_QuotedPreservesCase(t *testing.T) {
+	assert.Equal(t, "Users", normalizeIdentifier(`"Users"`))
+	assert.Equal(t, "USERS", normalizeIdentifier(`"USERS"`))
+	assert.Equal(t, "users", normalizeIdentifier(`"users"`))
+}
+
+func TestNormalizeIdentifier_EmptyString(t *testing.T) {
+	assert.Equal(t, "", normalizeIdentifier(""))
+}
+
+func TestNormalizeIdentifier_SpacesTrimmed(t *testing.T) {
+	assert.Equal(t, "users", normalizeIdentifier("  users  "))
+}
+
+func TestNormalizeIdentifier_UnmatchedQuote(t *testing.T) {
+	// A single unmatched quote should NOT strip
+	result := normalizeIdentifier(`"Users`)
+	assert.Contains(t, result, `"`)
+}
+
+func TestNormalizeConstraintDef_NormalizesWhitespace(t *testing.T) {
+	assert.Equal(t, "unique (a, b)", normalizeConstraintDef("  UNIQUE   (a,  b)  "))
+	assert.Equal(t, "check (x > 0)", normalizeConstraintDef("CHECK (x > 0)"))
+}
+
+func TestNormalizeConstraintDef_Lowercases(t *testing.T) {
+	assert.Equal(t, "foreign key (a) references b (c)", normalizeConstraintDef("FOREIGN KEY (a) REFERENCES b (c)"))
+	assert.Equal(t, "unique (a, b)", normalizeConstraintDef("UNIQUE (a, b)"))
+}
+
+func TestNormalizeConstraintDef_EmptyString(t *testing.T) {
+	assert.Equal(t, "", normalizeConstraintDef(""))
+}
+
+func TestIsBalancedParens_BasicCases(t *testing.T) {
+	assert.True(t, isBalancedParens("(a)"))
+	assert.True(t, isBalancedParens("((a))"))
+	assert.True(t, isBalancedParens(""))
+	assert.True(t, isBalancedParens("(a + (b * c))"))
+}
+
+func TestIsBalancedParens_Unbalanced(t *testing.T) {
+	assert.False(t, isBalancedParens("(a"))
+	assert.False(t, isBalancedParens("a)"))
+	assert.False(t, isBalancedParens(")("))
+	assert.False(t, isBalancedParens("((a)"))
+}
+
+func TestNormalizeDefaultExpr_DoubleTypeCast(t *testing.T) {
+	assert.Equal(t, "'val'", normalizeDefaultExpr("'val'::varchar::text"))
+}
+
+func TestNormalizeDefaultExpr_WhitespaceInCast(t *testing.T) {
+	assert.Equal(t, "'val'", normalizeDefaultExpr("'val':: character varying"))
+}
+
+func TestNormalizeDefaultExpr_EmptyString(t *testing.T) {
+	assert.Equal(t, "", normalizeDefaultExpr(""))
+}
+
+func TestNormalizeDefaultExpr_Literals(t *testing.T) {
+	assert.Equal(t, "true", normalizeDefaultExpr("true"))
+	assert.Equal(t, "false", normalizeDefaultExpr("false"))
+	assert.Equal(t, "-1", normalizeDefaultExpr("-1"))
+	assert.Equal(t, "gen_random_uuid()", normalizeDefaultExpr("gen_random_uuid()"))
+}
+
+func TestNormalizeDataType_EdgeCases(t *testing.T) {
+	assert.Equal(t, "integer", util.NormalizeDataType("  integer  "))
+	assert.Equal(t, "integer", util.NormalizeDataType(" int4 "))
+	assert.Equal(t, "", util.NormalizeDataType(""))
+	assert.Equal(t, "numeric(10,2)", util.NormalizeDataType("numeric(10,2)"))
+	assert.Equal(t, "text[]", util.NormalizeDataType("text[]"))
+	assert.Equal(t, "integer[]", util.NormalizeDataType("int4[]"))
+	assert.Equal(t, "pg_catalog.int4", util.NormalizeDataType("pg_catalog.int4"))
+	assert.Equal(t, "custom_type", util.NormalizeDataType("custom_type"))
 }
