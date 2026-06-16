@@ -13,6 +13,10 @@ import (
 // SQLFileLoader implements Loader for SQL file sources.
 type SQLFileLoader struct{}
 
+// Priority returns the lowest priority level so SQL files are matched last
+// (only after DB and directory loaders have been ruled out).
+func (l *SQLFileLoader) Priority() LoaderPriority { return LoaderPriorityLowest }
+
 // Match returns true if the source is a SQL file path or URL.
 func (l *SQLFileLoader) Match(source string) bool {
 	lowerSource := strings.ToLower(source)
@@ -33,9 +37,8 @@ func (l *SQLFileLoader) Load(ctx context.Context, source string, opt LoadOptions
 	}
 	p := parser.NewParser()
 	schema, parseErr := p.ParseSQL(string(data))
-	errs := p.Errors()
 	if parseErr != nil && opt.Strict {
-		return nil, errs, parseErr
+		return nil, nil, parseErr
 	}
-	return schema, errs, nil
+	return schema, nil, nil
 }

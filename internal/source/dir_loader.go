@@ -19,17 +19,11 @@ import (
 // CREATE INDEX referencing that table in another) are resolved correctly.
 type DirectoryLoader struct{}
 
+// Priority returns the default priority level.
+func (l *DirectoryLoader) Priority() LoaderPriority { return LoaderPriorityDefault }
+
 // Match returns true if source is an existing directory.
 func (l *DirectoryLoader) Match(source string) bool {
-	lower := strings.ToLower(source)
-	// DB URLs are handled by DBLoader (registered before us in the
-	// registry), but we defensively reject them here in case
-	// registration order changes in the future.
-	if strings.HasPrefix(lower, "postgres://") ||
-		strings.HasPrefix(lower, "postgresql://") ||
-		strings.HasPrefix(lower, "pg://") {
-		return false
-	}
 	path := stripFileScheme(source)
 	info, err := os.Stat(path)
 	if err != nil {
@@ -92,12 +86,11 @@ func (l *DirectoryLoader) Load(ctx context.Context, source string, opt LoadOptio
 	// non-strict mode, partial results are returned alongside errors.
 	p := parser.NewParser()
 	schema, parseErr := p.ParseSQL(combinedSQL.String())
-	errs := p.Errors()
 	if parseErr != nil && opt.Strict {
-		return nil, errs, fmt.Errorf("failed to parse directory contents: %w", parseErr)
+		return nil, nil, fmt.Errorf("failed to parse directory contents: %w", parseErr)
 	}
 
-	return schema, errs, nil
+	return schema, nil, nil
 }
 
 // stripFileScheme removes the "file://" prefix from s if present.
