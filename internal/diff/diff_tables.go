@@ -17,6 +17,9 @@ func (c *diffContext) diffTables(source, target *model.Namespace) {
 		}
 		sort.Strings(tableNames)
 		for _, name := range tableNames {
+			if err := c.checkCancelled(); err != nil {
+				return
+			}
 			c.addOp(NewAddTableOp(target.Name, name, target.Tables[name]))
 		}
 		return
@@ -35,6 +38,9 @@ func (c *diffContext) diffTables(source, target *model.Namespace) {
 	}
 	sort.Strings(addNames)
 	for _, name := range addNames {
+		if err := c.checkCancelled(); err != nil {
+			return
+		}
 		c.addOp(NewAddTableOp(target.Name, name, target.Tables[name]))
 	}
 
@@ -47,6 +53,9 @@ func (c *diffContext) diffTables(source, target *model.Namespace) {
 	}
 	sort.Strings(dropNames)
 	for _, name := range dropNames {
+		if err := c.checkCancelled(); err != nil {
+			return
+		}
 		c.addOp(NewDropTableOp(source.Name, name))
 	}
 
@@ -213,6 +222,9 @@ func (c *diffContext) diffTableColumns(schema string, source, target *model.Tabl
 	}
 
 	for _, srcName := range sourceOnlyNames {
+		if err := c.checkCancelled(); err != nil {
+			return
+		}
 		srcCol := source.ColumnByName[srcName]
 		sig := columnSignature(srcCol)
 		if tgtName, found := targetBySig[sig]; found && !renamedTarget[tgtName] {
@@ -244,6 +256,9 @@ func (c *diffContext) diffTableColumns(schema string, source, target *model.Tabl
 
 	// Phase 4: Compare columns that exist in both (unchanged)
 	for _, targetCol := range target.Columns {
+		if err := c.checkCancelled(); err != nil {
+			return
+		}
 		if sourceCol, exists := source.ColumnByName[targetCol.Name]; exists {
 			c.diffColumn(schema, target.Name, sourceCol, targetCol)
 		}

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/fred29910/migra-go/internal/diff"
@@ -85,9 +86,12 @@ func FilterDestructiveOps(ops []diff.Operation, unsafeDrop bool) ([]diff.Operati
 // BuildExecutionPlan creates an ordered execution plan from operations.
 // Operations are grouped into pre-deploy, deploy, and post-deploy stages,
 // then topologically sorted within each stage.
-func BuildExecutionPlan(ops []diff.Operation, unsafeDrop bool) ([]diff.Operation, error) {
+func BuildExecutionPlan(ctx context.Context, ops []diff.Operation, unsafeDrop bool) ([]diff.Operation, error) {
 	planner := plan.NewPlanner(unsafeDrop)
-	stages := planner.Plan(ops)
+	stages, err := planner.Plan(ctx, ops)
+	if err != nil {
+		return nil, err
+	}
 
 	stageOrder := []plan.Stage{
 		plan.StagePreDeploy,
@@ -101,7 +105,7 @@ func BuildExecutionPlan(ops []diff.Operation, unsafeDrop bool) ([]diff.Operation
 		if len(stageOps) == 0 {
 			continue
 		}
-		sortedStageOps, err := plan.TopoSort(stageOps)
+		sortedStageOps, err := plan.TopoSort(ctx, stageOps)
 		if err != nil {
 			return nil, fmt.Errorf("failed to topologically sort %s operations: %w", stage, err)
 		}
@@ -113,7 +117,7 @@ func BuildExecutionPlan(ops []diff.Operation, unsafeDrop bool) ([]diff.Operation
 
 // ComputeDiff performs the full diff computation between source and target schemas,
 // including normalization, filtering, and execution plan building.
-func ComputeDiff(source, target *model.Schema, cfg Config) ([]diff.Operation, []string, error) {
+func ComputeDiff(ctx context.Context, source, target *model.Schema, cfg DiffConfig) ([]diff.Operation, []string, error) {
 	if err := NormalizeSchemas(source, target); err != nil {
 		return nil, nil, err
 	}
@@ -121,13 +125,13 @@ func ComputeDiff(source, target *model.Schema, cfg Config) ([]diff.Operation, []
 	filterWarnings := FilterNamespaces(source, target, cfg.Schemas)
 
 	differ := diff.NewDiffer()
-	operations, warnings := differ.Diff(source, target)
+	operations, warnings := differ.Diff(ctx, source, target)
 	warnings = append(warnings, filterWarnings...)
 
 	filteredOps, filterWarnings2 := FilterDestructiveOps(operations, cfg.UnsafeDrop)
 	warnings = append(warnings, filterWarnings2...)
 
-	sortedOps, err := BuildExecutionPlan(filteredOps, cfg.UnsafeDrop)
+	sortedOps, err := BuildExecutionPlan(ctx, filteredOps, cfg.UnsafeDrop)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -136,7 +140,7 @@ func ComputeDiff(source, target *model.Schema, cfg Config) ([]diff.Operation, []
 }
 
 // RenderOutput renders a list of operations into the specified format.
-func RenderOutput(ops []diff.Operation, format string) (string, error) {
+func RenderOutput(ctx context.Context, ops []diff.Operation, format string) (string, error) {
 	renderer := render.NewRenderer()
-	return renderer.RenderOutput(ops, format)
+	return renderer.RenderOutput(ctx, ops, format)
 }

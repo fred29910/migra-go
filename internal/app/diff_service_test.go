@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -13,8 +14,8 @@ import (
 
 // fakeDeps is a test double for runnerDeps with call tracking
 type fakeDeps struct {
-	computeCalled int
 	deps          RunnerDeps
+	computeCalled int
 }
 
 func newFakeDeps() *fakeDeps {
@@ -23,11 +24,11 @@ func newFakeDeps() *fakeDeps {
 		LoadSchema: func(ctx context.Context, source string, schemas []string, strict bool) (*model.Schema, error) {
 			return model.NewSchema(), nil
 		},
-		Compute: func(source, target *model.Schema, cfg Config) ([]diff.Operation, []string, error) {
+		Compute: func(ctx context.Context, source, target *model.Schema, cfg DiffConfig) ([]diff.Operation, []string, error) {
 			fd.computeCalled++
 			return []diff.Operation{}, []string{}, nil
 		},
-		Render: func(ops []diff.Operation, format string) (string, error) {
+		Render: func(ctx context.Context, ops []diff.Operation, format string) (string, error) {
 			return "-- No changes detected", nil
 		},
 	}
@@ -37,7 +38,7 @@ func newFakeDeps() *fakeDeps {
 func TestDiffService_Run(t *testing.T) {
 	fd := newFakeDeps()
 	svc := NewDiffService(fd.deps)
-	cfg := Config{
+	cfg := DiffConfig{
 		Source:  "testdata/example_source.sql",
 		Target:  "testdata/example_target.sql",
 		Format:  "sql",
@@ -55,6 +56,37 @@ func TestDiffService_Run(t *testing.T) {
 		t.Fatal("expected compute to be called")
 	}
 	_ = warns
+}
+
+func TestDiffService_Hooks(t *testing.T) {
+	called := make([]HookStage, 0)
+	fd := newFakeDeps()
+	fd.deps.Hooks = []HookFunc{
+		func(ctx context.Context, hctx HookContext) error {
+			called = append(called, hctx.Stage)
+			return nil
+		},
+	}
+	svc := NewDiffService(fd.deps)
+	_, _, err := svc.Run(context.Background(), DiffConfig{Timeout: 5 * time.Second})
+	require.NoError(t, err)
+	require.Equal(t, []HookStage{HookAfterLoad, HookAfterCompute, HookAfterRender}, called)
+}
+
+func TestDiffService_HookErrorAborts(t *testing.T) {
+	fd := newFakeDeps()
+	fd.deps.Hooks = []HookFunc{
+		func(ctx context.Context, hctx HookContext) error {
+			if hctx.Stage == HookAfterCompute {
+				return fmt.Errorf("hook error")
+			}
+			return nil
+		},
+	}
+	svc := NewDiffService(fd.deps)
+	_, _, err := svc.Run(context.Background(), DiffConfig{Timeout: 5 * time.Second})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "hook error")
 }
 
 func TestNormalizeSchemas(t *testing.T) {
@@ -104,7 +136,7 @@ func TestBuildExecutionPlan(t *testing.T) {
 		diff.NewAddColumnOp("public", "users", &model.Column{Name: "id", DataType: "integer"}),
 	}
 
-	result, err := BuildExecutionPlan(ops, true)
+	result, err := BuildExecutionPlan(context.Background(), ops, true)
 	require.NoError(t, err)
 	require.Len(t, result, 2)
 

@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 // --- diffTables ---
 
 func TestDiffTables_NilSource_AllTablesAdded(t *testing.T) {
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	target := model.NewNamespace("public")
 	target.Tables["users"] = model.NewTable("public", "users")
 	target.Tables["posts"] = model.NewTable("public", "posts")
@@ -30,7 +31,7 @@ func TestDiffTables_NilSource_AllTablesAdded(t *testing.T) {
 }
 
 func TestDiffTables_NilTarget_NoTableOps(t *testing.T) {
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	source := model.NewNamespace("public")
 	source.Tables["users"] = model.NewTable("public", "users")
 
@@ -42,7 +43,7 @@ func TestDiffTables_NilTarget_NoTableOps(t *testing.T) {
 }
 
 func TestDiffTables_AddTable(t *testing.T) {
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	source := model.NewNamespace("public")
 	source.Tables["users"] = model.NewTable("public", "users")
 
@@ -64,7 +65,7 @@ func TestDiffTables_AddTable(t *testing.T) {
 }
 
 func TestDiffTables_DropTable(t *testing.T) {
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	source := model.NewNamespace("public")
 	source.Tables["users"] = model.NewTable("public", "users")
 	source.Tables["old_table"] = model.NewTable("public", "old_table")
@@ -86,7 +87,7 @@ func TestDiffTables_DropTable(t *testing.T) {
 }
 
 func TestDiffTables_IdenticalTables_NoOps(t *testing.T) {
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	source := model.NewNamespace("public")
 	source.Tables["users"] = model.NewTable("public", "users")
 
@@ -489,7 +490,7 @@ func TestSameIndexContent_EmptyElements(t *testing.T) {
 // --- diffTableConstraints ---
 
 func TestDiffTableConstraints_AddConstraint(t *testing.T) {
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	source := model.NewTable("public", "users")
 	target := model.NewTable("public", "users")
 	target.Constraints["pk_users"] = &model.Constraint{Name: "pk_users", Type: "primary_key", Columns: []string{"id"}}
@@ -505,7 +506,7 @@ func TestDiffTableConstraints_AddConstraint(t *testing.T) {
 }
 
 func TestDiffTableConstraints_DropConstraint(t *testing.T) {
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	source := model.NewTable("public", "users")
 	source.Constraints["old_pk"] = &model.Constraint{Name: "old_pk", Type: "primary_key", Columns: []string{"id"}}
 	target := model.NewTable("public", "users")
@@ -521,7 +522,7 @@ func TestDiffTableConstraints_DropConstraint(t *testing.T) {
 }
 
 func TestDiffTableConstraints_ChangeConstraint(t *testing.T) {
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	source := model.NewTable("public", "users")
 	source.Constraints["fk_posts"] = &model.Constraint{
 		Name:       "fk_posts",
@@ -552,7 +553,7 @@ func TestDiffTableConstraints_ChangeConstraint(t *testing.T) {
 }
 
 func TestDiffTableConstraints_SemanticsSameSkipsChange(t *testing.T) {
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	source := model.NewTable("public", "users")
 	source.Constraints["pk_users"] = &model.Constraint{
 		Name:       "pk_users",
@@ -578,7 +579,7 @@ func TestDiffTableConstraints_SemanticsSameSkipsChange(t *testing.T) {
 // --- diffTableIndexes ---
 
 func TestDiffTableIndexes_AddIndex(t *testing.T) {
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	source := model.NewTable("public", "users")
 	target := model.NewTable("public", "users")
 	target.Indexes["idx_users_email"] = &model.Index{Name: "idx_users_email", Table: "users"}
@@ -594,7 +595,7 @@ func TestDiffTableIndexes_AddIndex(t *testing.T) {
 }
 
 func TestDiffTableIndexes_DropIndex(t *testing.T) {
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	source := model.NewTable("public", "users")
 	source.Indexes["idx_old"] = &model.Index{Name: "idx_old", Table: "users"}
 	target := model.NewTable("public", "users")
@@ -610,7 +611,7 @@ func TestDiffTableIndexes_DropIndex(t *testing.T) {
 }
 
 func TestDiffTableIndexes_ChangeIndex(t *testing.T) {
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	source := model.NewTable("public", "users")
 	source.Indexes["idx_users"] = &model.Index{Name: "idx_users", Unique: false}
 	target := model.NewTable("public", "users")
@@ -627,7 +628,7 @@ func TestDiffTableIndexes_ChangeIndex(t *testing.T) {
 }
 
 func TestDiffTableIndexes_IdenticalIndexes(t *testing.T) {
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	source := model.NewTable("public", "users")
 	source.Indexes["idx_users"] = &model.Index{Name: "idx_users", Unique: true}
 	target := model.NewTable("public", "users")
@@ -643,7 +644,7 @@ func TestDiffTableIndexes_IdenticalIndexes(t *testing.T) {
 // --- diffTableColumns ---
 
 func TestDiffTableColumns_RenameColumn(t *testing.T) {
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	source := model.NewTable("public", "users")
 	source.AddColumn(&model.Column{Name: "username", DataType: "text", IsNullable: true})
 	source.AddColumn(&model.Column{Name: "email", DataType: "text", IsNullable: false})
@@ -675,7 +676,7 @@ func TestDiffTableColumns_RenameColumn(t *testing.T) {
 }
 
 func TestDiffTableColumns_AddColumn(t *testing.T) {
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	source := model.NewTable("public", "users")
 	source.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: false})
 
@@ -694,7 +695,7 @@ func TestDiffTableColumns_AddColumn(t *testing.T) {
 }
 
 func TestDiffTableColumns_DropColumn(t *testing.T) {
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	source := model.NewTable("public", "users")
 	source.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: false})
 	source.AddColumn(&model.Column{Name: "old_col", DataType: "text", IsNullable: true})
@@ -713,7 +714,7 @@ func TestDiffTableColumns_DropColumn(t *testing.T) {
 }
 
 func TestDiffTableColumns_NoChange(t *testing.T) {
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	source := model.NewTable("public", "users")
 	source.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: false})
 
@@ -810,7 +811,7 @@ func TestDiffSchemas_CreateAndDropSchema(t *testing.T) {
 	target := model.NewSchema()
 	target.Schemas["new_schema"] = model.NewNamespace("new_schema")
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffSchemas(source, target)
 
 	kinds := map[Kind]bool{}
@@ -832,7 +833,7 @@ func TestDiffSchemas_PublicSchemaNeverDropped(t *testing.T) {
 
 	target := model.NewSchema()
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffSchemas(source, target)
 
 	for _, op := range ctx.ops {
@@ -856,7 +857,7 @@ func TestDiffSchemas_IdenticalSchemas(t *testing.T) {
 	target := model.NewSchema()
 	target.Schemas["public"] = model.NewNamespace("public")
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffSchemas(source, target)
 
 	if len(ctx.ops) != 0 {
@@ -870,7 +871,7 @@ func TestDiffNamespace_NilTarget(t *testing.T) {
 	source := model.NewNamespace("public")
 	source.Tables["users"] = model.NewTable("public", "users")
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffNamespace(source, nil)
 
 	if len(ctx.ops) != 0 {
@@ -882,7 +883,7 @@ func TestDiffNamespace_NilSource(t *testing.T) {
 	target := model.NewNamespace("public")
 	target.Tables["users"] = model.NewTable("public", "users")
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffNamespace(nil, target)
 
 	if len(ctx.ops) != 1 {
@@ -900,7 +901,7 @@ func TestDiffTypes_AddType(t *testing.T) {
 	target := model.NewNamespace("public")
 	target.Types["user_role"] = &model.EnumType{Name: "user_role", Labels: []string{"admin", "user"}}
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffTypes(source, target)
 
 	if len(ctx.ops) != 1 {
@@ -916,7 +917,7 @@ func TestDiffTypes_DropType(t *testing.T) {
 	source.Types["old_type"] = &model.EnumType{Name: "old_type", Labels: []string{"a"}}
 	target := model.NewNamespace("public")
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffTypes(source, target)
 
 	if len(ctx.ops) != 1 {
@@ -933,7 +934,7 @@ func TestDiffTypes_AppendLabel(t *testing.T) {
 	target := model.NewNamespace("public")
 	target.Types["user_role"] = &model.EnumType{Name: "user_role", Labels: []string{"admin", "user", "guest"}}
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffTypes(source, target)
 
 	if len(ctx.ops) != 1 {
@@ -950,7 +951,7 @@ func TestDiffTypes_NonAppendChangeWarning(t *testing.T) {
 	target := model.NewNamespace("public")
 	target.Types["user_role"] = &model.EnumType{Name: "user_role", Labels: []string{"superadmin", "user"}}
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffTypes(source, target)
 
 	if len(ctx.warnings) == 0 {
@@ -965,7 +966,7 @@ func TestDiffViews_AddView(t *testing.T) {
 	target := model.NewNamespace("public")
 	target.Views["v_users"] = &model.View{Name: "v_users", Definition: "SELECT id FROM users"}
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffViews(source, target)
 
 	if len(ctx.ops) != 1 {
@@ -981,7 +982,7 @@ func TestDiffViews_DropView(t *testing.T) {
 	source.Views["v_old"] = &model.View{Name: "v_old", Definition: "SELECT 1"}
 	target := model.NewNamespace("public")
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffViews(source, target)
 
 	if len(ctx.ops) != 1 {
@@ -998,7 +999,7 @@ func TestDiffViews_ReplaceView(t *testing.T) {
 	target := model.NewNamespace("public")
 	target.Views["v_users"] = &model.View{Name: "v_users", Definition: "SELECT id, name FROM users"}
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffViews(source, target)
 
 	if len(ctx.ops) != 1 {
@@ -1016,7 +1017,7 @@ func TestDiffSequences_AddSequence(t *testing.T) {
 	target := model.NewNamespace("public")
 	target.Sequences["id_seq"] = &model.Sequence{Name: "id_seq", DataType: "bigint", StartValue: 1}
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffSequences(source, target)
 
 	if len(ctx.ops) != 1 {
@@ -1032,7 +1033,7 @@ func TestDiffSequences_DropSequence(t *testing.T) {
 	source.Sequences["old_seq"] = &model.Sequence{Name: "old_seq", DataType: "bigint", StartValue: 1}
 	target := model.NewNamespace("public")
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffSequences(source, target)
 
 	if len(ctx.ops) != 1 {
@@ -1049,7 +1050,7 @@ func TestDiffSequences_AlterSequence(t *testing.T) {
 	target := model.NewNamespace("public")
 	target.Sequences["id_seq"] = &model.Sequence{Name: "id_seq", DataType: "bigint", StartValue: 100}
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffSequences(source, target)
 
 	if len(ctx.ops) != 1 {
@@ -1067,7 +1068,7 @@ func TestDiffExtensions_AddExtension(t *testing.T) {
 	target := model.NewNamespace("public")
 	target.Extensions["pgcrypto"] = &model.Extension{Name: "pgcrypto", Version: "1.3"}
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffExtensions(source, target)
 
 	if len(ctx.ops) != 1 {
@@ -1083,7 +1084,7 @@ func TestDiffExtensions_DropExtension(t *testing.T) {
 	source.Extensions["old_ext"] = &model.Extension{Name: "old_ext", Version: "1.0"}
 	target := model.NewNamespace("public")
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffExtensions(source, target)
 
 	if len(ctx.ops) != 1 {
@@ -1100,7 +1101,7 @@ func TestDiffExtensions_UpdateExtension(t *testing.T) {
 	target := model.NewNamespace("public")
 	target.Extensions["pgcrypto"] = &model.Extension{Name: "pgcrypto", Version: "1.3"}
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffExtensions(source, target)
 
 	if len(ctx.ops) != 1 {
@@ -1117,7 +1118,7 @@ func TestDiffExtensions_NoChangeWhenVersionEmpty(t *testing.T) {
 	target := model.NewNamespace("public")
 	target.Extensions["pgcrypto"] = &model.Extension{Name: "pgcrypto", Version: ""}
 
-	ctx := &diffContext{ops: make([]Operation, 0), warnings: make([]string, 0)}
+	ctx := newDiffContext(context.Background())
 	ctx.diffExtensions(source, target)
 
 	if len(ctx.ops) != 0 {

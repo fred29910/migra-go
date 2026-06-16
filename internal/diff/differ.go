@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"context"
 	"sort"
 
 	"github.com/fred29910/migra-go/internal/model"
@@ -9,7 +10,7 @@ import (
 
 // Engine defines the interface for schema diff computation.
 type Engine interface {
-	Diff(source, target *model.Schema) ([]Operation, []string)
+	Diff(ctx context.Context, source, target *model.Schema) ([]Operation, []string)
 }
 
 // Compile-time check: Differ must satisfy Engine.
@@ -25,10 +26,10 @@ func NewDiffer() *Differ {
 }
 
 // Diff compares two schemas and returns operations and warnings.
-func (d *Differ) Diff(source, target *model.Schema) ([]Operation, []string) {
-	ctx := &diffContext{ops: make([]Operation, 0, 16), warnings: make([]string, 0, 4)}
-	ctx.diffSchemas(source, target)
-	return ctx.ops, ctx.warnings
+func (d *Differ) Diff(ctx context.Context, source, target *model.Schema) ([]Operation, []string) {
+	c := newDiffContext(ctx)
+	c.diffSchemas(source, target)
+	return c.ops, c.warnings
 }
 
 // diffSchemas compares namespaces in two schemas
@@ -41,6 +42,9 @@ func (c *diffContext) diffSchemas(source, target *model.Schema) {
 	sort.Strings(targetNames)
 
 	for _, name := range targetNames {
+		if err := c.checkCancelled(); err != nil {
+			return
+		}
 		targetNs := target.Schemas[name]
 		if sourceNs, exists := source.Schemas[name]; exists {
 			c.diffNamespace(sourceNs, targetNs)
@@ -59,6 +63,9 @@ func (c *diffContext) diffSchemas(source, target *model.Schema) {
 	sort.Strings(sourceNames)
 
 	for _, name := range sourceNames {
+		if err := c.checkCancelled(); err != nil {
+			return
+		}
 		if _, exists := target.Schemas[name]; !exists {
 			// The public schema is always present in PostgreSQL databases
 			// and should never be dropped in normal migrations.
@@ -99,6 +106,9 @@ func (c *diffContext) diffTypes(source, target *model.Namespace) {
 		}
 		sort.Strings(targetTypeNames)
 		for _, name := range targetTypeNames {
+			if err := c.checkCancelled(); err != nil {
+				return
+			}
 			c.addOp(&AddEnumTypeOp{
 				baseOperation: baseOperation{
 					kind:      KindAddEnumType,
@@ -118,6 +128,9 @@ func (c *diffContext) diffTypes(source, target *model.Namespace) {
 	}
 	sort.Strings(targetTypeNames)
 	for _, name := range targetTypeNames {
+		if err := c.checkCancelled(); err != nil {
+			return
+		}
 		if _, exists := source.Types[name]; !exists {
 			c.addOp(&AddEnumTypeOp{
 				baseOperation: baseOperation{
@@ -132,6 +145,9 @@ func (c *diffContext) diffTypes(source, target *model.Namespace) {
 
 	// Find types that exist in both
 	for _, name := range targetTypeNames {
+		if err := c.checkCancelled(); err != nil {
+			return
+		}
 		if sourceType, exists := source.Types[name]; exists {
 			c.diffEnumType(target.Name, name, sourceType, target.Types[name])
 		}
@@ -144,6 +160,9 @@ func (c *diffContext) diffTypes(source, target *model.Namespace) {
 	}
 	sort.Strings(sourceTypeNames)
 	for _, name := range sourceTypeNames {
+		if err := c.checkCancelled(); err != nil {
+			return
+		}
 		if _, exists := target.Types[name]; !exists {
 			c.addOp(&DropEnumTypeOp{
 				baseOperation: baseOperation{
@@ -188,6 +207,9 @@ func (c *diffContext) diffViews(source, target *model.Namespace) {
 		}
 		sort.Strings(names)
 		for _, name := range names {
+			if err := c.checkCancelled(); err != nil {
+				return
+			}
 			view := target.Views[name]
 			if view.Materialized {
 				c.addOp(NewCreateMaterializedViewOp(target.Name, view))
@@ -205,6 +227,9 @@ func (c *diffContext) diffViews(source, target *model.Namespace) {
 	}
 	sort.Strings(targetNames)
 	for _, name := range targetNames {
+		if err := c.checkCancelled(); err != nil {
+			return
+		}
 		tgtView := target.Views[name]
 		if src, ok := source.Views[name]; !ok {
 			if tgtView.Materialized {
@@ -244,6 +269,9 @@ func (c *diffContext) diffViews(source, target *model.Namespace) {
 	}
 	sort.Strings(sourceNames)
 	for _, name := range sourceNames {
+		if err := c.checkCancelled(); err != nil {
+			return
+		}
 		if _, ok := target.Views[name]; !ok {
 			if source.Views[name].Materialized {
 				c.addOp(NewDropMaterializedViewOp(source.Name, name))
@@ -263,6 +291,9 @@ func (c *diffContext) diffSequences(source, target *model.Namespace) {
 		}
 		sort.Strings(names)
 		for _, name := range names {
+			if err := c.checkCancelled(); err != nil {
+				return
+			}
 			c.addOp(NewCreateSequenceOp(target.Name, target.Sequences[name]))
 		}
 		return
@@ -275,6 +306,9 @@ func (c *diffContext) diffSequences(source, target *model.Namespace) {
 	}
 	sort.Strings(targetNames)
 	for _, name := range targetNames {
+		if err := c.checkCancelled(); err != nil {
+			return
+		}
 		if src, ok := source.Sequences[name]; !ok {
 			c.addOp(NewCreateSequenceOp(target.Name, target.Sequences[name]))
 		} else if !sameSequenceContent(src, target.Sequences[name]) {
@@ -289,6 +323,9 @@ func (c *diffContext) diffSequences(source, target *model.Namespace) {
 	}
 	sort.Strings(sourceNames)
 	for _, name := range sourceNames {
+		if err := c.checkCancelled(); err != nil {
+			return
+		}
 		if _, ok := target.Sequences[name]; !ok {
 			c.addOp(NewDropSequenceOp(source.Name, name))
 		}
@@ -317,6 +354,9 @@ func (c *diffContext) diffExtensions(source, target *model.Namespace) {
 		}
 		sort.Strings(names)
 		for _, name := range names {
+			if err := c.checkCancelled(); err != nil {
+				return
+			}
 			c.addOp(NewCreateExtensionOp(target.Name, target.Extensions[name]))
 		}
 		return
@@ -329,6 +369,9 @@ func (c *diffContext) diffExtensions(source, target *model.Namespace) {
 	}
 	sort.Strings(targetNames)
 	for _, name := range targetNames {
+		if err := c.checkCancelled(); err != nil {
+			return
+		}
 		if src, ok := source.Extensions[name]; !ok {
 			c.addOp(NewCreateExtensionOp(target.Name, target.Extensions[name]))
 		} else if src.Version != "" && target.Extensions[name].Version != "" && src.Version != target.Extensions[name].Version {
@@ -343,6 +386,9 @@ func (c *diffContext) diffExtensions(source, target *model.Namespace) {
 	}
 	sort.Strings(sourceNames)
 	for _, name := range sourceNames {
+		if err := c.checkCancelled(); err != nil {
+			return
+		}
 		if _, ok := target.Extensions[name]; !ok {
 			c.addOp(NewDropExtensionOp(source.Name, name))
 		}

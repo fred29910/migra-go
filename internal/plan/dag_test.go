@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -14,7 +15,7 @@ func TestTopoSortKeepsMultipleOpsForSameColumn(t *testing.T) {
 		diff.NewAlterColumnTypeOp("public", "users", "name", "varchar", "text"),
 	}
 
-	sorted, err := TopoSort(ops)
+	sorted, err := TopoSort(context.Background(), ops)
 	if err != nil {
 		t.Fatalf("TopoSort failed: %v", err)
 	}
@@ -42,7 +43,7 @@ func TestTopoSortCreateIndexDependsOnAddTable(t *testing.T) {
 		diff.NewAddTableOp("public", "users", &model.Table{Schema: "public", Name: "users"}),
 	}
 
-	sorted, err := TopoSort(ops)
+	sorted, err := TopoSort(context.Background(), ops)
 	if err != nil {
 		t.Fatalf("TopoSort failed: %v", err)
 	}
@@ -79,7 +80,7 @@ func TestDAGGetExecutionOrder_StableForLinearChain(t *testing.T) {
 	dag.AddDependency(a, b)
 	dag.AddDependency(b, c)
 
-	ops, err := dag.GetExecutionOrder()
+	ops, err := dag.GetExecutionOrder(context.Background())
 	if err != nil {
 		t.Fatalf("GetExecutionOrder failed: %v", err)
 	}
@@ -102,7 +103,7 @@ func TestTopoSortDropConstraintBeforeAddConstraint(t *testing.T) {
 		}),
 	}
 
-	sorted, err := TopoSort(ops)
+	sorted, err := TopoSort(context.Background(), ops)
 	if err != nil {
 		t.Fatalf("TopoSort failed: %v", err)
 	}

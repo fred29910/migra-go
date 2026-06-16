@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"context"
 	"testing"
 
 	"github.com/fred29910/migra-go/internal/model"
@@ -58,7 +59,7 @@ func TestDiffTableConstraints_NoFalseChangeForPK(t *testing.T) {
 	}
 	targetNs.Tables["posts"] = targetTable
 
-	ops, _ := differ.Diff(sourceSchema, targetSchema)
+	ops, _ := differ.Diff(context.Background(), sourceSchema, targetSchema)
 
 	// Should have no operations since constraints are identical
 	for _, op := range ops {

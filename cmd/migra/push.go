@@ -119,17 +119,15 @@ func runPush(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load target schema: %w", err)
 	}
 
-	appCfg := app.Config{
+	appCfg := app.DiffConfig{
 		Source:     cfg.Source,
 		Target:     cfg.Target,
 		Schemas:    cfg.Schemas,
 		Format:     "sql",
 		UnsafeDrop: cfg.UnsafeDrop,
 		Timeout:    cfg.Timeout,
-		Execute:    cfg.Execute,
-		NoVerify:   cfg.NoVerify,
 	}
-	ops, _, err := app.ComputeDiff(targetSchema, sourceSchema, appCfg)
+	ops, _, err := app.ComputeDiff(cmd.Context(), targetSchema, sourceSchema, appCfg)
 	if err != nil {
 		return err
 	}
@@ -172,8 +170,13 @@ func runPush(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	pushCfg := app.PushConfig{
+		DiffConfig: appCfg,
+		Execute:    cfg.Execute,
+		NoVerify:   cfg.NoVerify,
+	}
 	pushService := push.NewPushService()
-	if err := pushService.ExecutePlan(cmd.Context(), appCfg, sourceSchema, ops); err != nil {
+	if err := pushService.ExecutePlan(cmd.Context(), pushCfg, sourceSchema, ops); err != nil {
 		return err
 	}
 
@@ -184,7 +187,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("post-execution validation: failed to reload target schema: %w", err)
 		}
-		remainingOps, _, err := app.ComputeDiff(sourceSchema, newTargetSchema, appCfg)
+		remainingOps, _, err := app.ComputeDiff(cmd.Context(), sourceSchema, newTargetSchema, appCfg)
 		if err != nil {
 			return fmt.Errorf("post-execution validation: diff failed: %w", err)
 		}
