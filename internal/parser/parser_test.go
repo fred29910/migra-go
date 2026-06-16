@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -202,9 +203,9 @@ func TestParseErrors(t *testing.T) {
 		t.Error("expected error for unsupported statement")
 	}
 
-	// Check errors
-	if len(p.Errors()) == 0 {
-		t.Error("expected parsing errors")
+	// ParseSQL should return an error containing the error count
+	if err == nil {
+		t.Error("expected error from ParseSQL")
 	}
 }
 
@@ -240,9 +241,6 @@ func TestParseSQLResetsStateBetweenCalls(t *testing.T) {
 	schema, err := p.ParseSQL("CREATE TABLE users (id integer);")
 	if err != nil {
 		t.Fatalf("expected second ParseSQL call to succeed, got error: %v", err)
-	}
-	if len(p.Errors()) != 0 {
-		t.Fatalf("expected parser error list to be reset, got %d", len(p.Errors()))
 	}
 
 	ns, exists := schema.Schemas["public"]
@@ -312,7 +310,7 @@ func TestIntegrationParserToDiff(t *testing.T) {
 
 	// Run diff
 	d := diff.NewDiffer()
-	ops, _ := d.Diff(sourceSchema, targetSchema)
+	ops, _ := d.Diff(context.Background(), sourceSchema, targetSchema)
 
 	if len(ops) == 0 {
 		t.Fatal("expected diff operations, got none")
@@ -320,7 +318,7 @@ func TestIntegrationParserToDiff(t *testing.T) {
 
 	// Render SQL
 	r := render.NewRenderer()
-	sql := r.RenderAll(ops)
+	sql, _ := r.RenderAll(context.Background(), ops)
 
 	t.Logf("Generated SQL:\n%s", sql)
 

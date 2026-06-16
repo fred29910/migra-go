@@ -151,7 +151,8 @@ func TestReadUserInput_EOF(t *testing.T) {
 func TestExecSQL(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mock := &mockTx{}
-		err := execSQL(context.Background(), mock, "CREATE TABLE t (id int);", 1)
+		svc := &PushService{}
+		err := svc.executeOne(context.Background(), mock, "CREATE TABLE t (id int);", 1)
 		require.NoError(t, err)
 		require.Equal(t, 1, mock.execCalled)
 		require.Equal(t, []string{"CREATE TABLE t (id int);"}, mock.execSQLs)
@@ -159,7 +160,8 @@ func TestExecSQL(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		mock := &mockTx{execErr: errors.New("syntax error")}
-		err := execSQL(context.Background(), mock, "BAD SQL;", 5)
+		svc := &PushService{}
+		err := svc.executeOne(context.Background(), mock, "BAD SQL;", 5)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "SQL #5")
 		require.Contains(t, err.Error(), "syntax error")
@@ -179,7 +181,7 @@ func TestExecutePlan_BasicInteractive(t *testing.T) {
 	}
 
 	ops := []diff.Operation{diff.NewAddTableOp("public", "users", &model.Table{Name: "users"})}
-	err := svc.ExecutePlan(context.Background(), app.Config{}, model.NewSchema(), ops)
+	err := svc.ExecutePlan(context.Background(), app.PushConfig{DiffConfig: app.DiffConfig{}}, model.NewSchema(), ops)
 	require.NoError(t, err)
 	require.Equal(t, 1, mockTx.execCalled)
 	require.Equal(t, 1, mockTx.commitCalled)
@@ -196,7 +198,7 @@ func TestExecutePlan_ExecuteMode(t *testing.T) {
 		diff.NewAddTableOp("public", "users", &model.Table{Name: "users"}),
 		diff.NewAddColumnOp("public", "users", &model.Column{Name: "id", DataType: "integer"}),
 	}
-	cfg := app.Config{Execute: true}
+	cfg := app.PushConfig{DiffConfig: app.DiffConfig{}, Execute: true}
 
 	err := svc.ExecutePlan(context.Background(), cfg, model.NewSchema(), ops)
 	require.NoError(t, err)
@@ -212,7 +214,7 @@ func TestExecutePlan_ExecuteModeBlocksDestructive(t *testing.T) {
 	}
 
 	ops := []diff.Operation{diff.NewDropTableOp("public", "users")}
-	cfg := app.Config{Execute: true, UnsafeDrop: false}
+	cfg := app.PushConfig{DiffConfig: app.DiffConfig{UnsafeDrop: false}, Execute: true}
 
 	err := svc.ExecutePlan(context.Background(), cfg, model.NewSchema(), ops)
 	require.NoError(t, err)
@@ -228,7 +230,7 @@ func TestExecutePlan_UnsafeDropAllowsDestructive(t *testing.T) {
 	}
 
 	ops := []diff.Operation{diff.NewDropTableOp("public", "users")}
-	cfg := app.Config{Execute: true, UnsafeDrop: true}
+	cfg := app.PushConfig{DiffConfig: app.DiffConfig{UnsafeDrop: true}, Execute: true}
 
 	err := svc.ExecutePlan(context.Background(), cfg, model.NewSchema(), ops)
 	require.NoError(t, err)
@@ -245,7 +247,7 @@ func TestExecutePlan_UserCancels(t *testing.T) {
 	}
 
 	ops := []diff.Operation{diff.NewAddTableOp("public", "users", &model.Table{Name: "users"})}
-	err := svc.ExecutePlan(context.Background(), app.Config{}, model.NewSchema(), ops)
+	err := svc.ExecutePlan(context.Background(), app.PushConfig{DiffConfig: app.DiffConfig{}}, model.NewSchema(), ops)
 	require.NoError(t, err)
 	require.Equal(t, 0, mockTx.execCalled)
 	require.Equal(t, 1, mockTx.rollbackCalled)
@@ -260,7 +262,7 @@ func TestExecutePlan_Skip(t *testing.T) {
 	}
 
 	ops := []diff.Operation{diff.NewAddTableOp("public", "users", &model.Table{Name: "users"})}
-	err := svc.ExecutePlan(context.Background(), app.Config{}, model.NewSchema(), ops)
+	err := svc.ExecutePlan(context.Background(), app.PushConfig{DiffConfig: app.DiffConfig{}}, model.NewSchema(), ops)
 	require.NoError(t, err)
 	require.Equal(t, 0, mockTx.execCalled)
 	require.Equal(t, 1, mockTx.commitCalled)
@@ -278,7 +280,7 @@ func TestExecutePlan_ApplyAll(t *testing.T) {
 		diff.NewAddTableOp("public", "t1", &model.Table{Name: "t1"}),
 		diff.NewAddTableOp("public", "t2", &model.Table{Name: "t2"}),
 	}
-	err := svc.ExecutePlan(context.Background(), app.Config{}, model.NewSchema(), ops)
+	err := svc.ExecutePlan(context.Background(), app.PushConfig{DiffConfig: app.DiffConfig{}}, model.NewSchema(), ops)
 	require.NoError(t, err)
 	require.Equal(t, 2, mockTx.execCalled)
 	require.Equal(t, 1, mockTx.commitCalled)
@@ -293,7 +295,7 @@ func TestExecutePlan_InvalidInput(t *testing.T) {
 	}
 
 	ops := []diff.Operation{diff.NewAddTableOp("public", "users", &model.Table{Name: "users"})}
-	err := svc.ExecutePlan(context.Background(), app.Config{}, model.NewSchema(), ops)
+	err := svc.ExecutePlan(context.Background(), app.PushConfig{DiffConfig: app.DiffConfig{}}, model.NewSchema(), ops)
 	require.NoError(t, err)
 	require.Equal(t, 1, mockTx.execCalled)
 	require.Equal(t, 1, mockTx.commitCalled)
@@ -308,7 +310,7 @@ func TestExecutePlan_CommitError(t *testing.T) {
 	}
 
 	ops := []diff.Operation{diff.NewAddTableOp("public", "users", &model.Table{Name: "users"})}
-	err := svc.ExecutePlan(context.Background(), app.Config{}, model.NewSchema(), ops)
+	err := svc.ExecutePlan(context.Background(), app.PushConfig{DiffConfig: app.DiffConfig{}}, model.NewSchema(), ops)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to commit")
 }
@@ -320,7 +322,7 @@ func TestExecutePlan_ConnectError(t *testing.T) {
 		},
 	}
 
-	err := svc.ExecutePlan(context.Background(), app.Config{}, model.NewSchema(), nil)
+	err := svc.ExecutePlan(context.Background(), app.PushConfig{DiffConfig: app.DiffConfig{}}, model.NewSchema(), nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to connect")
 }
@@ -334,7 +336,7 @@ func TestExecutePlan_DestructiveInteractiveAllow(t *testing.T) {
 	}
 
 	ops := []diff.Operation{diff.NewDropTableOp("public", "users")}
-	cfg := app.Config{UnsafeDrop: true}
+	cfg := app.PushConfig{DiffConfig: app.DiffConfig{UnsafeDrop: true}}
 
 	err := svc.ExecutePlan(context.Background(), cfg, model.NewSchema(), ops)
 	require.NoError(t, err)
@@ -350,7 +352,7 @@ func TestExecutePlan_DestructiveInteractiveBlock(t *testing.T) {
 	}
 
 	ops := []diff.Operation{diff.NewDropTableOp("public", "users")}
-	cfg := app.Config{UnsafeDrop: false}
+	cfg := app.PushConfig{DiffConfig: app.DiffConfig{UnsafeDrop: false}}
 
 	err := svc.ExecutePlan(context.Background(), cfg, model.NewSchema(), ops)
 	require.NoError(t, err)

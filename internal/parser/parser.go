@@ -27,12 +27,9 @@ func (e *ParseError) Error() string {
 	return fmt.Sprintf("parse error at position %d: %s", e.Position, e.Message)
 }
 
-// Parser parses SQL statements using pg_query_go and builds a Schema model
+// Parser parses SQL statements using pg_query_go and builds a Schema model.
+// Parser is stateless: all mutable state is held in local variables within ParseSQL.
 type Parser struct {
-	schema   *model.Schema
-	errors   []error
-	warnings []string
-	sql      string // Original SQL for extracting statement snippets
 	applier  *MutationApplier
 	registry *HandlerRegistry
 	warnFn   WarningEmitter
@@ -41,9 +38,6 @@ type Parser struct {
 // NewParser creates a new SQL parser with default handler registry.
 func NewParser() *Parser {
 	return &Parser{
-		schema:   model.NewSchema(),
-		errors:   make([]error, 0),
-		warnings: make([]string, 0),
 		applier:  &MutationApplier{},
 		registry: DefaultRegistry(),
 	}
@@ -58,9 +52,6 @@ func NewParserWith(registry *HandlerRegistry, applier *MutationApplier) *Parser 
 		applier = &MutationApplier{}
 	}
 	return &Parser{
-		schema:   model.NewSchema(),
-		errors:   make([]error, 0),
-		warnings: make([]string, 0),
 		applier:  applier,
 		registry: registry,
 	}
@@ -71,14 +62,8 @@ func (p *Parser) SetWarningEmitter(fn WarningEmitter) {
 	p.warnFn = fn
 }
 
-// Warnings returns parsing warnings (defensive copy).
-func (p *Parser) Warnings() []string {
-	out := make([]string, len(p.warnings))
-	copy(out, p.warnings)
-	return out
-}
-
-// ParseSQL parses SQL string and returns the schema
+// ParseSQL parses SQL string and returns the schema.
+// All parsing state is local to this call; the Parser is stateless.
 func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
 	// Ensure dependencies are initialized even if created via struct literal
 	if p.registry == nil {
@@ -88,11 +73,9 @@ func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
 		p.applier = &MutationApplier{}
 	}
 
-	// Reset parser state for each ParseSQL call
-	p.schema = model.NewSchema()
-	p.errors = p.errors[:0]
-	p.warnings = p.warnings[:0]
-	p.sql = sql
+	schema := model.NewSchema()
+	var errs []error
+	var warnings []string
 
 	tree, err := pg_query.Parse(sql)
 	if err != nil {
@@ -100,21 +83,29 @@ func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
 	}
 
 	for _, rawStmt := range tree.Stmts {
-		if err := p.visitNode(rawStmt.Stmt, int(rawStmt.StmtLocation)); err != nil {
-			p.errors = append(p.errors, err)
+		if err := p.visitNode(schema, rawStmt.Stmt, int(rawStmt.StmtLocation), sql); err != nil {
+			errs = append(errs, err)
 		}
 	}
 
-	if len(p.errors) > 0 {
-		first := p.errors[0]
-		return p.schema, fmt.Errorf("parsing completed with %d errors, first: %w", len(p.errors), first)
+	// Emit warnings via callback
+	for _, w := range warnings {
+		if p.warnFn != nil {
+			p.warnFn(w)
+		}
 	}
-	return p.schema, nil
+
+	if len(errs) > 0 {
+		first := errs[0]
+		return schema, fmt.Errorf("parsing completed with %d errors, first: %w", len(errs), first)
+	}
+	return schema, nil
 }
 
 // visitNode dispatches the statement node to the registered handler via HandlerRegistry.
 // stmt is the inner statement (e.g., CreateStmt) extracted from a RawStmt wrapper.
-func (p *Parser) visitNode(stmt *pg_query.Node, pos int) (err error) {
+// schema is the Schema being built and sql is the original SQL for snippet extraction.
+func (p *Parser) visitNode(schema *model.Schema, stmt *pg_query.Node, pos int, sql string) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			buf := make([]byte, 4096)
@@ -136,7 +127,7 @@ func (p *Parser) visitNode(stmt *pg_query.Node, pos int) (err error) {
 		return &ParseError{
 			Message:   fmt.Sprintf("unsupported statement type: %T", stmt),
 			Position:  pos,
-			Statement: p.getStatementSnippet(pos),
+			Statement: getStatementSnippet(sql, pos),
 		}
 	}
 
@@ -145,35 +136,28 @@ func (p *Parser) visitNode(stmt *pg_query.Node, pos int) (err error) {
 		return &ParseError{
 			Message:   err.Error(),
 			Position:  pos,
-			Statement: p.getStatementSnippet(pos),
+			Statement: getStatementSnippet(sql, pos),
 		}
 	}
 
-	if err := p.applier.Apply(p.schema, mutations); err != nil {
+	if err := p.applier.Apply(schema, mutations); err != nil {
 		return &ParseError{
 			Message:   err.Error(),
 			Position:  pos,
-			Statement: p.getStatementSnippet(pos),
+			Statement: getStatementSnippet(sql, pos),
 		}
 	}
 	return nil
 }
 
 // getStatementSnippet extracts SQL snippet around position
-func (p *Parser) getStatementSnippet(pos int) string {
-	if pos < 0 || pos >= len(p.sql) {
+func getStatementSnippet(sql string, pos int) string {
+	if pos < 0 || pos >= len(sql) {
 		return ""
 	}
 	end := pos + 100
-	if end > len(p.sql) {
-		end = len(p.sql)
+	if end > len(sql) {
+		end = len(sql)
 	}
-	return p.sql[pos:end]
-}
-
-// Errors returns parsing errors (defensive copy)
-func (p *Parser) Errors() []error {
-	out := make([]error, len(p.errors))
-	copy(out, p.errors)
-	return out
+	return sql[pos:end]
 }
