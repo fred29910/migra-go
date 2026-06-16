@@ -360,7 +360,7 @@ graph TD
 │   ├── diff.go             # diff 子命令
 │   ├── diff_runner.go      # 差异计算流水线编排
 │   ├── push.go             # push 子命令
-│   ├── push_runner.go      # push 执行逻辑（交互确认、事务、回滚）
+│   ├── push.go             # push 子命令（已迁移到 internal/app/push/）
 │   └── *_test.go           # 各层测试
 ├── internal/
 │   ├── app/                # 应用层服务（依赖注入编排）

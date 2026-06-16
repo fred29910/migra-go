@@ -96,7 +96,7 @@ func (p *Parser) ParseSQL(sql string) (*model.Schema, error) {
 
 	tree, err := pg_query.Parse(sql)
 	if err != nil {
-		return nil, fmt.Errorf("parse SQL: %w", errors.ErrParseFailed)
+		return nil, fmt.Errorf("parse SQL: %w, %w", errors.ErrParseFailed, err)
 	}
 
 	for _, rawStmt := range tree.Stmts {

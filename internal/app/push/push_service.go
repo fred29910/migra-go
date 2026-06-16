@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/fred29910/migra-go/internal/app"
 	"github.com/fred29910/migra-go/internal/diff"
@@ -105,9 +104,10 @@ func (s *PushService) ExecutePlan(ctx context.Context, cfg app.Config, sourceSch
 
 	renderer := render.NewRenderer()
 
-	next:
+	var applyAll bool // set by "a" to auto-execute all remaining ops
+
+next:
 	for i, op := range ops {
-		// Check for interrupt at the start of each iteration.
 		if err := checkInterrupt(); err != nil {
 			return err
 		}
@@ -126,25 +126,14 @@ func (s *PushService) ExecutePlan(ctx context.Context, cfg app.Config, sourceSch
 			return fmt.Errorf("non-transactional DDL at SQL #%d", i+1)
 		}
 
-		// Interactive confirmation
-		prompt := fmt.Sprintf("Execute SQL #%d? (y=yes, n=no, a=apply all, s=skip): ", i+1)
-		if isDestructive {
-			prompt = fmt.Sprintf("DANGER: Execute SQL #%d? (y=yes, n=no, a=apply all, s=skip): ", i+1)
-		}
-
-		fmt.Print(prompt)
-
-		input := readUserInput(s.stdinReader)
-
-		// Check for interrupt after blocking read.
-		if err := checkInterrupt(); err != nil {
-			return err
-		}
-
-		switch input {
-		case "y":
+		if cfg.Execute || applyAll {
 			if isDestructive && !cfg.UnsafeDrop {
-				fmt.Println("Destructive operation requires --unsafe-drop or explicit confirmation")
+				if applyAll {
+					fmt.Printf("Destructive operation detected in auto-mode, reverting to interactive mode.\nSQL #%d: %s\n\n", i+1, sql)
+					applyAll = false
+				} else {
+					fmt.Printf("Destructive operation blocked at SQL #%d (use --unsafe-drop to allow):\n  %s\n", i+1, sql)
+				}
 				continue next
 			}
 			if err := execSQL(ctx, tx, sql, i+1); err != nil {
@@ -154,35 +143,60 @@ func (s *PushService) ExecutePlan(ctx context.Context, cfg app.Config, sourceSch
 				return fmt.Errorf("execution failed at SQL #%d, transaction rolled back: %w", i+1, err)
 			}
 			continue next
-		case "n":
-			fmt.Println("Cancelled")
-			_ = tx.Rollback(ctx)
-			txActive = false
-			return nil
-		case "a":
-			if isDestructive && !cfg.UnsafeDrop {
-				fmt.Printf("Destructive operation detected in auto-mode, reverting to interactive mode.\nSQL #%d: %s\n\n", i+1, sql)
-				continue
-			}
-			// Fall through to auto mode
-			fallthrough
-		case "auto":
-			// Auto mode: execute without confirmation
+		}
+
+		prompt := fmt.Sprintf("Execute SQL #%d? (y=yes, n=no, a=apply all, s=skip): ", i+1)
+		if isDestructive {
+			prompt = fmt.Sprintf("DANGER: Execute SQL #%d? (y=yes, n=no, a=apply all, s=skip): ", i+1)
+		}
+
+		for {
+			fmt.Print(prompt)
+
+			input := readUserInput(s.stdinReader)
+
 			if err := checkInterrupt(); err != nil {
 				return err
 			}
-			if err := execSQL(ctx, tx, sql, i+1); err != nil {
-				fmt.Println("Rolling back transaction...")
+
+			switch input {
+			case "y":
+				if isDestructive && !cfg.UnsafeDrop {
+					fmt.Println("Destructive operation requires --unsafe-drop or explicit confirmation")
+					continue next
+				}
+				if err := execSQL(ctx, tx, sql, i+1); err != nil {
+					fmt.Println("Rolling back transaction...")
+					_ = tx.Rollback(ctx)
+					txActive = false
+					return fmt.Errorf("execution failed at SQL #%d, transaction rolled back: %w", i+1, err)
+				}
+				continue next
+			case "n":
+				fmt.Println("Cancelled")
 				_ = tx.Rollback(ctx)
 				txActive = false
-				return fmt.Errorf("execution failed at SQL #%d, transaction rolled back: %w", i+1, err)
+				return nil
+			case "a":
+				applyAll = true
+				if isDestructive && !cfg.UnsafeDrop {
+					fmt.Printf("Destructive operation detected in auto-mode, reverting to interactive mode.\nSQL #%d: %s\n\n", i+1, sql)
+					applyAll = false
+					continue next
+				}
+				if err := execSQL(ctx, tx, sql, i+1); err != nil {
+					fmt.Println("Rolling back transaction...")
+					_ = tx.Rollback(ctx)
+					txActive = false
+					return fmt.Errorf("execution failed at SQL #%d, transaction rolled back: %w", i+1, err)
+				}
+				continue next
+			case "s":
+				fmt.Printf("SQL #%d skipped\n", i+1)
+				continue next
+			default:
+				fmt.Println("Invalid input. Use: y, n, a, or s")
 			}
-			continue next
-		case "s":
-			fmt.Printf("SQL #%d skipped\n", i+1)
-			continue next
-		default:
-			fmt.Println("Invalid input. Use: y, n, a, or s")
 		}
 	}
 
@@ -212,11 +226,6 @@ func execSQL(ctx context.Context, tx sqlTx, sql string, idx int) error {
 	}
 	fmt.Printf("SQL #%d executed\n", idx)
 	return nil
-}
-
-// isDestructiveOperation checks if an operation is destructive.
-func isDestructiveOperation(isDestructive, unsafeDrop bool) bool {
-	return isDestructive && !unsafeDrop
 }
 
 var nonTransactionalPatterns = []*regexp.Regexp{

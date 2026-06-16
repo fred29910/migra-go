@@ -21,12 +21,10 @@ var rootCmd = &cobra.Command{
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Global flags
 	rootCmd.PersistentFlags().StringP("config", "c", "", "config file (default is $HOME/.migra.yaml)")
 	rootCmd.PersistentFlags().BoolP("verbose", "V", false, "verbose output")
 	rootCmd.PersistentFlags().BoolP("version", "v", false, "print version and exit")
 
-	// Handle --version in PersistentPreRun using function composition
 	existingPreRun := rootCmd.PersistentPreRun
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		if existingPreRun != nil {
@@ -53,7 +51,6 @@ func setupFlags(cmd *cobra.Command) error {
 }
 
 func initConfig() {
-	// 设置环境变量前缀为 MIGRA_
 	viper.SetEnvPrefix("MIGRA")
 	viper.AutomaticEnv()
 

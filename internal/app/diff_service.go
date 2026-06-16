@@ -20,6 +20,8 @@ type Config struct {
 	UnsafeDrop bool
 	Strict     bool
 	Timeout    time.Duration
+	Execute    bool // push: skip interactive confirmation (--execute)
+	NoVerify   bool // push: skip post-execution validation (--no-verify)
 }
 
 // DiffService defines the interface for running schema diff operations.
@@ -49,11 +51,11 @@ func (s *diffService) Run(parent context.Context, cfg Config) (string, []string,
 
 	sourceSchema, err := s.deps.LoadSchema(ctx, cfg.Source, cfg.Schemas, cfg.Strict)
 	if err != nil {
-		return "", nil, fmt.Errorf("load source: %w", errors.ErrLoadFailed)
+		return "", nil, fmt.Errorf("load source: %w, %w", errors.ErrLoadFailed, err)
 	}
 	targetSchema, err := s.deps.LoadSchema(ctx, cfg.Target, cfg.Schemas, cfg.Strict)
 	if err != nil {
-		return "", nil, fmt.Errorf("load target: %w", errors.ErrLoadFailed)
+		return "", nil, fmt.Errorf("load target: %w, %w", errors.ErrLoadFailed, err)
 	}
 
 	ops, warnings, err := s.deps.Compute(sourceSchema, targetSchema, cfg)
