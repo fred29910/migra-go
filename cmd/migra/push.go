@@ -41,6 +41,7 @@ func init() {
 
 	_ = viper.BindPFlag("diff.schemas", pushCmd.Flags().Lookup("schema"))
 	_ = viper.BindPFlag("diff.unsafe_drop", pushCmd.Flags().Lookup("unsafe-drop"))
+	_ = viper.BindPFlag("diff.timeout", pushCmd.Flags().Lookup("timeout"))
 }
 
 type pushConfig struct {

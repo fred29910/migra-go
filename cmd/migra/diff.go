@@ -54,6 +54,7 @@ func init() {
 	_ = viper.BindPFlag("diff.unsafe_drop", diffCmd.Flags().Lookup("unsafe-drop"))
 	_ = viper.BindPFlag("diff.strict", diffCmd.Flags().Lookup("strict"))
 	_ = viper.BindPFlag("output.file", diffCmd.Flags().Lookup("output"))
+	_ = viper.BindPFlag("diff.timeout", diffCmd.Flags().Lookup("timeout"))
 }
 
 func runDiff(cmd *cobra.Command, args []string) error {

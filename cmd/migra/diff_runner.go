@@ -69,6 +69,12 @@ func parseDiffConfig(cmd *cobra.Command, args []string) (app.DiffConfig, error) 
 	if err != nil {
 		return app.DiffConfig{}, fmt.Errorf("failed to get timeout flag: %w", err)
 	}
+	// 添加配置 fallback
+	if timeout == defaultDiffTimeout {
+		if cfgTimeout := viper.GetDuration("diff.timeout"); cfgTimeout > 0 {
+			timeout = cfgTimeout
+		}
+	}
 
 	return app.DiffConfig{
 		Source:     source,
