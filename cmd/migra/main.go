@@ -22,8 +22,8 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringP("config", "c", "", "config file (default is $HOME/.migra.yaml)")
-	rootCmd.PersistentFlags().BoolP("verbose", "V", false, "verbose output")
-	rootCmd.PersistentFlags().BoolP("version", "v", false, "print version and exit")
+	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "verbose output")
+	rootCmd.PersistentFlags().BoolP("version", "V", false, "print version and exit")
 
 	existingPreRun := rootCmd.PersistentPreRun
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {

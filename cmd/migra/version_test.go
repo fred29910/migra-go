@@ -12,8 +12,8 @@ func TestVersionFlag_Registered(t *testing.T) {
 	if f == nil {
 		t.Fatal("--version flag not registered on rootCmd")
 	}
-	if f.Shorthand != "v" {
-		t.Errorf("--version shorthand = %q, want %q", f.Shorthand, "v")
+	if f.Shorthand != "V" {
+		t.Errorf("--version shorthand = %q, want %q", f.Shorthand, "V")
 	}
 }
 
@@ -22,8 +22,8 @@ func TestVerboseFlag_ShorthandChangedToUppercase(t *testing.T) {
 	if f == nil {
 		t.Fatal("--verbose flag not registered on rootCmd")
 	}
-	if f.Shorthand != "V" {
-		t.Errorf("--verbose shorthand = %q, want %q", f.Shorthand, "V")
+	if f.Shorthand != "v" {
+		t.Errorf("--verbose shorthand = %q, want %q", f.Shorthand, "v")
 	}
 }
 
@@ -49,13 +49,13 @@ func TestVersionCLI_Output(t *testing.T) {
 		}
 	}
 
-	cmd = exec.Command("/tmp/migra-test", "-v")
+	cmd = exec.Command("/tmp/migra-test", "-V")
 	out, err = cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("-v exited with error: %v\n%s", err, out)
+		t.Fatalf("-V exited with error: %v\n%s", err, out)
 	}
 	outputShort := string(out)
 	if !strings.Contains(outputShort, "Version:") {
-		t.Errorf("-v output should contain 'Version:', got:\n%s", outputShort)
+		t.Errorf("-V output should contain 'Version:', got:\n%s", outputShort)
 	}
 }
