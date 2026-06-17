@@ -17,11 +17,11 @@ database:
   source: "postgres://localhost/db1"
   target: "postgres://localhost/db2"
 
-  # 连接池配置
-  pool:
-    max_open_conns: 10
-    max_idle_conns: 5
-    conn_max_lifetime: "1h"
+  # 连接池配置（预留，暂未实现）
+  # pool:
+  #   max_open_conns: 10
+  #   max_idle_conns: 5
+  #   conn_max_lifetime: "1h"
 
 # 比较选项
 diff:
@@ -38,17 +38,17 @@ output:
 # 全局选项
 verbose: false    # 详细输出模式（注意：此为顶层键，不是 output.verbose）
 
-# 日志配置
-logging:
-  level: "info"  # debug, info, warn, error
-  format: "text" # text, json
+# 日志配置（预留，暂未实现）
+# logging:
+#   level: "info"  # debug, info, warn, error
+#   format: "text" # text, json
 ```
 
 示例文件：`examples/config.yaml`
 
 ### .env 文件
 
-migra 支持通过 `.env` 文件加载环境变量配置（使用 [godotenv](https://github.com/joho/godotenv) 自动加载）：
+migra 可以通过 `source .env` 或 `direnv` 等外部工具加载 `.env` 文件中的环境变量。Viper 的 `AutomaticEnv()` 会自动读取已设置的 OS 环境变量（使用 `MIGRA_` 前缀）。
 
 ```bash
 cp examples/.env.example .env
@@ -69,10 +69,10 @@ MIGRA_DATABASE_URL=postgres://user:password@localhost:5432/dbname?sslmode=disabl
 MIGRA_DATABASE_SOURCE=postgres://localhost/db1
 MIGRA_DATABASE_TARGET=postgres://localhost/db2
 
-# 连接池配置
-MIGRA_DATABASE_POOL_MAX_OPEN_CONNS=10
-MIGRA_DATABASE_POOL_MAX_IDLE_CONNS=5
-MIGRA_DATABASE_POOL_CONN_MAX_LIFETIME=1h
+# 连接池配置（预留，暂未实现）
+# MIGRA_DATABASE_POOL_MAX_OPEN_CONNS=10
+# MIGRA_DATABASE_POOL_MAX_IDLE_CONNS=5
+# MIGRA_DATABASE_POOL_CONN_MAX_LIFETIME=1h
 
 # 比较选项
 MIGRA_DIFF_SCHEMAS=public
@@ -86,9 +86,9 @@ MIGRA_OUTPUT_FILE=
 # 全局选项
 MIGRA_VERBOSE=false
 
-# 日志
-MIGRA_LOGGING_LEVEL=info
-MIGRA_LOGGING_FORMAT=text
+# 日志（预留，暂未实现）
+# MIGRA_LOGGING_LEVEL=info
+# MIGRA_LOGGING_FORMAT=text
 ```
 
 环境变量通过 Viper 自动绑定，点分隔键转换为下划线分隔的大写形式（如 `diff.schemas` → `MIGRA_DIFF_SCHEMAS`）。

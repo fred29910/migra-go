@@ -4,7 +4,7 @@
 
 ## 概述
 
-MIGRA-Go 是一个用 Go 编写的 PostgreSQL Schema 差异比较工具。它采用**五阶段流水线架构**，将 schema 加载、解析、归一化、差异比较、执行计划编排和渲染输出串联为一条清晰的数据处理管道。
+MIGRA-Go 是一个用 Go 编写的 PostgreSQL Schema 差异比较工具。它采用**六阶段流水线架构**，将 schema 加载、解析、归一化、差异比较、执行计划编排和渲染输出串联为一条清晰的数据处理管道。
 
 核心设计原则：
 
@@ -16,7 +16,7 @@ MIGRA-Go 是一个用 Go 编写的 PostgreSQL Schema 差异比较工具。它采
 
 ---
 
-## 1. 五阶段流水线
+## 1. 六阶段流水线
 
 ```mermaid
 flowchart LR
@@ -62,8 +62,8 @@ flowchart TD
     end
     subgraph Parser["internal/parser/ (SQL 解析)"]
         parser_impl[parser.go]
-        handlers[Handlers 9种]
-        mutations[Mutations 14种]
+        handlers[Handlers 10种]
+        mutations[Mutations 17种]
     end
     subgraph Model["internal/model/ (数据模型)"]
         schema[Schema/Namespace]
@@ -101,13 +101,9 @@ cmd/migra/
 ├── main.go               # 根命令、全局配置初始化、version 标志
 ├── diff.go               # diff 子命令定义 + sourceRegistry 注册
 ├── diff_runner.go        # diff 参数解析 + 依赖注入工厂 (newDefaultDeps)
-├── diff_test.go          # CLI 层测试
-├── diff_runner_test.go   # diff 运行器测试
 ├── push.go               # push 子命令定义
-├── push_runner.go        # push 交互执行逻辑（事务、确认、回滚、校验）
-├── push_test.go          # push 命令测试
-├── version_test.go       # version 输出测试
-└── integration_test.go   # 端到端集成测试
+├── integration_test.go   # 端到端集成测试
+└── version_test.go       # version 输出测试
 ```
 
 **关键组件：**
@@ -124,12 +120,10 @@ cmd/migra/
 `diff_service.go` + `pipeline.go` 是整个流水线的编排者。
 
 ```go
-type DiffService interface {
-    Run(ctx context.Context, cfg Config) (output string, warnings []string, err error)
-}
+func (d *Differ) Diff(ctx context.Context, source, target *model.Schema) ([]Operation, []string)
 ```
 
-`pipeline.go` 中的 `ComputeDiff` (行 116-136) 是核心管线：
+`pipeline.go` 中的 `ComputeDiff` (行 120-140) 是核心管线：
 
 ```
 NormalizeSchemas → Differ.Diff → FilterNamespaces → FilterDestructiveOps → BuildExecutionPlan
@@ -172,7 +166,7 @@ flowchart TD
 
 **关键类型：**
 
-- **ObjectKey** (`object_key.go`)：统一的对象标识符，包含 `Schema`、`Name`、`Kind`(Table/Column/Index/Constraint/Type/View/Sequence/Extension/Schema)
+- **ObjectKey** (`object_key.go`)：统一的对象标识符，包含 `Schema`、`Name`、`Kind`(Table/Column/Index/Constraint/Type/View/Function/Sequence/Extension/Schema)
 - **FKActionCode** (`fk_action.go`)：单字符 FK 动作码到 SQL 关键字的映射
 
 ### 2.5 解析器层 (`internal/parser/`)
@@ -204,10 +198,11 @@ flowchart TD
 | `CreateSchemaHandler` | `CREATE SCHEMA` | `CreateSchemaMutation` |
 | `RenameStmtHandler` | `ALTER TABLE ... RENAME COLUMN` | `RenameColumnMutation` |
 | `CreateViewHandler` | `CREATE VIEW` | `CreateViewMutation` |
+| `CreateMaterializedViewHandler` | `CREATE MATERIALIZED VIEW` | `CreateMaterializedViewMutation` |
 | `CreateSequenceHandler` | `CREATE SEQUENCE` | `CreateSequenceMutation` |
 | `CreateExtensionHandler` | `CREATE EXTENSION` | `CreateExtensionMutation` |
 
-**所有 Mutation 类型（14 种）：**
+**所有 Mutation 类型（17 种）：**
 
 `create_table`, `add_column`, `create_enum_type`, `create_index`, `drop_column`, `alter_column_type`, `set_not_null`, `drop_not_null`, `set_default`, `drop_default`, `create_schema`, `rename_column`, `add_constraint`, `drop_constraint`
 
@@ -284,9 +279,9 @@ flowchart TD
 
 | 阶段 | 包含的操作 |
 |------|-----------|
-| `StagePreDeploy` | `create_schema`, `add_table`, `add_column`, `add_index`, `add_constraint`, `add_enum_type`, `create_view`, `create_materialized_view`, `create_sequence`, `create_extension` |
-| `StageDeploy` | `alter_column_type`, `set_not_null`, `drop_not_null`, `set_default`, `drop_default`, `add_enum_label`, `rename_column`, `add_identity`, `set_identity`, `alter_column_collation`, `replace_view`, `alter_sequence`, `alter_extension_update` |
-| `StagePostDeploy` | `drop_schema`, `drop_table`, `drop_column`, `drop_index`, `drop_constraint`, `drop_enum_type`, `drop_identity`, `drop_view`, `drop_materialized_view`, `drop_sequence`, `drop_extension` |
+| `StagePreDeploy` | `create_schema`, `add_table`, `add_column`, `set_default`, `add_index`, `add_constraint`, `add_enum_type`, `add_enum_label`, `create_view`, `create_materialized_view`, `create_sequence`, `create_extension`, `alter_extension_update` |
+| `StageDeploy` | `alter_column_type`, `set_not_null`, `drop_not_null`, `drop_default`, `rename_column`, `add_identity`, `set_identity`, `drop_identity`, `alter_column_collation`, `alter_sequence` |
+| `StagePostDeploy` | `drop_schema`, `drop_table`, `drop_column`, `drop_index`, `drop_constraint`, `drop_enum_type`, `drop_view`, `drop_materialized_view`, `replace_view`, `drop_sequence`, `drop_extension` |
 
 基于 **Kahn 算法**的 DAG 拓扑排序保证执行顺序。
 
@@ -412,7 +407,7 @@ flowchart TD
 
 ### 4.2 Handler Registry（OCP）
 
-新增 DDL 类型只需：实现 Handler → 实现 Mutation → 注册。无需改动核心解析器。目前已支持 9 种 DDL。
+新增 DDL 类型只需：实现 Handler → 实现 Mutation → 注册。无需改动核心解析器。目前已支持 10 种 DDL。
 
 ### 4.3 独立 Normalize 阶段
 

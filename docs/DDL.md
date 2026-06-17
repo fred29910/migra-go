@@ -181,9 +181,9 @@
 
 | 阶段 | 包含操作 | 状态 |
 |------|---------|------|
-| **Pre-deploy** (创建) | `CREATE SCHEMA`, `ADD TABLE`, `ADD COLUMN`, `ADD INDEX`, `ADD CONSTRAINT`, `ADD ENUM TYPE`, `CREATE VIEW`, `CREATE MATERIALIZED VIEW`, `CREATE SEQUENCE`, `CREATE EXTENSION` | ✅ |
-| **Deploy** (修改) | `ALTER COLUMN TYPE`, `SET/DROP NOT NULL`, `SET/DROP DEFAULT`, `SET/DROP IDENTITY`, `ADD IDENTITY`, `ADD ENUM LABEL`, `RENAME COLUMN`, `ALTER COLUMN COLLATION`, `REPLACE VIEW`, `ALTER SEQUENCE`, `ALTER EXTENSION UPDATE` | ✅ |
-| **Post-deploy** (删除, 需 `--unsafe-drop`) | `DROP SCHEMA`, `DROP TABLE`, `DROP COLUMN`, `DROP INDEX`, `DROP CONSTRAINT`, `DROP ENUM TYPE`, `DROP IDENTITY`, `DROP VIEW`, `DROP MATERIALIZED VIEW`, `DROP SEQUENCE`, `DROP EXTENSION` | ✅ |
+| **Pre-deploy** (创建) | `CREATE SCHEMA`, `ADD TABLE`, `ADD COLUMN`, `SET DEFAULT`, `ADD INDEX`, `ADD CONSTRAINT`, `ADD ENUM TYPE`, `ADD ENUM LABEL`, `CREATE VIEW`, `CREATE MATERIALIZED VIEW`, `CREATE SEQUENCE`, `CREATE EXTENSION`, `ALTER EXTENSION UPDATE` | ✅ |
+| **Deploy** (修改) | `ALTER COLUMN TYPE`, `SET/DROP NOT NULL`, `DROP DEFAULT`, `RENAME COLUMN`, `ADD IDENTITY`, `SET IDENTITY`, `DROP IDENTITY`, `ALTER COLUMN COLLATION`, `ALTER SEQUENCE` | ✅ |
+| **Post-deploy** (删除, 需 `--unsafe-drop`) | `DROP SCHEMA`, `DROP TABLE`, `DROP COLUMN`, `DROP INDEX`, `DROP CONSTRAINT`, `DROP ENUM TYPE`, `DROP VIEW`, `DROP MATERIALIZED VIEW`, `REPLACE VIEW`, `DROP SEQUENCE`, `DROP EXTENSION` | ✅ |
 
 依赖排序使用 **Kahn 拓扑排序** 算法，确保:
 - 外键引用的表先于引用它的表创建
@@ -230,7 +230,7 @@
 
 17. **序列 CYCLE 渲染**: `ALTER SEQUENCE` 根据目标状态分别渲染 `CYCLE` / `NO CYCLE`。
 
-18. **`strict` 行为一致性**: `SQLFileLoader` 和 `DirectoryLoader` 对 `strict` 参数的处理已统一：非 strict 模式下跳过不支持的语句并输出警告。
+18. **`strict` 行为说明**: `SQLFileLoader` 和 `DirectoryLoader` 在非 strict 模式下会静默跳过无法解析的语句（parse error 被丢弃，不输出警告）。仅在 strict 模式下遇到不支持的语句才会报错退出。
 
 19. **push 超时上下文**: push 交互流程已将 schema 加载超时和执行阶段上下文拆分，避免用户在交互确认过程中触发超时。
 

@@ -45,7 +45,8 @@ diff:
 
   # Schema 加载超时时间（支持格式：30s, 2m, 1h）
   # 默认值：30s
-  timeout: 30s
+  # 注意：此配置项未绑定到 Viper，YAML 中的值不会生效，需通过 CLI --timeout 设置
+  # timeout: 30s
 
 # 输出选项
 output:

@@ -27,10 +27,10 @@
 - 🛡️ **安全保护**：DROP 操作默认拦截告警，可选 `--unsafe-drop` 放行
 - 🎯 **语义归一化**：同义类型名（如 `int4` → `integer`）自动映射，减少误报
 - 🚀 **DAG 拓扑排序**：基于 Kahn 算法对有向无环图进行排序，保证执行顺序正确且高效
-|- ⚙️ **三阶段执行计划**：自动将操作分为 Pre-deploy（创建）、Deploy（修改）、Post-deploy（删除）三个阶段，覆盖全部 34 种操作
-- 🔧 **可扩展解析器**：基于 HandlerRegistry + 访问者模式的 OCP 设计，已支持 9 种 DDL，新增 DDL 只需实现 Handler + Mutation 并注册
-|- 🧩 **丰富的差异检测**：支持表、列、类型、默认值、非空约束、索引内容、约束、视图、物化视图、序列、扩展的全量对比，共 34 种差异操作
-|- 📊 **多格式输出**：支持 SQL 和 JSON 两种输出格式
+- ⚙️ **三阶段执行计划**：自动将操作分为 Pre-deploy（创建）、Deploy（修改）、Post-deploy（删除）三个阶段，覆盖全部 34 种操作
+- 🔧 **可扩展解析器**：基于 HandlerRegistry + 访问者模式的 OCP 设计，已支持 10 种 DDL，新增 DDL 只需实现 Handler + Mutation 并注册
+- 🧩 **丰富的差异检测**：支持表、列、类型、默认值、非空约束、索引内容、约束、视图、物化视图、序列、扩展的全量对比，共 34 种差异操作
+- 📊 **多格式输出**：支持 SQL 和 JSON 两种输出格式
 - ⏱️ **超时控制**：支持 `--timeout` 参数控制 Schema 加载超时时间
 - 📁 **目录作为 Schema 来源**：支持递归扫描目录下所有 `.sql` 文件，合并为完整 schema 参与 diff
 - 🔌 **多种连接方式**：支持连接字符串、环境变量、`pg_service.conf`、`.pgpass` 等 PostgreSQL 标准连接方式
@@ -157,7 +157,8 @@ Validation passed: target schema matches expected state
 | `--execute` | push | 跳过交互确认直接执行（生产环境慎用） | `false` |
 | `--no-verify` | push | 跳过执行后校验 | `false` |
 | `-c, --config` | 全局 | 指定配置文件路径 | `~/.migra.yaml` 或 `./migra.yaml` |
-| `-v, --verbose` | 全局 | 输出详细日志 | `false` |
+| `-V, --verbose` | 全局 | 输出详细日志 | `false` |
+| `-v, --version` | 全局 | 输出版本信息并退出 | `false` |
 
 ### 配置文件
 
@@ -174,7 +175,7 @@ export MIGRA_DIFF_SCHEMAS="public,auth"
 export MIGRA_DATABASE_SOURCE="postgres://localhost/db1"
 export MIGRA_DATABASE_TARGET="postgres://localhost/db2"
 
-# .env 文件（通过 godotenv 自动加载）
+# .env 文件（需手动 source 或使用 direnv）
 ```
 
 详细配置说明请参考 [docs/configuration.md](docs/configuration.md)。
@@ -359,8 +360,6 @@ graph TD
 │   ├── main.go             # 根命令与配置初始化
 │   ├── diff.go             # diff 子命令
 │   ├── diff_runner.go      # 差异计算流水线编排
-│   ├── push.go             # push 子命令
-│   ├── push.go             # push 子命令（已迁移到 internal/app/push/）
 │   └── *_test.go           # 各层测试
 ├── internal/
 │   ├── app/                # 应用层服务（依赖注入编排）
@@ -373,7 +372,11 @@ graph TD
 │   ├── diff/               # 差异比较引擎（34 种 Operation）
 │   ├── plan/               # 执行计划与拓扑排序（DAG）
 │   ├── render/             # SQL / JSON 渲染器（多态分发）
-│   └── testutil/           # 测试工具集
+│   ├── errors/             # 错误处理（结构化错误 + 哨兵错误）
+│   ├── util/               # 工具函数（QuoteIdentifier 等）
+│   ├── indexdef/           # 索引定义解析
+│   ├── version/            # 版本信息
+│   ├── testutil/           # 测试工具集
 ├── testdata/               # 单元测试与集成测试用例
 ├── docs/                   # 架构设计、配置文档、DDL 矩阵
 ├── examples/               # 配置与环境变量示例

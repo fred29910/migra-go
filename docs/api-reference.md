@@ -86,7 +86,7 @@ type Engine interface {
 
 ```go
 type SQLEngine interface {
-    RenderAll(ops []Operation) string
+    RenderAll(ctx context.Context, ops []diff.Operation) (string, error)
 }
 ```
 
@@ -104,9 +104,9 @@ SQL 渲染引擎接口，将所有 Operation 渲染为完整 SQL 输出。
 
 ```go
 func NewRenderer() *Renderer
-func (r *Renderer) RenderOutput(ops []Operation, format string) (string, error)
-func (r *Renderer) RenderAll(ops []Operation) string
-func (r *Renderer) Render(op Operation) string
+func (r *Renderer) RenderOutput(ctx context.Context, ops []diff.Operation, format string) (string, error)
+func (r *Renderer) RenderAll(ctx context.Context, ops []diff.Operation) (string, error)
+func (r *Renderer) Render(op diff.Operation) string
 ```
 
 渲染器，将 Operation 渲染为 SQL 或 JSON。`Render` 方法通过 `op.RenderString(r)` 多态分发。
@@ -117,7 +117,7 @@ func (r *Renderer) Render(op Operation) string
 
 ```go
 func NewDiffer() *Differ
-func (d *differ) Diff(source, target *model.Schema) ([]Operation, []string)
+func (d *Differ) Diff(ctx context.Context, source, target *model.Schema) ([]Operation, []string)
 ```
 
 差异比较器，比较两个 Schema 并返回 Operation 列表。
@@ -126,7 +126,7 @@ func (d *differ) Diff(source, target *model.Schema) ([]Operation, []string)
 
 ```go
 func NewPlanner(unsafeDrop bool) *Planner
-func (p *Planner) Plan(ops []Operation) map[Stage][]Operation
+func (p *Planner) Plan(ctx context.Context, ops []diff.Operation) (map[Stage][]diff.Operation, error)
 ```
 
 执行计划器，将 Operation 分组为三个阶段。
@@ -134,7 +134,7 @@ func (p *Planner) Plan(ops []Operation) map[Stage][]Operation
 ### plan.TopoSort
 
 ```go
-func TopoSort(ops []Operation) ([]diff.Operation, error)
+func TopoSort(ctx context.Context, ops []diff.Operation) ([]diff.Operation, error)
 ```
 
 基于 Kahn 算法的拓扑排序，保证依赖关系正确。
@@ -144,7 +144,8 @@ func TopoSort(ops []Operation) ([]diff.Operation, error)
 ```go
 type Loader interface {
     Match(source string) bool
-    Load(ctx context.Context, source string, schemas []string, strict bool) (*model.Schema, error)
+    Load(ctx context.Context, source string, opt LoadOptions) (*model.Schema, []error, error)
+    Priority() LoaderPriority
 }
 ```
 
@@ -205,7 +206,7 @@ var (
 ### app.Config
 
 ```go
-type Config struct {
+type DiffConfig struct {
     Source     string
     Target     string
     Schemas    []string
@@ -252,7 +253,7 @@ func main() {
     target := &model.Schema{}
 
     differ := diff.NewDiffer()
-    operations, warnings := differ.Diff(source, target)
+    operations, warnings := differ.Diff(context.Background(), source, target)
 
     for _, op := range operations {
         fmt.Printf("Operation: %s\n", op.Kind())
