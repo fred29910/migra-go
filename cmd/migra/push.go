@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/fred29910/migra-go/internal/app"
+	"github.com/fred29910/migra-go/internal/app/push"
 	"github.com/fred29910/migra-go/internal/diff"
 	"github.com/fred29910/migra-go/internal/render"
-	"github.com/fred29910/migra-go/internal/app/push"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

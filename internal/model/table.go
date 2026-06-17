@@ -147,5 +147,3 @@ func (t *Table) HasConstraint(name string) bool {
 func (t *Table) ConstraintNames() []string {
 	return sortedKeys(t.Constraints)
 }
-
-

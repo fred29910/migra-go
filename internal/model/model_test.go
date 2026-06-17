@@ -535,7 +535,7 @@ func TestIndex_Clone(t *testing.T) {
 	idx := &Index{
 		Name: "idx_users_email", Table: "users", Columns: []string{"email"},
 		Elements: []IndexElem{{Name: "email", Ordering: "ASC"}},
-		Unique: true, Method: "btree", WhereClause: "active = true",
+		Unique:   true, Method: "btree", WhereClause: "active = true",
 		Definition: "CREATE UNIQUE INDEX ...", Concurrent: true, IfNotExists: true,
 	}
 	c := idx.Clone()
