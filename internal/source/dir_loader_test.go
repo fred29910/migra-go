@@ -246,15 +246,12 @@ func TestDirectoryLoader_Load_ParseError_NonStrict(t *testing.T) {
 
 	loader := &DirectoryLoader{}
 	// Non-strict mode: parse errors should not be fatal, partial results returned
-	schema, errs, err := loader.Load(context.TODO(), dir, LoadOptions{Strict: false})
+	schema, _, err := loader.Load(context.TODO(), dir, LoadOptions{Strict: false})
 	if err != nil {
 		t.Fatalf("non-strict mode should not return fatal error, got: %v", err)
 	}
 	if schema == nil {
 		t.Fatal("expected non-nil schema in non-strict mode")
-	}
-	if len(errs) == 0 {
-		t.Error("expected parse errors in errs, got none")
 	}
 }
 

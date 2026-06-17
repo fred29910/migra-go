@@ -14,10 +14,23 @@ type LoadOptions struct {
 	Strict bool
 }
 
+// LoaderPriority defines priority levels for loader ordering.
+// Higher priority loaders are matched first.
+type LoaderPriority int
+
+const (
+	LoaderPriorityLowest  LoaderPriority = 10
+	LoaderPriorityDefault LoaderPriority = 50
+	LoaderPriorityHighest LoaderPriority = 100
+)
+
 // Loader defines the interface for loading schema sources.
 type Loader interface {
 	// Match returns true if this loader can handle the given source.
 	Match(source string) bool
 	// Load loads schema from the given source with options.
 	Load(ctx context.Context, source string, opt LoadOptions) (*model.Schema, []error, error)
+	// Priority returns the loader's priority level.
+	// Higher priority loaders are matched first during registry dispatch.
+	Priority() LoaderPriority
 }

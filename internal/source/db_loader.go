@@ -21,6 +21,9 @@ func (l *DBLoader) Match(source string) bool {
 		strings.HasPrefix(lowerSource, "pg://")
 }
 
+// Priority returns the highest priority level so DB connections are matched first.
+func (l *DBLoader) Priority() LoaderPriority { return LoaderPriorityHighest }
+
 // Load loads schema from a database connection string.
 // Returns the loaded schema, any parsing errors, and any fatal error.
 func (l *DBLoader) Load(ctx context.Context, source string, opt LoadOptions) (*model.Schema, []error, error) {

@@ -1,6 +1,7 @@
 package render
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/fred29910/migra-go/internal/diff"
@@ -14,10 +15,12 @@ type OpInfo struct {
 	SQL         string `json:"sql"`
 }
 
-func renderJSON(ops []diff.Operation) (string, error) {
-	r := NewRenderer()
+func (r *Renderer) renderJSON(ctx context.Context, ops []diff.Operation) (string, error) {
 	infos := make([]OpInfo, len(ops))
 	for i, op := range ops {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
 		obj := op.ObjectKey()
 		infos[i] = OpInfo{
 			Kind:        string(op.Kind()),

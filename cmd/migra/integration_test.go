@@ -38,7 +38,7 @@ func TestIntegrationDiffRender(t *testing.T) {
 
 	// Run diff
 	d := diff.NewDiffer()
-	ops, _ := d.Diff(source, target)
+	ops, _ := d.Diff(context.Background(), source, target)
 
 	// Verify operations
 	if len(ops) == 0 {
@@ -82,7 +82,10 @@ func TestIntegrationDiffRender(t *testing.T) {
 
 	// Render to SQL
 	r := render.NewRenderer()
-	sql := r.RenderAll(ops)
+	sql, err := r.RenderAll(context.Background(), ops)
+	if err != nil {
+		t.Fatalf("RenderAll failed: %v", err)
+	}
 
 	if sql == "" || sql == "-- No changes detected" {
 		t.Fatal("expected SQL output, got empty")
@@ -99,7 +102,7 @@ func TestIntegrationDiffRender(t *testing.T) {
 	}
 
 	// Test JSON rendering
-	jsonStr, err := render.NewRenderer().RenderOutput(ops, "json")
+	jsonStr, err := render.NewRenderer().RenderOutput(context.Background(), ops, "json")
 	if err != nil {
 		t.Errorf("RenderJSON failed: %v", err)
 	} else {
@@ -130,7 +133,7 @@ func TestIntegrationEnumType(t *testing.T) {
 
 	// Run diff
 	d := diff.NewDiffer()
-	ops, _ := d.Diff(source, target)
+	ops, _ := d.Diff(context.Background(), source, target)
 
 	// Should detect no changes (enum labels order matters, but we added a new one)
 	// Actually, this should detect that the enum type changed
@@ -141,7 +144,7 @@ func TestIntegrationEnumType(t *testing.T) {
 
 	// Render to SQL
 	r := render.NewRenderer()
-	sql := r.RenderAll(ops)
+	sql, _ := r.RenderAll(context.Background(), ops)
 	t.Logf("Enum SQL:\n%s", sql)
 }
 
@@ -161,7 +164,7 @@ func TestIntegrationDAGSort(t *testing.T) {
 	}
 
 	// Sort using DAG (from plan package)
-	sorted, err := plan.TopoSort(ops)
+	sorted, err := plan.TopoSort(context.Background(), ops)
 	if err != nil {
 		t.Fatalf("TopoSort failed: %v", err)
 	}
@@ -185,7 +188,7 @@ func TestIntegrationDAGSort(t *testing.T) {
 
 // TestExampleSQLFilesDiffIncludesEnumAndConstraints tests end-to-end diff of example SQL files
 func TestExampleSQLFilesDiffIncludesEnumAndConstraints(t *testing.T) {
-	out, warns, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+	out, warns, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.DiffConfig{
 		Source:     "../../testdata/example_source.sql",
 		Target:     "../../testdata/example_target.sql",
 		Schemas:    []string{"public"},
@@ -275,7 +278,7 @@ func TestDirectoryVsDirectory_Diff(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.DiffConfig{
 		Source:     sourceDir,
 		Target:     targetDir,
 		Schemas:    []string{"public"},
@@ -319,7 +322,7 @@ func TestDirectoryVsFile_Diff(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.DiffConfig{
 		Source:     sourceDir,
 		Target:     targetFile,
 		Schemas:    []string{"public"},
@@ -337,7 +340,7 @@ func TestDirectoryVsFile_Diff(t *testing.T) {
 }
 
 func TestRenameColumnDiff(t *testing.T) {
-	out, warns, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+	out, warns, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.DiffConfig{
 		Source:     "../../testdata/diff/rename_example/v1/schema.sql",
 		Target:     "../../testdata/diff/rename_example/v2/schema.sql",
 		Schemas:    []string{"public"},
@@ -363,7 +366,7 @@ func TestRenameColumnDiff(t *testing.T) {
 }
 
 func TestRenameColumnComplexDiff(t *testing.T) {
-	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.DiffConfig{
 		Source:     "../../testdata/diff/rename_complex/v1/schema.sql",
 		Target:     "../../testdata/diff/rename_complex/v2/schema.sql",
 		Schemas:    []string{"public"},
@@ -454,7 +457,7 @@ CREATE TABLE auth.permissions (
 		t.Fatal(err)
 	}
 
-	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.DiffConfig{
 		Source:     sourceDir,
 		Target:     targetDir,
 		Schemas:    []string{"public", "auth"},
@@ -482,7 +485,7 @@ CREATE TABLE auth.permissions (
 }
 
 func TestV3DirectoryDiff(t *testing.T) {
-	out, warns, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+	out, warns, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.DiffConfig{
 		Source:     "../../testdata/diff/v1/",
 		Target:     "../../testdata/diff/v2/",
 		Schemas:    []string{"public"},
@@ -510,7 +513,7 @@ func TestV3DirectoryDiff(t *testing.T) {
 }
 
 func TestV3UnsafeDropDiff_Safe(t *testing.T) {
-	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.DiffConfig{
 		Source:     "../../testdata/diff/v2/schema.sql",
 		Target:     "../../testdata/diff/v3/schema.sql",
 		Schemas:    []string{"public"},
@@ -534,7 +537,7 @@ func TestV3UnsafeDropDiff_Safe(t *testing.T) {
 }
 
 func TestV3UnsafeDropDiff_Unsafe(t *testing.T) {
-	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.DiffConfig{
 		Source:     "../../testdata/diff/v2/schema.sql",
 		Target:     "../../testdata/diff/v3/schema.sql",
 		Schemas:    []string{"public"},
@@ -558,7 +561,7 @@ func TestV3UnsafeDropDiff_Unsafe(t *testing.T) {
 }
 
 func TestNestedDirectoryDiff(t *testing.T) {
-	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.DiffConfig{
 		Source:     "../../testdata/diff/nested/",
 		Target:     "../../testdata/diff/nested_target/",
 		Schemas:    []string{"public"},
@@ -581,7 +584,7 @@ func TestNestedDirectoryDiff(t *testing.T) {
 }
 
 func TestIdentityColumnDiff(t *testing.T) {
-	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.DiffConfig{
 		Source:     "../../testdata/diff/identity_example/v1/schema.sql",
 		Target:     "../../testdata/diff/identity_example/v2/schema.sql",
 		Schemas:    []string{"public"},
@@ -602,7 +605,7 @@ func TestIdentityColumnDiff(t *testing.T) {
 }
 
 func TestCollateClauseDiff(t *testing.T) {
-	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.DiffConfig{
 		Source:     "../../testdata/diff/collate_example/v1/schema.sql",
 		Target:     "../../testdata/diff/collate_example/v2/schema.sql",
 		Schemas:    []string{"public"},
@@ -620,7 +623,7 @@ func TestCollateClauseDiff(t *testing.T) {
 }
 
 func TestObjectsDiff(t *testing.T) {
-	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.DiffConfig{
 		Source:     "../../testdata/diff/objects_example/v1/schema.sql",
 		Target:     "../../testdata/diff/objects_example/v2/schema.sql",
 		Schemas:    []string{"public"},
@@ -644,7 +647,7 @@ func TestObjectsDiff(t *testing.T) {
 }
 
 func TestV3ToV4Diff(t *testing.T) {
-	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.DiffConfig{
 		Source:     "../../testdata/diff/v3/schema.sql",
 		Target:     "../../testdata/diff/v4/schema.sql",
 		Schemas:    []string{"public"},
@@ -672,7 +675,7 @@ func TestV3ToV4Diff(t *testing.T) {
 }
 
 func TestMultiSchemaDirectoryDiffStatic(t *testing.T) {
-	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.Config{
+	out, _, err := app.NewDiffService(newDefaultDeps()).Run(context.Background(), app.DiffConfig{
 		Source:     "../../testdata/diff/multi_schema/v1/",
 		Target:     "../../testdata/diff/multi_schema/v2/",
 		Schemas:    []string{"public", "auth"},

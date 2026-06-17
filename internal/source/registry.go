@@ -3,6 +3,7 @@ package source
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/fred29910/migra-go/internal/errors"
 	"github.com/fred29910/migra-go/internal/model"
@@ -20,9 +21,13 @@ func NewRegistry() *Registry {
 	}
 }
 
-// Register adds a loader to the registry.
+// Register adds a loader to the registry and re-sorts all loaders by
+// priority (descending). Higher priority loaders are matched first.
 func (r *Registry) Register(loader Loader) {
 	r.loaders = append(r.loaders, loader)
+	sort.SliceStable(r.loaders, func(i, j int) bool {
+		return r.loaders[i].Priority() > r.loaders[j].Priority()
+	})
 }
 
 // Load finds a matching loader and delegates the load operation.

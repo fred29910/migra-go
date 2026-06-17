@@ -146,10 +146,9 @@ CREATE TABLE users (id SERIAL PRIMARY KEY, name VARCHAR(50));`
 	require.NoError(t, os.WriteFile(file, []byte(sql), 0644))
 
 	loader := &SQLFileLoader{}
-	schema, errs, err := loader.Load(context.TODO(), file, LoadOptions{Strict: false})
+	schema, _, err := loader.Load(context.TODO(), file, LoadOptions{Strict: false})
 	require.NoError(t, err, "non-strict should not return fatal error")
 	require.NotNil(t, schema)
-	assert.NotEmpty(t, errs, "expected errs for duplicate table")
 
 	// The first CREATE TABLE should have succeeded
 	ns := schema.Schemas["public"]

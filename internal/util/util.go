@@ -50,6 +50,11 @@ func NormalizeDataType(dt string) string {
 	dt = strings.TrimSpace(dt)
 	lower := strings.ToLower(dt)
 
+	if strings.HasSuffix(lower, "[]") {
+		base := strings.TrimSuffix(lower, "[]")
+		return NormalizeDataType(base) + "[]"
+	}
+
 	if m := charVaryingWithLenRe.FindStringSubmatch(lower); m != nil {
 		return "varchar(" + m[1] + ")"
 	}

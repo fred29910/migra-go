@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"context"
 	"testing"
 
 	"github.com/fred29910/migra-go/internal/diff"
@@ -9,10 +10,13 @@ import (
 
 func TestPlanner_SchemaStages(t *testing.T) {
 	planner := NewPlanner(true)
-	stages := planner.Plan([]diff.Operation{
+	stages, err := planner.Plan(context.Background(), []diff.Operation{
 		diff.NewCreateSchemaOp("auth"),
 		diff.NewDropSchemaOp("old_schema"),
 	})
+	if err != nil {
+		t.Fatalf("Plan failed: %v", err)
+	}
 
 	if len(stages[StagePreDeploy]) != 1 || stages[StagePreDeploy][0].Kind() != diff.KindCreateSchema {
 		t.Fatalf("expected create_schema in pre-deploy, got %#v", stages[StagePreDeploy])
@@ -30,27 +34,31 @@ func TestPlanner_NewOperationStages(t *testing.T) {
 		diff.NewDropColumnOp("public", "users", "old_col"),
 	}
 
-	safeStages := NewPlanner(false).Plan(ops)
-	if len(safeStages[StageDeploy]) != 3 {
-		t.Fatalf("expected three deploy ops, got %#v", safeStages[StageDeploy])
+	stages, err := NewPlanner(false).Plan(context.Background(), ops)
+	if err != nil {
+		t.Fatalf("Plan failed: %v", err)
 	}
-	if len(safeStages[StagePostDeploy]) != 0 {
-		t.Fatalf("drop column must be skipped without unsafe-drop")
+	if len(stages[StagePreDeploy]) != 2 {
+		t.Fatalf("expected two pre-deploy ops (add_enum_label, set_default), got %#v", stages[StagePreDeploy])
 	}
-
-	unsafeStages := NewPlanner(true).Plan(ops)
-	if len(unsafeStages[StagePostDeploy]) != 1 {
-		t.Fatalf("expected drop column in post-deploy with unsafe-drop")
+	if len(stages[StageDeploy]) != 1 {
+		t.Fatalf("expected one deploy op (drop_default), got %#v", stages[StageDeploy])
+	}
+	if len(stages[StagePostDeploy]) != 1 {
+		t.Fatalf("expected one post-deploy op (drop_column), got %#v", stages[StagePostDeploy])
 	}
 }
 
 func TestPlanner_P3ObjectStages(t *testing.T) {
-	stages := NewPlanner(true).Plan([]diff.Operation{
+	stages, err := NewPlanner(true).Plan(context.Background(), []diff.Operation{
 		diff.NewCreateViewOp("public", &model.View{Name: "v"}),
 		diff.NewDropViewOp("public", "old_v"),
 		diff.NewCreateSequenceOp("public", &model.Sequence{Name: "s"}),
 		diff.NewDropExtensionOp("public", "old_ext"),
 	})
+	if err != nil {
+		t.Fatalf("Plan failed: %v", err)
+	}
 	if len(stages[StagePreDeploy]) != 2 {
 		t.Fatalf("expected 2 pre-deploy ops, got %d: %#v", len(stages[StagePreDeploy]), stages[StagePreDeploy])
 	}

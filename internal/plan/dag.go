@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/fred29910/migra-go/internal/diff"
@@ -100,7 +101,7 @@ func (d *DAG) findNodeByObjectKey(key model.ObjectKey) *Node {
 }
 
 // GetExecutionOrder returns operations in topological order
-func (d *DAG) GetExecutionOrder() ([]diff.Operation, error) {
+func (d *DAG) GetExecutionOrder(ctx context.Context) ([]diff.Operation, error) {
 	// Kahn's algorithm for topological sort
 
 	// Calculate in-degree for each node
@@ -121,6 +122,9 @@ func (d *DAG) GetExecutionOrder() ([]diff.Operation, error) {
 
 	head := 0
 	for head < len(queue) {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		node := queue[head]
 		head++
 		result = append(result, node.Op)

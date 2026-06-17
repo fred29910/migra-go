@@ -19,7 +19,10 @@ type mockLoader struct {
 	loadSchema  *model.Schema
 	loadErrs    []error
 	loadErr     error
+	priority    LoaderPriority
 }
+
+func (m *mockLoader) Priority() LoaderPriority { return m.priority }
 
 func (m *mockLoader) Match(source string) bool {
 	m.matchCalled = true
@@ -160,4 +163,29 @@ func TestRegistry_Load_PassesOptions(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, schema)
+}
+
+func TestRegistry_PriorityOrdering(t *testing.T) {
+	r := NewRegistry()
+
+	lowPri := &mockLoader{
+		matchResult: true,
+		priority:    LoaderPriorityLowest,
+	}
+	highPri := &mockLoader{
+		matchResult: true,
+		priority:    LoaderPriorityHighest,
+	}
+
+	// Register low priority first, then high priority
+	r.Register(lowPri)
+	r.Register(highPri)
+
+	// High priority loader should be consulted first, even though it was
+	// registered second. If sorting works, highPri matches first and lowPri
+	// never gets called.
+	_, _, err := r.Load(context.TODO(), "test-source", LoadOptions{})
+	require.NoError(t, err)
+	assert.True(t, highPri.matchCalled, "high priority loader should have been consulted first")
+	assert.False(t, lowPri.matchCalled, "low priority loader should not have been consulted when a higher priority loader matched")
 }

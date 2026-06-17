@@ -1,6 +1,7 @@
 package render
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -254,7 +255,7 @@ func TestRenderOutput_UnsupportedFormat(t *testing.T) {
 	r := NewRenderer()
 	ops := []diff.Operation{diff.NewDropIndexOp("public", "idx_a")}
 
-	_, err := r.RenderOutput(ops, "yaml")
+	_, err := r.RenderOutput(context.Background(), ops, "yaml")
 	if err == nil {
 		t.Fatal("expected error for unsupported format")
 	}
@@ -265,13 +266,19 @@ func TestRenderOutput_UnsupportedFormat(t *testing.T) {
 
 func TestRenderAll_EmptyOps(t *testing.T) {
 	r := NewRenderer()
-	got := r.RenderAll(nil)
+	got, err := r.RenderAll(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("RenderAll failed: %v", err)
+	}
 	want := "-- No changes detected"
 	if got != want {
 		t.Errorf("expected %q, got %q", want, got)
 	}
 
-	got = r.RenderAll([]diff.Operation{})
+	got, err = r.RenderAll(context.Background(), []diff.Operation{})
+	if err != nil {
+		t.Fatalf("RenderAll failed: %v", err)
+	}
 	if got != want {
 		t.Errorf("expected %q for empty slice, got %q", want, got)
 	}
@@ -283,7 +290,10 @@ func TestRenderAll_MultipleOps(t *testing.T) {
 		diff.NewDropIndexOp("public", "idx_a"),
 		diff.NewDropIndexOp("public", "idx_b"),
 	}
-	got := r.RenderAll(ops)
+	got, err := r.RenderAll(context.Background(), ops)
+	if err != nil {
+		t.Fatalf("RenderAll failed: %v", err)
+	}
 
 	if !strings.Contains(got, "-- Begin Diff") {
 		t.Errorf("expected '-- Begin Diff' in output, got:\n%s", got)
@@ -308,7 +318,10 @@ func TestRenderAll_WithEmptyRenderResult(t *testing.T) {
 	})
 	// This should be skipped in RenderAll
 	ops := []diff.Operation{op}
-	got := r.RenderAll(ops)
+	got, err := r.RenderAll(context.Background(), ops)
+	if err != nil {
+		t.Fatalf("RenderAll failed: %v", err)
+	}
 
 	// Should return "No changes detected" since the constraint renders to empty
 	want := "-- No changes detected"
@@ -724,7 +737,7 @@ func TestRenderJSON_MultipleOps(t *testing.T) {
 		diff.NewDropTableOp("public", "old_table"),
 	}
 
-	json, err := r.RenderOutput(ops, "json")
+	json, err := r.RenderOutput(context.Background(), ops, "json")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

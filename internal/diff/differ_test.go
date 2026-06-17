@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"context"
 	"testing"
 
 	"github.com/fred29910/migra-go/internal/model"
@@ -14,7 +15,7 @@ func TestDiffer_DiffNoSharedState(t *testing.T) {
 	tgt := model.NewSchema()
 	tgt.GetOrCreateNamespace("public")
 	for i := 0; i < 20; i++ {
-		ops, _ := d.Diff(src, tgt)
+		ops, _ := d.Diff(context.Background(), src, tgt)
 		if len(ops) != 1 || ops[0].Kind() != KindCreateSchema {
 			t.Fatalf("expected 1 CreateSchemaOp, got %d ops: %#v", len(ops), ops)
 		}
@@ -38,7 +39,7 @@ func TestDiffer_EnumLabelAppendDefaultChangeAndDropColumn(t *testing.T) {
 	targetTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: false, DefaultExpr: &defaultExpr})
 	targetNs.Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(source, target)
+	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %#v", warnings)
 	}
@@ -80,7 +81,7 @@ func TestDiffer_DetectsSameNameConstraintContentChange(t *testing.T) {
 	}
 	targetNs.Tables["comments"] = targetTable
 
-	ops, _ := NewDiffer().Diff(source, target)
+	ops, _ := NewDiffer().Diff(context.Background(), source, target)
 	var hasDrop, hasAdd bool
 	for _, op := range ops {
 		switch op.Kind() {
@@ -108,7 +109,7 @@ func TestDiffer_DetectsColumnCollationChange(t *testing.T) {
 	targetTable.AddColumn(&model.Column{Name: "name", DataType: "text", IsNullable: true, Collation: "en_US.UTF-8"})
 	targetNs.Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(source, target)
+	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %#v", warnings)
 	}
@@ -147,7 +148,7 @@ func TestDiffer_DetectsColumnCollationRemoval(t *testing.T) {
 	targetTable.AddColumn(&model.Column{Name: "name", DataType: "text", IsNullable: true, Collation: ""})
 	targetNs.Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(source, target)
+	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %#v", warnings)
 	}
@@ -183,7 +184,7 @@ func TestDiffer_NoCollationDifferenceWhenSame(t *testing.T) {
 	targetTable.AddColumn(&model.Column{Name: "name", DataType: "text", IsNullable: true, Collation: "en_US.UTF-8"})
 	targetNs.Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(source, target)
+	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %#v", warnings)
 	}
@@ -201,7 +202,7 @@ func TestDiffer_DropSchema(t *testing.T) {
 	target := model.NewSchema()
 	target.GetOrCreateNamespace("public")
 
-	ops, warnings := NewDiffer().Diff(source, target)
+	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
 	require.Empty(t, warnings)
 
 	found := false
@@ -229,7 +230,7 @@ func TestDiffer_CreateSchemaOp(t *testing.T) {
 	authNs := target.GetOrCreateNamespace("auth")
 	authNs.Tables["roles"] = model.NewTable("auth", "roles")
 
-	ops, warnings := NewDiffer().Diff(source, target)
+	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
 
 	for _, w := range warnings {
 		t.Logf("warning: %s", w)
@@ -286,7 +287,7 @@ func TestDiffer_DetectsIdentityKindChange(t *testing.T) {
 	targetTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: true, IsIdentity: true, IdentityKind: "BY DEFAULT"})
 	targetNs.Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(source, target)
+	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %#v", warnings)
 	}
@@ -325,7 +326,7 @@ func TestDiffer_DetectsIdentityDrop(t *testing.T) {
 	targetTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: true, IsIdentity: false})
 	targetNs.Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(source, target)
+	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %#v", warnings)
 	}
@@ -361,7 +362,7 @@ func TestDiffer_NoIdentityDifferenceWhenSame(t *testing.T) {
 	targetTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: true, IsIdentity: true, IdentityKind: "ALWAYS"})
 	targetNs.Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(source, target)
+	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %#v", warnings)
 	}
@@ -387,7 +388,7 @@ func TestDiffer_IdentityAddUsesAddIdentityOp(t *testing.T) {
 	})
 	target.GetOrCreateNamespace("public").Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(source, target)
+	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
 	require.Empty(t, warnings)
 	require.Len(t, ops, 1)
 	_, ok := ops[0].(*AddIdentityOp)
@@ -407,7 +408,7 @@ func TestDiffer_NoIdentityDifferenceWhenBothFalse(t *testing.T) {
 	targetTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: true, IsIdentity: false})
 	targetNs.Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(source, target)
+	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %#v", warnings)
 	}

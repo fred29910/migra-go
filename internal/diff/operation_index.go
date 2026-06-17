@@ -104,7 +104,7 @@ func NewDropIndexOp(schema, name string) *DropIndexOp {
 
 // IsDestructive returns whether the operation is destructive.
 func (op *DropIndexOp) IsDestructive() bool {
-	return false
+	return true
 }
 
 // RenderString renders the operation as a SQL string.

@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -34,7 +35,7 @@ func BenchmarkDiffSmall(b *testing.B) {
 	d := NewDiffer()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		d.Diff(source, target)
+		d.Diff(context.Background(), source, target)
 	}
 }
 
@@ -71,7 +72,7 @@ func BenchmarkDiffLarge(b *testing.B) {
 	d := NewDiffer()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		d.Diff(source, target)
+		d.Diff(context.Background(), source, target)
 	}
 }
 
@@ -118,7 +119,7 @@ func BenchmarkDiffWithChanges(b *testing.B) {
 	d := NewDiffer()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		d.Diff(source, target)
+		d.Diff(context.Background(), source, target)
 	}
 }
 
@@ -168,7 +169,7 @@ func BenchmarkRenameDetection(b *testing.B) {
 			d := NewDiffer()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				d.Diff(source, target)
+				d.Diff(context.Background(), source, target)
 			}
 		})
 	}
@@ -232,7 +233,7 @@ func BenchmarkConstraintComparison(b *testing.B) {
 			d := NewDiffer()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				d.Diff(source, target)
+				d.Diff(context.Background(), source, target)
 			}
 		})
 	}
@@ -295,7 +296,7 @@ func BenchmarkManyTables(b *testing.B) {
 			d := NewDiffer()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				d.Diff(source, target)
+				d.Diff(context.Background(), source, target)
 			}
 		})
 	}

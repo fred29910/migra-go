@@ -28,8 +28,6 @@ func TestParseError_Error(t *testing.T) {
 func TestNewParser_CreatesFunctionalParser(t *testing.T) {
 	p := NewParser()
 	require.NotNil(t, p)
-	require.NotNil(t, p.schema)
-	require.NotNil(t, p.errors)
 	require.NotNil(t, p.applier)
 	require.NotNil(t, p.registry)
 }
@@ -43,60 +41,30 @@ func TestNewParserWith_NonNilValues(t *testing.T) {
 	assert.Equal(t, applier, p.applier)
 }
 
-func TestErrors_ReturnsDefensiveCopy(t *testing.T) {
-	p := NewParser()
-	_, _ = p.ParseSQL("SELECT 1;") // triggers an error
-
-	errs := p.Errors()
-	require.Len(t, errs, 1)
-
-	// Modifying the returned slice should not affect the parser
-	errs[0] = nil
-	assert.Len(t, p.Errors(), 1)
-	assert.NotNil(t, p.Errors()[0])
-}
-
-func TestErrors_EmptyWhenNoErrors(t *testing.T) {
-	p := NewParser()
-	_, err := p.ParseSQL("CREATE TABLE t (id integer);")
-	require.NoError(t, err)
-	assert.Empty(t, p.Errors())
-}
-
 // ─── getStatementSnippet tests ─────────────────────────────────────
 
 func TestGetStatementSnippet_NormalPosition(t *testing.T) {
-	p := NewParser()
-	p.sql = "CREATE TABLE users (id integer);"
-	snippet := p.getStatementSnippet(0)
+	snippet := getStatementSnippet("CREATE TABLE users (id integer);", 0)
 	assert.Contains(t, snippet, "CREATE TABLE")
 }
 
 func TestGetStatementSnippet_PositionBeyondEnd(t *testing.T) {
-	p := NewParser()
-	p.sql = "short"
-	snippet := p.getStatementSnippet(100)
+	snippet := getStatementSnippet("short", 100)
 	assert.Equal(t, "", snippet)
 }
 
 func TestGetStatementSnippet_NegativePosition(t *testing.T) {
-	p := NewParser()
-	p.sql = "CREATE TABLE t (id integer);"
-	snippet := p.getStatementSnippet(-1)
+	snippet := getStatementSnippet("CREATE TABLE t (id integer);", -1)
 	assert.Equal(t, "", snippet)
 }
 
 func TestGetStatementSnippet_Extracts100Chars(t *testing.T) {
-	p := NewParser()
-	p.sql = "CREATE TABLE very_long_table_name_with_many_characters (id integer, name varchar(255), description text, extra_column bigint);"
-	snippet := p.getStatementSnippet(0)
+	snippet := getStatementSnippet("CREATE TABLE very_long_table_name_with_many_characters (id integer, name varchar(255), description text, extra_column bigint);", 0)
 	assert.LessOrEqual(t, len(snippet), 100)
 }
 
 func TestGetStatementSnippet_PositionNearEnd(t *testing.T) {
-	p := NewParser()
-	p.sql = "ABCDEFGHIJ" // 10 chars
-	snippet := p.getStatementSnippet(5)
+	snippet := getStatementSnippet("ABCDEFGHIJ", 5)
 	assert.Equal(t, "FGHIJ", snippet)
 }
 
@@ -1463,8 +1431,8 @@ func TestCreateTableHandler_DefaultFuncExpr(t *testing.T) {
 
 func TestVisitNode_UnsupportedStatement(t *testing.T) {
 	p := NewParser()
-	p.sql = "VACUUM users;"
-	err := p.visitNode(&pg_query.Node{Node: &pg_query.Node_VacuumStmt{}}, 0)
+	schema := model.NewSchema()
+	err := p.visitNode(schema, &pg_query.Node{Node: &pg_query.Node_VacuumStmt{}}, 0, "VACUUM users;")
 	require.Error(t, err)
 	parseErr, ok := err.(*ParseError)
 	require.True(t, ok)
@@ -1480,7 +1448,8 @@ func TestVisitNode_HandlerReturnsError(t *testing.T) {
 		CreateStmt: nil,
 	}}
 	p := NewParserWith(registry, nil)
-	err := p.visitNode(node, 0)
+	schema := model.NewSchema()
+	err := p.visitNode(schema, node, 0, "")
 	require.Error(t, err)
 }
 

@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"context"
 	"testing"
 
 	"github.com/fred29910/migra-go/internal/model"
@@ -34,7 +35,7 @@ func TestDiffIndex_ContentChange(t *testing.T) {
 	ns2.Tables["users"] = targetTable
 
 	d := NewDiffer()
-	ops, _ := d.Diff(sourceSchema, targetSchema)
+	ops, _ := d.Diff(context.Background(), sourceSchema, targetSchema)
 
 	// Should detect change and generate DROP + CREATE
 	foundDrop := false
@@ -85,7 +86,7 @@ func TestDiffIndex_SameContent(t *testing.T) {
 	ns2.Tables["users"] = targetTable
 
 	d := NewDiffer()
-	ops, _ := d.Diff(sourceSchema, targetSchema)
+	ops, _ := d.Diff(context.Background(), sourceSchema, targetSchema)
 
 	// Should NOT generate any index operations
 	for _, op := range ops {
@@ -122,7 +123,7 @@ func TestDiffIndex_ExpressionChange(t *testing.T) {
 	ns2.Tables["users"] = targetTable
 
 	d := NewDiffer()
-	ops, _ := d.Diff(sourceSchema, targetSchema)
+	ops, _ := d.Diff(context.Background(), sourceSchema, targetSchema)
 
 	// Should detect change
 	foundDrop := false
@@ -161,7 +162,7 @@ func TestDiffIndex_CollationChange(t *testing.T) {
 	}
 	target.GetOrCreateNamespace("public").Tables["users"] = targetTable
 
-	ops, _ := NewDiffer().Diff(source, target)
+	ops, _ := NewDiffer().Diff(context.Background(), source, target)
 	var foundDrop, foundCreate bool
 	for _, op := range ops {
 		if _, ok := op.(*DropIndexOp); ok {

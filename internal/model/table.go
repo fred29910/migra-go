@@ -93,3 +93,59 @@ func (t *Table) RemoveColumn(name string) {
 	}
 	t.Columns = t.Columns[:last]
 }
+
+// --- Table accessor methods ---
+
+// HasColumn returns true if a column with the given name exists.
+func (t *Table) HasColumn(name string) bool {
+	_, exists := t.ColumnByName[name]
+	return exists
+}
+
+// ColumnNames returns all column names in order (matching Columns slice order).
+func (t *Table) ColumnNames() []string {
+	names := make([]string, len(t.Columns))
+	for i, col := range t.Columns {
+		names[i] = col.Name
+	}
+	return names
+}
+
+// ColumnCount returns the number of columns.
+func (t *Table) ColumnCount() int {
+	return len(t.Columns)
+}
+
+// GetIndex returns the index by name, or nil if not found.
+func (t *Table) GetIndex(name string) *Index {
+	return t.Indexes[name]
+}
+
+// HasIndex returns true if an index with the given name exists.
+func (t *Table) HasIndex(name string) bool {
+	_, exists := t.Indexes[name]
+	return exists
+}
+
+// IndexNames returns all index names in sorted order.
+func (t *Table) IndexNames() []string {
+	return sortedKeys(t.Indexes)
+}
+
+// GetConstraint returns the constraint by name, or nil if not found.
+func (t *Table) GetConstraint(name string) *Constraint {
+	return t.Constraints[name]
+}
+
+// HasConstraint returns true if a constraint with the given name exists.
+func (t *Table) HasConstraint(name string) bool {
+	_, exists := t.Constraints[name]
+	return exists
+}
+
+// ConstraintNames returns all constraint names in sorted order.
+func (t *Table) ConstraintNames() []string {
+	return sortedKeys(t.Constraints)
+}
+
+

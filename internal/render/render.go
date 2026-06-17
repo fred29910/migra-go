@@ -1,6 +1,7 @@
 package render
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -10,7 +11,7 @@ import (
 // SQLEngine defines the interface for SQL rendering.
 // Implementations can render diff operations into SQL statements.
 type SQLEngine interface {
-	RenderAll(ops []diff.Operation) string
+	RenderAll(ctx context.Context, ops []diff.Operation) (string, error)
 }
 
 var _ SQLEngine = (*Renderer)(nil)
@@ -33,21 +34,24 @@ func (r *Renderer) UseIfExists() bool {
 }
 
 // RenderOutput renders all operations in the specified format ("sql" or "json").
-func (r *Renderer) RenderOutput(ops []diff.Operation, format string) (string, error) {
+func (r *Renderer) RenderOutput(ctx context.Context, ops []diff.Operation, format string) (string, error) {
 	switch format {
 	case "sql":
-		return r.RenderAll(ops), nil
+		return r.RenderAll(ctx, ops)
 	case "json":
-		return renderJSON(ops)
+		return r.renderJSON(ctx, ops)
 	default:
 		return "", fmt.Errorf("unsupported format: %s (allowed: sql, json)", format)
 	}
 }
 
 // RenderAll renders all operations as a single SQL string.
-func (r *Renderer) RenderAll(ops []diff.Operation) string {
+func (r *Renderer) RenderAll(ctx context.Context, ops []diff.Operation) (string, error) {
 	var b strings.Builder
 	for _, op := range ops {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
 		sql := r.Render(op)
 		if sql == "" {
 			continue
@@ -61,10 +65,10 @@ func (r *Renderer) RenderAll(ops []diff.Operation) string {
 	}
 
 	if b.Len() == 0 {
-		return "-- No changes detected"
+		return "-- No changes detected", nil
 	}
 	b.WriteString("\n-- End Diff")
-	return b.String()
+	return b.String(), nil
 }
 
 // Render renders a single operation as SQL by delegating to the operation's RenderString method.
