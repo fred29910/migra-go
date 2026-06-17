@@ -118,14 +118,17 @@ func BuildExecutionPlan(ctx context.Context, ops []diff.Operation, unsafeDrop bo
 // ComputeDiff performs the full diff computation between source and target schemas,
 // including normalization, filtering, and execution plan building.
 func ComputeDiff(ctx context.Context, source, target *model.Schema, cfg DiffConfig) ([]diff.Operation, []string, error) {
-	if err := NormalizeSchemas(source, target); err != nil {
+	sourceClone := source.Clone()
+	targetClone := target.Clone()
+
+	if err := NormalizeSchemas(sourceClone, targetClone); err != nil {
 		return nil, nil, err
 	}
 
-	filterWarnings := FilterNamespaces(source, target, cfg.Schemas)
+	filterWarnings := FilterNamespaces(sourceClone, targetClone, cfg.Schemas)
 
 	differ := diff.NewDiffer()
-	operations, warnings := differ.Diff(ctx, source, target)
+	operations, warnings := differ.Diff(ctx, sourceClone, targetClone)
 	warnings = append(warnings, filterWarnings...)
 
 	filteredOps, filterWarnings2 := FilterDestructiveOps(operations, cfg.UnsafeDrop)
