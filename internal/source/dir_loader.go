@@ -90,7 +90,12 @@ func (l *DirectoryLoader) Load(ctx context.Context, source string, opt LoadOptio
 		return nil, nil, fmt.Errorf("failed to parse directory contents: %w", parseErr)
 	}
 
-	return schema, nil, nil
+	// 始终返回解析警告，不吞掉
+	var warnings []error
+	if parseErr != nil {
+		warnings = []error{parseErr}
+	}
+	return schema, warnings, nil
 }
 
 // stripFileScheme removes the "file://" prefix from s if present.

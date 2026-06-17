@@ -40,5 +40,10 @@ func (l *SQLFileLoader) Load(ctx context.Context, source string, opt LoadOptions
 	if parseErr != nil && opt.Strict {
 		return nil, nil, parseErr
 	}
-	return schema, nil, nil
+	// 始终返回解析警告，不吞掉
+	var warnings []error
+	if parseErr != nil {
+		warnings = []error{parseErr}
+	}
+	return schema, warnings, nil
 }
