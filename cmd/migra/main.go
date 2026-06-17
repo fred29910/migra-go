@@ -18,6 +18,14 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print version information",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(version.Info())
+	},
+}
+
 func init() {
 	cobra.OnInitialize(initConfig)
 
@@ -35,6 +43,8 @@ func init() {
 			os.Exit(0)
 		}
 	}
+
+	rootCmd.AddCommand(versionCmd)
 }
 
 func setupFlags(cmd *cobra.Command) error {
