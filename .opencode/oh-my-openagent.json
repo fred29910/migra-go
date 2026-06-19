@@ -33,16 +33,20 @@
       ]
     },
     "oracle": {
-      "model": "zenmux/moonshotai/kimi-k2.7-code-free",
-      "variant": "high",
+      "model": "kilo/poolside/laguna-m.1:free",
+      "variant": "max",
       "fallback_models": [
-        {
-          "model": "opencode/deepseek-v4-flash-free",
-          "variant": "high"
-        },
         {
           "model": "google/antigravity-claude-sonnet-4-6",
           "variant": "max"
+        },
+        {
+          "model": "zenmux/moonshotai/kimi-k2.7-code-free",
+          "variant": "high"
+        },
+        {
+          "model": "opencode/deepseek-v4-flash-free",
+          "variant": "high"
         },
         {
           "model": "google/gemini-3.1-pro-preview-customtools",
@@ -62,10 +66,10 @@
       ]
     },
     "explore": {
-      "model": "zenmux/z-ai/glm-4.7-flash-free",
+      "model": "opencode/mimo-v2.5-free",
       "fallback_models": [
         {
-          "model": "opencode/mimo-v2.5-free"
+          "model": "kilo/poolside/laguna-m.1:free"
         },
         {
           "model": "zenmux/moonshotai/kimi-k2.7-code-free"
@@ -157,7 +161,7 @@
       ]
     },
     "sisyphus-junior": {
-      "model": "opencode/deepseek-v4-flash-free",
+      "model": "opencode/north-mini-code-free",
       "variant": "medium",
       "fallback_models": [
         {
@@ -167,7 +171,7 @@
           "model": "google/gemini-3.1-pro-preview-customtools"
         },
         {
-          "model": "opencode/north-mini-code-free",
+          "model": "opencode/deepseek-v4-flash-free",
           "variant": "medium"
         },
         {
@@ -184,14 +188,14 @@
   },
   "categories": {
     "visual-engineering": {
-      "model": "zenmux/stepfun/step-3.7-flash-free",
+      "model": "opencode/gemini-3.1-pro",
       "variant": "high",
       "fallback_models": [
         {
           "model": "opencode/deepseek-v4-flash-free"
         },
         {
-          "model": "opencode/gemini-3.1-pro",
+          "model": "zenmux/stepfun/step-3.7-flash-free",
           "variant": "high"
         },
         {
@@ -204,7 +208,7 @@
       ]
     },
     "ultrabrain": {
-      "model": "google/antigravity-claude-sonnet-4-6",
+      "model": "kilo/poolside/laguna-m.1:free",
       "variant": "xhigh",
       "fallback_models": [
         {
@@ -226,11 +230,11 @@
       ]
     },
     "deep": {
-      "model": "zenmux/moonshotai/kimi-k2.7-code-free",
+      "model": "opencode/nemotron-3-ultra-free",
       "variant": "max",
       "fallback_models": [
         {
-          "model": "google/antigravity-claude-sonnet-4-6",
+          "model": "zenmux/moonshotai/kimi-k2.7-code-free",
           "variant": "medium"
         },
         {
@@ -257,13 +261,13 @@
       ]
     },
     "quick": {
-      "model": "zenmux/moonshotai/kimi-k2.7-code-free",
+      "model": "opencode/deepseek-v4-flash-free",
       "fallback_models": [
         {
           "model": "google/gemini-3.1-flash-lite"
         },
         {
-          "model": "opencode/deepseek-v4-flash-free"
+          "model": "zenmux/moonshotai/kimi-k2.7-code-free"
         },
         {
           "model": "opencode/big-pickle"
@@ -295,16 +299,16 @@
       ]
     },
     "unspecified-high": {
-      "model": "zenmux/stepfun/step-3.7-flash-free",
-      "variant": "max",
+      "model": "kilo/poolside/laguna-m.1:free",
+      "variant": "high",
       "fallback_models": [
         {
           "model": "google/antigravity-claude-sonnet-4-6",
           "variant": "max"
         },
         {
-          "model": "opencode/deepseek-v4-flash-free",
-          "variant": "high"
+          "model": "zenmux/stepfun/step-3.7-flash-free",
+          "variant": "max"
         }
       ]
     },
