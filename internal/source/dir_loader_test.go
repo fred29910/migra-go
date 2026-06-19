@@ -2,6 +2,7 @@ package source
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -330,5 +331,23 @@ func TestDirectoryLoader_Load_SkipHidden(t *testing.T) {
 	}
 	if _, ok := ns.Tables["secret"]; ok {
 		t.Error("hidden file should be skipped")
+	}
+}
+
+func TestDirectoryLoader_CancelledContext(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.sql"), []byte("CREATE TABLE a (id int);"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	l := &DirectoryLoader{}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, _, err := l.Load(ctx, dir, LoadOptions{})
+	if err == nil {
+		t.Fatal("expected error on cancelled context, got nil")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
 	}
 }

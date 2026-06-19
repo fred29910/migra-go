@@ -37,10 +37,16 @@ func (l *DirectoryLoader) Match(source string) bool {
 // This approach (方案 B) resolves cross-file DDL dependencies that would
 // fail when parsing each file in isolation.
 func (l *DirectoryLoader) Load(ctx context.Context, source string, opt LoadOptions) (*model.Schema, []error, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
 	sourcePath := stripFileScheme(source)
 
 	var files []string
 	err := filepath.WalkDir(sourcePath, func(path string, d os.DirEntry, err error) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if err != nil {
 			return err
 		}
@@ -71,6 +77,9 @@ func (l *DirectoryLoader) Load(ctx context.Context, source string, opt LoadOptio
 	// are resolved within a single parse session.
 	var combinedSQL strings.Builder
 	for _, file := range files {
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
+		}
 		data, readErr := os.ReadFile(file)
 		if readErr != nil {
 			return nil, nil, fmt.Errorf("failed to read %s: %w", file, readErr)

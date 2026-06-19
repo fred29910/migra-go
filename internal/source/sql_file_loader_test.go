@@ -2,6 +2,7 @@ package source
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -170,4 +171,23 @@ CREATE TABLE users (id SERIAL PRIMARY KEY);`
 	require.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "duplicate"),
 		"expected duplicate/already exists error, got: %v", err)
+}
+
+func TestSQLFileLoader_CancelledContext(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "s.sql")
+	if err := os.WriteFile(path, []byte("CREATE TABLE t (id int);"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	l := &SQLFileLoader{}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, _, err := l.Load(ctx, path, LoadOptions{})
+	if err == nil {
+		t.Fatal("expected error on cancelled context, got nil")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
 }
