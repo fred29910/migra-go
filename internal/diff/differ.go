@@ -10,7 +10,7 @@ import (
 
 // Engine defines the interface for schema diff computation.
 type Engine interface {
-	Diff(ctx context.Context, source, target *model.Schema) ([]Operation, []string)
+	Diff(ctx context.Context, source, target *model.Schema) ([]Operation, []string, error)
 }
 
 // Compile-time check: Differ must satisfy Engine.
@@ -25,14 +25,17 @@ func NewDiffer() *Differ {
 	return &Differ{}
 }
 
-// Diff compares two schemas and returns operations and warnings.
-func (d *Differ) Diff(ctx context.Context, source, target *model.Schema) ([]Operation, []string) {
+// Diff compares two schemas and returns operations, warnings, and error.
+func (d *Differ) Diff(ctx context.Context, source, target *model.Schema) ([]Operation, []string, error) {
 	c := newDiffContext(ctx)
 	c.diffSchemas(source, target)
-	return c.ops, c.warnings
+	if c.cancelErr != nil {
+		return c.ops, c.warnings, c.cancelErr
+	}
+	return c.ops, c.warnings, nil
 }
 
-// diffSchemas compares namespaces in two schemas
+// diffSchemas compares namespaces in two schemas.
 func (c *diffContext) diffSchemas(source, target *model.Schema) {
 	// Check all namespaces in target (sorted for deterministic output)
 	targetNames := make([]string, 0, len(target.Schemas))

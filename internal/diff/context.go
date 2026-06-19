@@ -7,9 +7,10 @@ import (
 
 // diffContext holds the local state during a single diff operation
 type diffContext struct {
-	ctx      context.Context
-	ops      []Operation
-	warnings []string
+	ctx       context.Context
+	ops       []Operation
+	warnings  []string
+	cancelErr error
 }
 
 // newDiffContext creates a new diffContext with the given background context.
@@ -21,9 +22,13 @@ func newDiffContext(ctx context.Context) *diffContext {
 	}
 }
 
-// checkCancelled checks if the context has been cancelled.
+// checkCancelled checks if the context has been cancelled and records the error.
 func (c *diffContext) checkCancelled() error {
-	return c.ctx.Err()
+	if err := c.ctx.Err(); err != nil {
+		c.cancelErr = err
+		return err
+	}
+	return nil
 }
 
 func (c *diffContext) addOp(op Operation) {

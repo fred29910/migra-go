@@ -24,7 +24,10 @@ func TestDiffer_DetectsColumnRename(t *testing.T) {
 	targetTable.AddColumn(&model.Column{Name: "email", DataType: "text", IsNullable: false})
 	targetNs.Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
+ops, warnings, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %v", warnings)
 	}
@@ -66,7 +69,10 @@ func TestDiffer_NoFalsePositiveOnTypeMismatch(t *testing.T) {
 	tt.AddColumn(&model.Column{Name: "login_name", DataType: "integer", IsNullable: true})
 	targetNs.Tables["users"] = tt
 
-	ops, _ := NewDiffer().Diff(context.Background(), source, target)
+ops, _, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	for _, op := range ops {
 		if op.Kind() == KindRenameColumn {
 			t.Fatal("should not detect rename when types differ")
@@ -88,7 +94,10 @@ func TestDiffer_RenameWithAddColumn(t *testing.T) {
 	tt.AddColumn(&model.Column{Name: "age", DataType: "integer", IsNullable: true})
 	targetNs.Tables["users"] = tt
 
-	ops, _ := NewDiffer().Diff(context.Background(), source, target)
+ops, _, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	var hasRename, hasAdd bool
 	for _, op := range ops {
 		switch op.Kind() {
@@ -120,7 +129,10 @@ func TestDiffer_RenameWithDropColumn(t *testing.T) {
 	tt.AddColumn(&model.Column{Name: "login_name", DataType: "text", IsNullable: true})
 	targetNs.Tables["users"] = tt
 
-	ops, _ := NewDiffer().Diff(context.Background(), source, target)
+ops, _, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	var hasRename, hasDrop bool
 	for _, op := range ops {
 		switch op.Kind() {
@@ -151,7 +163,10 @@ func TestDiffer_RenameNullableChangeDoesNotMatch(t *testing.T) {
 	tt.AddColumn(&model.Column{Name: "login_name", DataType: "text", IsNullable: false})
 	targetNs.Tables["users"] = tt
 
-	ops, _ := NewDiffer().Diff(context.Background(), source, target)
+ops, _, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	for _, op := range ops {
 		if op.Kind() == KindRenameColumn {
 			t.Fatal("should not detect rename when nullable differs")
@@ -176,7 +191,10 @@ func TestDiffer_RenameWithColumnReorder(t *testing.T) {
 	tt.AddColumn(&model.Column{Name: "email", DataType: "text", IsNullable: false})
 	targetNs.Tables["users"] = tt
 
-	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
+ops, warnings, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %v", warnings)
 	}
