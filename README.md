@@ -151,6 +151,7 @@ Validation passed: target schema matches expected state
 | `-f, --format` | diff | 输出格式：`sql` 或 `json` | `sql` |
 | `--unsafe-drop` | diff, push | 允许输出/执行危险的 DROP 操作 | `false` |
 | `--strict` | diff | 遇到不支持的语句时直接失败退出（默认跳过并警告） | `false` |
+| `--no-rename` | diff, push | 禁用列重命名启发式检测 | `false` |
 | `--timeout` | diff, push | Schema 加载超时时间（如 `30s`, `2m`） | `30s` |
 | `-o, --output` | diff | 输出到文件（默认输出到 stdout） | - |
 | `--dry-run` | push | 显示 SQL 预览但不执行 | `false` |
