@@ -14,7 +14,7 @@ func TestOperationInterfaceHasDependsOn(t *testing.T) {
 	ops := []Operation{
 		NewAddTableOp("public", "users", &model.Table{}),
 		NewDropTableOp("public", "users"),
-		NewAddColumnOp("public", "users", &model.Column{Name: "email"}),
+		NewAddColumnOp("public", "users", &model.Column{Name: "email", DataType: "varchar"}),
 		NewAlterColumnTypeOp("public", "users", "email", "varchar(50)", "varchar(100)"),
 		NewSetNotNullOp("public", "users", "email"),
 		NewDropNotNullOp("public", "users", "email"),

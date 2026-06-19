@@ -460,6 +460,46 @@ func TestDiffer_NoIdentityDifferenceWhenBothFalse(t *testing.T) {
 	}
 }
 
+func TestDiff_EnumBeforeTable(t *testing.T) {
+	// 源为空，目标有 enum mood + 表 users(status mood)
+	// 期望输出顺序：CREATE TYPE mood 在 CREATE TABLE users 之前
+	src := model.NewSchema()
+
+	tgt := model.NewSchema()
+	tgtNs := model.NewNamespace("public")
+	tgtNs.Types["mood"] = &model.EnumType{Name: "mood", Labels: []string{"happy", "sad"}}
+	users := model.NewTable("public", "users")
+	users.AddColumn(&model.Column{Name: "status", DataType: "mood", IsNullable: true})
+	tgtNs.Tables["users"] = users
+	tgt.Schemas["public"] = tgtNs
+
+	d := NewDiffer()
+	ops, _, err := d.Diff(context.Background(), src, tgt)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
+
+	// 找到 AddEnumType 和 AddTable 的位置
+	enumIdx, tableIdx := -1, -1
+	for i, op := range ops {
+		switch op.Kind() {
+		case KindAddEnumType:
+			enumIdx = i
+		case KindAddTable:
+			tableIdx = i
+		}
+	}
+	if enumIdx < 0 {
+		t.Fatal("expected AddEnumType op")
+	}
+	if tableIdx < 0 {
+		t.Fatal("expected AddTable op")
+	}
+	if enumIdx >= tableIdx {
+		t.Errorf("enum (idx %d) should come before table (idx %d)", enumIdx, tableIdx)
+	}
+}
+
 func TestDiffer_Diff_CancelledContext(t *testing.T) {
 	d := NewDiffer()
 	src := model.NewSchema()

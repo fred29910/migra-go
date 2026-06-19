@@ -2,6 +2,7 @@ package diff
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/fred29910/migra-go/internal/model"
 	"github.com/fred29910/migra-go/internal/util"
@@ -35,9 +36,11 @@ func (op *AddColumnOp) IsDestructive() bool {
 
 // DependsOn returns the object keys this operation depends on.
 func (op *AddColumnOp) DependsOn() []model.ObjectKey {
-	return []model.ObjectKey{
+	deps := []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
 	}
+	deps = append(deps, columnTypeDependencies(op.Schema, op.Column)...)
+	return deps
 }
 
 // RenderString renders the SQL statement for adding a column.
@@ -198,9 +201,11 @@ func (op *AlterColumnTypeOp) IsDestructive() bool {
 
 // DependsOn returns the object keys this operation depends on.
 func (op *AlterColumnTypeOp) DependsOn() []model.ObjectKey {
-	return []model.ObjectKey{
+	deps := []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
 	}
+	deps = append(deps, columnTypeDependencies(op.Schema, &model.Column{DataType: op.ToType})...)
+	return deps
 }
 
 // SetNotNullOp represents an operation to set a column to NOT NULL.
@@ -506,4 +511,26 @@ func (op *AlterColumnCollationOp) DependsOn() []model.ObjectKey {
 	return []model.ObjectKey{
 		model.NewObjectKey(op.Schema, op.Table, model.KindTable),
 	}
+}
+
+// columnTypeDependencies returns ObjectKeys for custom types referenced by a column.
+// Built-in types return nil. Schema-qualified types (auth.mood) are split into
+// schema + name. Non-qualified custom types use the given schema.
+func columnTypeDependencies(schema string, col *model.Column) []model.ObjectKey {
+	dt := col.DataType
+	if dt == "" || util.IsBuiltinType(dt) {
+		return nil
+	}
+	// Strip array suffix for dependency lookup
+	base := dt
+	if strings.HasSuffix(base, "[]") {
+		base = strings.TrimSuffix(base, "[]")
+		if util.IsBuiltinType(base) {
+			return nil
+		}
+	}
+	if idx := strings.LastIndex(base, "."); idx > 0 {
+		return []model.ObjectKey{model.NewObjectKey(base[:idx], base[idx+1:], model.KindType)}
+	}
+	return []model.ObjectKey{model.NewObjectKey(schema, base, model.KindType)}
 }

@@ -81,3 +81,45 @@ func SameStringSlice(a, b []string) bool {
 	}
 	return true
 }
+
+var builtinTypeNames = map[string]bool{
+	"int": true, "integer": true, "int4": true, "int8": true, "int2": true,
+	"bigint": true, "smallint": true,
+	"serial": true, "bigserial": true, "smallserial": true,
+	"boolean": true, "bool": true,
+	"text": true, "varchar": true, "character varying": true,
+	"char": true, "character": true,
+	"numeric": true, "decimal": true,
+	"real": true, "float4": true, "double precision": true, "float8": true,
+	"json": true, "jsonb": true,
+	"uuid": true, "inet": true, "cidr": true, "macaddr": true, "macaddr8": true,
+	"interval": true, "date": true,
+	"time": true, "timetz": true,
+	"timestamp": true, "timestamptz": true,
+	"timestamp without time zone": true, "timestamp with time zone": true,
+	"bytea": true, "money": true, "oid": true, "void": true, "name": true,
+	"bpchar": true, "int2vector": true, "oidvector": true,
+	"pg_node_tree": true, "pg_ddl_command": true, "pg_snapshot": true,
+	"tsvector": true, "tsquery": true, "gtsvector": true,
+	"xml": true, "point": true, "line": true, "lseg": true, "box": true,
+	"path": true, "polygon": true, "circle": true,
+}
+
+// IsBuiltinType reports whether dt is a PostgreSQL built-in type.
+// Handles length modifiers (varchar(N)), array suffixes (int[]),
+// and case-insensitive matching.
+func IsBuiltinType(dt string) bool {
+	dt = strings.ToLower(strings.TrimSpace(dt))
+	if dt == "" {
+		return false
+	}
+	// Strip array suffix recursively
+	if strings.HasSuffix(dt, "[]") {
+		return IsBuiltinType(strings.TrimSuffix(dt, "[]"))
+	}
+	// Strip length modifier: varchar(255) -> varchar, numeric(10,2) -> numeric
+	if idx := strings.IndexByte(dt, '('); idx > 0 {
+		dt = dt[:idx]
+	}
+	return builtinTypeNames[dt]
+}

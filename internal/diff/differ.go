@@ -86,14 +86,8 @@ func (c *diffContext) diffNamespace(source, target *model.Namespace) {
 	if target == nil {
 		return
 	}
-
-	// Compare tables
-	c.diffTables(source, target)
-
-	// Compare types (enums)
 	c.diffTypes(source, target)
-
-	// Compare P3 objects
+	c.diffTables(source, target)
 	c.diffViews(source, target)
 	c.diffSequences(source, target)
 	c.diffExtensions(source, target)
