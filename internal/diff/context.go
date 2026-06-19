@@ -11,15 +11,20 @@ type diffContext struct {
 	ops       []Operation
 	warnings  []string
 	cancelErr error
+	noRename  bool
 }
 
 // newDiffContext creates a new diffContext with the given background context.
-func newDiffContext(ctx context.Context) *diffContext {
-	return &diffContext{
+func newDiffContext(ctx context.Context, d *Differ) *diffContext {
+	c := &diffContext{
 		ctx:      ctx,
 		ops:      make([]Operation, 0, 16),
 		warnings: make([]string, 0, 4),
 	}
+	if d != nil {
+		c.noRename = d.noRename
+	}
+	return c
 }
 
 // checkCancelled checks if the context has been cancelled and records the error.

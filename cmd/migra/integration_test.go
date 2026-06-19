@@ -38,7 +38,7 @@ func TestIntegrationDiffRender(t *testing.T) {
 
 	// Run diff
 	d := diff.NewDiffer()
-	ops, _ := d.Diff(context.Background(), source, target)
+	ops, _, _ := d.Diff(context.Background(), source, target)
 
 	// Verify operations
 	if len(ops) == 0 {
@@ -133,7 +133,7 @@ func TestIntegrationEnumType(t *testing.T) {
 
 	// Run diff
 	d := diff.NewDiffer()
-	ops, _ := d.Diff(context.Background(), source, target)
+	ops, _, _ := d.Diff(context.Background(), source, target)
 
 	// Should detect no changes (enum labels order matters, but we added a new one)
 	// Actually, this should detect that the enum type changed

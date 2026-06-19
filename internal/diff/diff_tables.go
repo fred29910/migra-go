@@ -212,25 +212,32 @@ func (c *diffContext) diffTableColumns(schema string, source, target *model.Tabl
 	renamedSource := make(map[string]bool)
 	renamedTarget := make(map[string]bool)
 
-	// Build a map from column signature to target column name for O(n) lookup.
-	// Signature = dataType + isNullable + defaultExpr + collation
-	targetBySig := make(map[string]string, len(targetOnlyNames))
-	for _, tgtName := range targetOnlyNames {
-		tgtCol := target.ColumnByName[tgtName]
-		sig := columnSignature(tgtCol)
-		targetBySig[sig] = tgtName
-	}
-
-	for _, srcName := range sourceOnlyNames {
-		if err := c.checkCancelled(); err != nil {
-			return
+	// Heuristic rename detection: disabled when noRename is set.
+	if !c.noRename && len(sourceOnlyNames) > 0 && len(targetOnlyNames) > 0 {
+		// Build a map from column signature to target column name for O(n) lookup.
+		targetBySig := make(map[string]string, len(targetOnlyNames))
+		sigConflict := make(map[string]bool)
+		for _, tgtName := range targetOnlyNames {
+			tgtCol := target.ColumnByName[tgtName]
+			sig := columnSignature(tgtCol)
+			if _, found := targetBySig[sig]; found {
+				sigConflict[sig] = true
+				c.warnf("column rename ambiguous in %s.%s: signature %q matches multiple target columns, falling back to drop+add", schema, target.Name, sig)
+			}
+			targetBySig[sig] = tgtName
 		}
-		srcCol := source.ColumnByName[srcName]
-		sig := columnSignature(srcCol)
-		if tgtName, found := targetBySig[sig]; found && !renamedTarget[tgtName] {
-			c.addOp(NewRenameColumnOp(schema, target.Name, srcName, tgtName))
-			renamedSource[srcName] = true
-			renamedTarget[tgtName] = true
+
+		for _, srcName := range sourceOnlyNames {
+			if err := c.checkCancelled(); err != nil {
+				return
+			}
+			srcCol := source.ColumnByName[srcName]
+			sig := columnSignature(srcCol)
+			if tgtName, found := targetBySig[sig]; found && !sigConflict[sig] && !renamedTarget[tgtName] {
+				c.addOp(NewRenameColumnOp(schema, target.Name, srcName, tgtName))
+				renamedSource[srcName] = true
+				renamedTarget[tgtName] = true
+			}
 		}
 	}
 

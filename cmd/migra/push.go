@@ -38,10 +38,12 @@ func init() {
 	pushCmd.Flags().Bool("execute", false, "execute SQL without confirmation (not recommended)")
 	pushCmd.Flags().Bool("no-verify", false, "skip post-execution validation")
 	pushCmd.Flags().Duration("timeout", defaultDiffTimeout, "timeout for schema loading")
+	pushCmd.Flags().Bool("no-rename", false, "disable heuristic column rename detection")
 
 	_ = viper.BindPFlag("diff.schemas", pushCmd.Flags().Lookup("schema"))
 	_ = viper.BindPFlag("diff.unsafe_drop", pushCmd.Flags().Lookup("unsafe-drop"))
 	_ = viper.BindPFlag("diff.timeout", pushCmd.Flags().Lookup("timeout"))
+	_ = viper.BindPFlag("diff.no_rename", pushCmd.Flags().Lookup("no-rename"))
 }
 
 type pushConfig struct {
@@ -53,6 +55,7 @@ type pushConfig struct {
 	Execute    bool
 	NoVerify   bool
 	Timeout    time.Duration
+	NoRename   bool
 }
 
 func parsePushConfig(cmd *cobra.Command, args []string) (pushConfig, error) {
@@ -80,6 +83,10 @@ func parsePushConfig(cmd *cobra.Command, args []string) (pushConfig, error) {
 	if err != nil {
 		return pushConfig{}, fmt.Errorf("failed to get timeout flag: %w", err)
 	}
+	noRename, err := cmd.Flags().GetBool("no-rename")
+	if err != nil {
+		return pushConfig{}, fmt.Errorf("failed to get no-rename flag: %w", err)
+	}
 
 	return pushConfig{
 		Source:     args[0],
@@ -90,6 +97,7 @@ func parsePushConfig(cmd *cobra.Command, args []string) (pushConfig, error) {
 		Execute:    execute,
 		NoVerify:   noVerify,
 		Timeout:    timeout,
+		NoRename:   noRename,
 	}, nil
 }
 
@@ -127,6 +135,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 		Format:     "sql",
 		UnsafeDrop: cfg.UnsafeDrop,
 		Timeout:    cfg.Timeout,
+		NoRename:   cfg.NoRename,
 	}
 	ops, _, err := app.ComputeDiff(cmd.Context(), targetSchema, sourceSchema, appCfg)
 	if err != nil {

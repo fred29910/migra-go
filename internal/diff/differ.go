@@ -18,16 +18,30 @@ var _ Engine = (*Differ)(nil)
 
 // Differ performs diff between two schemas.
 // Note: Differ is not safe for concurrent use.
-type Differ struct{}
+type Differ struct {
+	noRename bool
+}
 
-// NewDiffer creates a new Differ.
-func NewDiffer() *Differ {
-	return &Differ{}
+// DifferOption configures a Differ.
+type DifferOption func(*Differ)
+
+// WithNoRename disables heuristic column rename detection.
+func WithNoRename(v bool) DifferOption {
+	return func(d *Differ) { d.noRename = v }
+}
+
+// NewDiffer creates a new Differ with optional configuration.
+func NewDiffer(opts ...DifferOption) *Differ {
+	d := &Differ{}
+	for _, opt := range opts {
+		opt(d)
+	}
+	return d
 }
 
 // Diff compares two schemas and returns operations, warnings, and error.
 func (d *Differ) Diff(ctx context.Context, source, target *model.Schema) ([]Operation, []string, error) {
-	c := newDiffContext(ctx)
+	c := newDiffContext(ctx, d)
 	c.diffSchemas(source, target)
 	if c.cancelErr != nil {
 		return c.ops, c.warnings, c.cancelErr
