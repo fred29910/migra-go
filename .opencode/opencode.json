@@ -6,7 +6,7 @@
   ],
   "lsp": true,
   "instructions": [
-    "AGENTS.md",
+    ".opencode/AGENTS.md",
     ".opencode/CONVENTIONS.md"
   ]
 }
