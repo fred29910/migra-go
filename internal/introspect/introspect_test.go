@@ -31,10 +31,10 @@ func newMock(t *testing.T) (*mockQuerier, pgxmock.PgxConnIface) {
 
 func emptyTableRows() *pgxmock.Rows {
 	return pgxmock.NewRows([]string{
-		"table_name", "column_name", "data_type", "character_maximum_length",
-		"is_nullable", "column_default", "ordinal_position",
-		"is_identity", "identity_generation", "collation_name",
-	})
+		"table_name", "column_name", "data_type",
+		"is_not_null", "column_default", "ordinal_position",
+		"is_identity", "collation_name",
+})
 }
 
 func emptyConstraintRows() *pgxmock.Rows {
@@ -159,9 +159,9 @@ func TestLoadTables_SingleTable(t *testing.T) {
 	q, mock := newMock(t)
 
 	rows := emptyTableRows().
-		AddRow("users", "id", "bigint", nil, "NO", "nextval('users_id_seq'::regclass)", 1, "NO", nil, "").
-		AddRow("users", "name", "varchar", int64(255), "YES", nil, 2, "NO", nil, "").
-		AddRow("users", "email", "text", nil, "NO", nil, 3, "NO", nil, "en_US")
+		AddRow("users", "id", "bigint", true, "nextval('users_id_seq'::regclass)", 1, "", "").
+		AddRow("users", "name", "character varying(255)", false, nil, 2, "", "").
+		AddRow("users", "email", "text", true, nil, 3, "", "en_US")
 	mock.ExpectQuery("SELECT").WithArgs(pgxmock.AnyArg()).WillReturnRows(rows)
 
 	ns := model.NewNamespace("public")
@@ -186,8 +186,8 @@ func TestLoadTables_SingleTable(t *testing.T) {
 	}
 
 	nameCol := table.Columns[1]
-	if nameCol.DataType != "varchar(255)" {
-		t.Errorf("name column type: got %q, want 'varchar(255)'", nameCol.DataType)
+	if nameCol.DataType != "character varying(255)" {
+		t.Errorf("name column type: got %q, want 'character varying(255)'", nameCol.DataType)
 	}
 	if !nameCol.IsNullable {
 		t.Error("name column should be nullable")
@@ -202,8 +202,10 @@ func TestLoadTables_SingleTable(t *testing.T) {
 func TestLoadTables_IdentityColumn(t *testing.T) {
 	q, mock := newMock(t)
 
+	// attidentity: 'a' = ALWAYS, 'd' = BY DEFAULT, '' = 非 identity
 	rows := emptyTableRows().
-		AddRow("items", "id", "integer", nil, "NO", nil, 1, "YES", "ALWAYS", "")
+		AddRow("t", "id", "integer", true, nil, 1, "a", "").
+		AddRow("t", "seq", "integer", true, nil, 2, "d", "")
 	mock.ExpectQuery("SELECT").WithArgs(pgxmock.AnyArg()).WillReturnRows(rows)
 
 	ns := model.NewNamespace("public")
@@ -211,12 +213,12 @@ func TestLoadTables_IdentityColumn(t *testing.T) {
 		t.Fatalf("loadTables: %v", err)
 	}
 
-	col := ns.Tables["items"].Columns[0]
-	if !col.IsIdentity {
-		t.Error("expected IsIdentity=true")
+	cols := ns.Tables["t"].Columns
+	if !cols[0].IsIdentity || cols[0].IdentityKind != "ALWAYS" {
+		t.Errorf("id identity: IsIdentity=%v, Kind=%q", cols[0].IsIdentity, cols[0].IdentityKind)
 	}
-	if col.IdentityKind != "ALWAYS" {
-		t.Errorf("expected IdentityKind='ALWAYS', got %q", col.IdentityKind)
+	if !cols[1].IsIdentity || cols[1].IdentityKind != "BY DEFAULT" {
+		t.Errorf("seq identity: IsIdentity=%v, Kind=%q", cols[1].IsIdentity, cols[1].IdentityKind)
 	}
 }
 
@@ -919,8 +921,8 @@ func TestLoadFromQuerier_FullPipeline(t *testing.T) {
 	q, mock := newMock(t)
 
 	mock.ExpectQuery("SELECT").WithArgs(pgxmock.AnyArg()).WillReturnRows(emptyTableRows().
-		AddRow("posts", "id", "bigint", nil, "NO", "nextval('posts_id_seq'::regclass)", 1, "NO", nil, "").
-		AddRow("posts", "title", "text", nil, "NO", nil, 2, "NO", nil, ""))
+		AddRow("posts", "id", "bigint", true, "nextval('posts_id_seq'::regclass)", 1, "", "").
+		AddRow("posts", "title", "text", true, nil, 2, "", ""))
 	mock.ExpectQuery("SELECT").WithArgs(pgxmock.AnyArg()).WillReturnRows(emptyConstraintRows().
 		AddRow("posts_pkey", "p", "posts", []string{"id"}, "PRIMARY KEY (id)"))
 	mock.ExpectQuery("SELECT").WithArgs(pgxmock.AnyArg()).WillReturnRows(emptyFKRows())
@@ -987,5 +989,32 @@ func TestLoadFromQuerier_FullPipeline(t *testing.T) {
 	}
 	if seq.DataType != "bigint" {
 		t.Errorf("expected bigint sequence, got %q", seq.DataType)
+	}
+}
+
+func TestLoadTables_EnumAndArrayColumns(t *testing.T) {
+	q, mock := newMock(t)
+
+	// format_type 对 enum 返回类型名，对数组返回 "int[]"，对 domain 返回域名
+	rows := emptyTableRows().
+		AddRow("t", "status", "mood", false, nil, 1, "", "").
+		AddRow("t", "tags", "text[]", false, nil, 2, "", "").
+		AddRow("t", "score", "posint", false, nil, 3, "", "")
+	mock.ExpectQuery("SELECT").WithArgs(pgxmock.AnyArg()).WillReturnRows(rows)
+
+	ns := model.NewNamespace("public")
+	if err := loadTables(context.Background(), q, "public", ns); err != nil {
+		t.Fatalf("loadTables: %v", err)
+	}
+
+	table := ns.Tables["t"]
+	if table.Columns[0].DataType != "mood" {
+		t.Errorf("enum column: got %q, want mood", table.Columns[0].DataType)
+	}
+	if table.Columns[1].DataType != "text[]" {
+		t.Errorf("array column: got %q, want text[]", table.Columns[1].DataType)
+	}
+	if table.Columns[2].DataType != "posint" {
+		t.Errorf("domain column: got %q, want posint", table.Columns[2].DataType)
 	}
 }

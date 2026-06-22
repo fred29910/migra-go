@@ -48,6 +48,7 @@ func init() {
 	diffCmd.Flags().Bool("strict", false, "fail on unsupported statements")
 	diffCmd.Flags().StringP("output", "o", "", "output file (default: stdout)")
 	diffCmd.Flags().Duration("timeout", defaultDiffTimeout, "timeout for schema loading (e.g. 30s, 2m)")
+	diffCmd.Flags().Bool("no-rename", false, "disable heuristic column rename detection")
 
 	_ = viper.BindPFlag("diff.schemas", diffCmd.Flags().Lookup("schema"))
 	_ = viper.BindPFlag("diff.format", diffCmd.Flags().Lookup("format"))
@@ -55,6 +56,7 @@ func init() {
 	_ = viper.BindPFlag("diff.strict", diffCmd.Flags().Lookup("strict"))
 	_ = viper.BindPFlag("output.file", diffCmd.Flags().Lookup("output"))
 	_ = viper.BindPFlag("diff.timeout", diffCmd.Flags().Lookup("timeout"))
+	_ = viper.BindPFlag("diff.no_rename", diffCmd.Flags().Lookup("no-rename"))
 }
 
 func runDiff(cmd *cobra.Command, args []string) error {

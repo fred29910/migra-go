@@ -75,6 +75,10 @@ func parseDiffConfig(cmd *cobra.Command, args []string) (app.DiffConfig, error) 
 			timeout = cfgTimeout
 		}
 	}
+	noRename, err := cmd.Flags().GetBool("no-rename")
+	if err != nil {
+		return app.DiffConfig{}, fmt.Errorf("failed to get no-rename flag: %w", err)
+	}
 
 	return app.DiffConfig{
 		Source:     source,
@@ -85,6 +89,7 @@ func parseDiffConfig(cmd *cobra.Command, args []string) (app.DiffConfig, error) 
 		UnsafeDrop: unsafeDrop,
 		Strict:     strict,
 		Timeout:    timeout,
+		NoRename:   noRename,
 	}, nil
 }
 

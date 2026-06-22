@@ -6,7 +6,7 @@ import (
 )
 
 func TestDiffContext_AddOp(t *testing.T) {
-	ctx := newDiffContext(context.Background())
+	ctx := newDiffContext(context.Background(), nil)
 
 	if len(ctx.ops) != 0 {
 		t.Fatalf("expected 0 ops initially, got %d", len(ctx.ops))
@@ -25,7 +25,7 @@ func TestDiffContext_AddOp(t *testing.T) {
 }
 
 func TestDiffContext_AddOp_Multiple(t *testing.T) {
-	ctx := newDiffContext(context.Background())
+	ctx := newDiffContext(context.Background(), nil)
 
 	ctx.addOp(NewCreateSchemaOp("s1"))
 	ctx.addOp(NewDropSchemaOp("s2"))
@@ -44,7 +44,7 @@ func TestDiffContext_AddOp_Multiple(t *testing.T) {
 }
 
 func TestDiffContext_Warnf(t *testing.T) {
-	ctx := newDiffContext(context.Background())
+	ctx := newDiffContext(context.Background(), nil)
 
 	if len(ctx.warnings) != 0 {
 		t.Fatalf("expected 0 warnings initially, got %d", len(ctx.warnings))
@@ -62,7 +62,7 @@ func TestDiffContext_Warnf(t *testing.T) {
 }
 
 func TestDiffContext_Warnf_Multiple(t *testing.T) {
-	ctx := newDiffContext(context.Background())
+	ctx := newDiffContext(context.Background(), nil)
 
 	ctx.warnf("warning 1")
 	ctx.warnf("warning 2: %d", 42)
@@ -81,7 +81,7 @@ func TestDiffContext_Warnf_Multiple(t *testing.T) {
 }
 
 func TestDiffContext_OpsAndWarningsIndependent(t *testing.T) {
-	ctx := newDiffContext(context.Background())
+	ctx := newDiffContext(context.Background(), nil)
 
 	ctx.addOp(NewCreateSchemaOp("s1"))
 	ctx.warnf("warn 1")

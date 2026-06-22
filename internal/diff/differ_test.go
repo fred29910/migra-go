@@ -2,6 +2,7 @@ package diff
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/fred29910/migra-go/internal/model"
@@ -15,7 +16,10 @@ func TestDiffer_DiffNoSharedState(t *testing.T) {
 	tgt := model.NewSchema()
 	tgt.GetOrCreateNamespace("public")
 	for i := 0; i < 20; i++ {
-		ops, _ := d.Diff(context.Background(), src, tgt)
+	ops, _, err := d.Diff(context.Background(), src, tgt)
+		if err != nil {
+			t.Fatalf("Diff: %v", err)
+		}
 		if len(ops) != 1 || ops[0].Kind() != KindCreateSchema {
 			t.Fatalf("expected 1 CreateSchemaOp, got %d ops: %#v", len(ops), ops)
 		}
@@ -39,7 +43,10 @@ func TestDiffer_EnumLabelAppendDefaultChangeAndDropColumn(t *testing.T) {
 	targetTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: false, DefaultExpr: &defaultExpr})
 	targetNs.Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
+	ops, warnings, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %#v", warnings)
 	}
@@ -81,7 +88,10 @@ func TestDiffer_DetectsSameNameConstraintContentChange(t *testing.T) {
 	}
 	targetNs.Tables["comments"] = targetTable
 
-	ops, _ := NewDiffer().Diff(context.Background(), source, target)
+	ops, _, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	var hasDrop, hasAdd bool
 	for _, op := range ops {
 		switch op.Kind() {
@@ -109,7 +119,10 @@ func TestDiffer_DetectsColumnCollationChange(t *testing.T) {
 	targetTable.AddColumn(&model.Column{Name: "name", DataType: "text", IsNullable: true, Collation: "en_US.UTF-8"})
 	targetNs.Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
+	ops, warnings, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %#v", warnings)
 	}
@@ -148,7 +161,10 @@ func TestDiffer_DetectsColumnCollationRemoval(t *testing.T) {
 	targetTable.AddColumn(&model.Column{Name: "name", DataType: "text", IsNullable: true, Collation: ""})
 	targetNs.Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
+	ops, warnings, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %#v", warnings)
 	}
@@ -184,7 +200,10 @@ func TestDiffer_NoCollationDifferenceWhenSame(t *testing.T) {
 	targetTable.AddColumn(&model.Column{Name: "name", DataType: "text", IsNullable: true, Collation: "en_US.UTF-8"})
 	targetNs.Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
+	ops, warnings, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %#v", warnings)
 	}
@@ -202,7 +221,10 @@ func TestDiffer_DropSchema(t *testing.T) {
 	target := model.NewSchema()
 	target.GetOrCreateNamespace("public")
 
-	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
+	ops, warnings, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	require.Empty(t, warnings)
 
 	found := false
@@ -230,7 +252,10 @@ func TestDiffer_CreateSchemaOp(t *testing.T) {
 	authNs := target.GetOrCreateNamespace("auth")
 	authNs.Tables["roles"] = model.NewTable("auth", "roles")
 
-	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
+	ops, warnings, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 
 	for _, w := range warnings {
 		t.Logf("warning: %s", w)
@@ -287,7 +312,10 @@ func TestDiffer_DetectsIdentityKindChange(t *testing.T) {
 	targetTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: true, IsIdentity: true, IdentityKind: "BY DEFAULT"})
 	targetNs.Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
+	ops, warnings, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %#v", warnings)
 	}
@@ -326,7 +354,10 @@ func TestDiffer_DetectsIdentityDrop(t *testing.T) {
 	targetTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: true, IsIdentity: false})
 	targetNs.Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
+	ops, warnings, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %#v", warnings)
 	}
@@ -362,7 +393,10 @@ func TestDiffer_NoIdentityDifferenceWhenSame(t *testing.T) {
 	targetTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: true, IsIdentity: true, IdentityKind: "ALWAYS"})
 	targetNs.Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
+	ops, warnings, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %#v", warnings)
 	}
@@ -388,7 +422,10 @@ func TestDiffer_IdentityAddUsesAddIdentityOp(t *testing.T) {
 	})
 	target.GetOrCreateNamespace("public").Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
+	ops, warnings, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	require.Empty(t, warnings)
 	require.Len(t, ops, 1)
 	_, ok := ops[0].(*AddIdentityOp)
@@ -408,7 +445,10 @@ func TestDiffer_NoIdentityDifferenceWhenBothFalse(t *testing.T) {
 	targetTable.AddColumn(&model.Column{Name: "id", DataType: "integer", IsNullable: true, IsIdentity: false})
 	targetNs.Tables["users"] = targetTable
 
-	ops, warnings := NewDiffer().Diff(context.Background(), source, target)
+	ops, warnings, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	if len(warnings) != 0 {
 		t.Fatalf("unexpected warnings: %#v", warnings)
 	}
@@ -418,4 +458,67 @@ func TestDiffer_NoIdentityDifferenceWhenBothFalse(t *testing.T) {
 			t.Fatal("expected NO identity ops when identity is false in both")
 		}
 	}
+}
+
+func TestDiff_EnumBeforeTable(t *testing.T) {
+	// 源为空，目标有 enum mood + 表 users(status mood)
+	// 期望输出顺序：CREATE TYPE mood 在 CREATE TABLE users 之前
+	src := model.NewSchema()
+
+	tgt := model.NewSchema()
+	tgtNs := model.NewNamespace("public")
+	tgtNs.Types["mood"] = &model.EnumType{Name: "mood", Labels: []string{"happy", "sad"}}
+	users := model.NewTable("public", "users")
+	users.AddColumn(&model.Column{Name: "status", DataType: "mood", IsNullable: true})
+	tgtNs.Tables["users"] = users
+	tgt.Schemas["public"] = tgtNs
+
+	d := NewDiffer()
+	ops, _, err := d.Diff(context.Background(), src, tgt)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
+
+	// 找到 AddEnumType 和 AddTable 的位置
+	enumIdx, tableIdx := -1, -1
+	for i, op := range ops {
+		switch op.Kind() {
+		case KindAddEnumType:
+			enumIdx = i
+		case KindAddTable:
+			tableIdx = i
+		}
+	}
+	if enumIdx < 0 {
+		t.Fatal("expected AddEnumType op")
+	}
+	if tableIdx < 0 {
+		t.Fatal("expected AddTable op")
+	}
+	if enumIdx >= tableIdx {
+		t.Errorf("enum (idx %d) should come before table (idx %d)", enumIdx, tableIdx)
+	}
+}
+
+func TestDiffer_Diff_CancelledContext(t *testing.T) {
+	d := NewDiffer()
+	src := model.NewSchema()
+	tgt := model.NewSchema()
+	tgtNs := model.NewNamespace("public")
+	tgtNs.Tables["users"] = model.NewTable("public", "users")
+	tgtNs.Tables["users"].AddColumn(&model.Column{Name: "id", DataType: "integer"})
+	tgt.Schemas["public"] = tgtNs
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // 立即取消
+
+	ops, warns, err := d.Diff(ctx, src, tgt)
+	if err == nil {
+		t.Fatal("expected error on cancelled context, got nil")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+	_ = ops
+	_ = warns
 }

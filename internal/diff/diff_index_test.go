@@ -34,8 +34,11 @@ func TestDiffIndex_ContentChange(t *testing.T) {
 	}
 	ns2.Tables["users"] = targetTable
 
-	d := NewDiffer()
-	ops, _ := d.Diff(context.Background(), sourceSchema, targetSchema)
+d := NewDiffer()
+	ops, _, err := d.Diff(context.Background(), sourceSchema, targetSchema)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 
 	// Should detect change and generate DROP + CREATE
 	foundDrop := false
@@ -85,8 +88,11 @@ func TestDiffIndex_SameContent(t *testing.T) {
 	}
 	ns2.Tables["users"] = targetTable
 
-	d := NewDiffer()
-	ops, _ := d.Diff(context.Background(), sourceSchema, targetSchema)
+d := NewDiffer()
+	ops, _, err := d.Diff(context.Background(), sourceSchema, targetSchema)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 
 	// Should NOT generate any index operations
 	for _, op := range ops {
@@ -122,8 +128,11 @@ func TestDiffIndex_ExpressionChange(t *testing.T) {
 	}
 	ns2.Tables["users"] = targetTable
 
-	d := NewDiffer()
-	ops, _ := d.Diff(context.Background(), sourceSchema, targetSchema)
+d := NewDiffer()
+	ops, _, err := d.Diff(context.Background(), sourceSchema, targetSchema)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 
 	// Should detect change
 	foundDrop := false
@@ -162,7 +171,10 @@ func TestDiffIndex_CollationChange(t *testing.T) {
 	}
 	target.GetOrCreateNamespace("public").Tables["users"] = targetTable
 
-	ops, _ := NewDiffer().Diff(context.Background(), source, target)
+ops, _, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	var foundDrop, foundCreate bool
 	for _, op := range ops {
 		if _, ok := op.(*DropIndexOp); ok {

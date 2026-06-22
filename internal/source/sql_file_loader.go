@@ -26,6 +26,9 @@ func (l *SQLFileLoader) Match(source string) bool {
 // Load loads schema from a SQL file.
 // Returns the loaded schema, any parsing errors, and any fatal error.
 func (l *SQLFileLoader) Load(ctx context.Context, source string, opt LoadOptions) (*model.Schema, []error, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
 	// Remove file:// prefix if present (case-insensitive)
 	path := source
 	if strings.HasPrefix(strings.ToLower(source), "file://") {

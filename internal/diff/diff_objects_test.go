@@ -14,7 +14,10 @@ func TestDiffMaterializedView_AddDropReplaceChangeType(t *testing.T) {
 		tgtNS := target.GetOrCreateNamespace("public")
 		tgtNS.Views["mv_summary"] = &model.View{Name: "mv_summary", Definition: "SELECT count(*) FROM users", Materialized: true}
 
-		ops, _ := NewDiffer().Diff(context.Background(), source, target)
+ops, _, err := NewDiffer().Diff(context.Background(), source, target)
+		if err != nil {
+			t.Fatalf("Diff: %v", err)
+		}
 		// Filter to only materialized view ops (there may also be a CreateSchemaOp)
 		var mvOps []Operation
 		for _, op := range ops {
@@ -34,7 +37,10 @@ func TestDiffMaterializedView_AddDropReplaceChangeType(t *testing.T) {
 		target := model.NewSchema()
 		target.GetOrCreateNamespace("public") // ensure target has the namespace
 
-		ops, _ := NewDiffer().Diff(context.Background(), source, target)
+ops, _, err := NewDiffer().Diff(context.Background(), source, target)
+		if err != nil {
+			t.Fatalf("Diff: %v", err)
+		}
 		var mvOps []Operation
 		for _, op := range ops {
 			if op.Kind() == KindDropMaterializedView {
@@ -57,7 +63,10 @@ func TestDiffMaterializedView_AddDropReplaceChangeType(t *testing.T) {
 		tgtNS.Views["v_users"] = &model.View{Name: "v_users", Definition: "SELECT id FROM users", Materialized: false}
 		tgtNS.Views["mv_users"] = &model.View{Name: "mv_users", Definition: "SELECT id FROM users", Materialized: true}
 
-		ops, _ := NewDiffer().Diff(context.Background(), source, target)
+ops, _, err := NewDiffer().Diff(context.Background(), source, target)
+		if err != nil {
+			t.Fatalf("Diff: %v", err)
+		}
 		if len(ops) != 0 {
 			t.Fatalf("expected 0 ops (identical), got %d: %#v", len(ops), ops)
 		}
@@ -72,7 +81,10 @@ func TestDiffMaterializedView_AddDropReplaceChangeType(t *testing.T) {
 		tgtNS := target.GetOrCreateNamespace("public")
 		tgtNS.Views["myview"] = &model.View{Name: "myview", Definition: "SELECT 1", Materialized: true}
 
-		ops, _ := NewDiffer().Diff(context.Background(), source, target)
+ops, _, err := NewDiffer().Diff(context.Background(), source, target)
+		if err != nil {
+			t.Fatalf("Diff: %v", err)
+		}
 		// Should drop old view + create new materialized view
 		if len(ops) != 2 {
 			t.Fatalf("expected 2 ops, got %d: %#v", len(ops), ops)
@@ -100,7 +112,10 @@ func TestDiffP3Objects_AddChangeDrop(t *testing.T) {
 	tgtNS.Sequences["invoice_id_seq"] = &model.Sequence{Name: "invoice_id_seq", DataType: "bigint", StartValue: 100}
 	tgtNS.Extensions["pgcrypto"] = &model.Extension{Name: "pgcrypto", Version: "1.3"}
 
-	ops, _ := NewDiffer().Diff(context.Background(), source, target)
+ops, _, err := NewDiffer().Diff(context.Background(), source, target)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 	kinds := map[Kind]bool{}
 	for _, op := range ops {
 		kinds[op.Kind()] = true

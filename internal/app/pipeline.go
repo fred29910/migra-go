@@ -127,8 +127,11 @@ func ComputeDiff(ctx context.Context, source, target *model.Schema, cfg DiffConf
 
 	filterWarnings := FilterNamespaces(sourceClone, targetClone, cfg.Schemas)
 
-	differ := diff.NewDiffer()
-	operations, warnings := differ.Diff(ctx, sourceClone, targetClone)
+	differ := diff.NewDiffer(diff.WithNoRename(cfg.NoRename))
+	operations, warnings, err := differ.Diff(ctx, sourceClone, targetClone)
+	if err != nil {
+		return nil, warnings, fmt.Errorf("diff interrupted: %w", err)
+	}
 	warnings = append(warnings, filterWarnings...)
 
 	filteredOps, filterWarnings2 := FilterDestructiveOps(operations, cfg.UnsafeDrop)

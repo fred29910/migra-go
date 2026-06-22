@@ -20,6 +20,7 @@ type DiffConfig struct {
 	UnsafeDrop bool
 	Strict     bool
 	Timeout    time.Duration
+	NoRename   bool
 }
 
 // PushConfig holds configuration for a push operation.

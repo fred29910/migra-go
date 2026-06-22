@@ -59,7 +59,10 @@ func TestDiffTableConstraints_NoFalseChangeForPK(t *testing.T) {
 	}
 	targetNs.Tables["posts"] = targetTable
 
-	ops, _ := differ.Diff(context.Background(), sourceSchema, targetSchema)
+ops, _, err := differ.Diff(context.Background(), sourceSchema, targetSchema)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
 
 	// Should have no operations since constraints are identical
 	for _, op := range ops {

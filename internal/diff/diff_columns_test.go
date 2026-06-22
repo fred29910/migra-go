@@ -8,7 +8,7 @@ import (
 )
 
 func TestDiffColumn_SetDefault(t *testing.T) {
-	ctx := newDiffContext(context.Background())
+	ctx := newDiffContext(context.Background(), nil)
 	src := &model.Column{Name: "created_at", DataType: "timestamp", IsNullable: true}
 	tgt := &model.Column{Name: "created_at", DataType: "timestamp", IsNullable: true, DefaultExpr: strPtr("now()")}
 
@@ -27,7 +27,7 @@ func TestDiffColumn_SetDefault(t *testing.T) {
 }
 
 func TestDiffColumn_DropDefault(t *testing.T) {
-	ctx := newDiffContext(context.Background())
+	ctx := newDiffContext(context.Background(), nil)
 	defaultExpr := "now()"
 	src := &model.Column{Name: "created_at", DataType: "timestamp", IsNullable: true, DefaultExpr: &defaultExpr}
 	tgt := &model.Column{Name: "created_at", DataType: "timestamp", IsNullable: true, DefaultExpr: nil}
@@ -43,7 +43,7 @@ func TestDiffColumn_DropDefault(t *testing.T) {
 }
 
 func TestDiffColumn_NoChange(t *testing.T) {
-	ctx := newDiffContext(context.Background())
+	ctx := newDiffContext(context.Background(), nil)
 	src := &model.Column{Name: "id", DataType: "integer", IsNullable: false}
 	tgt := &model.Column{Name: "id", DataType: "integer", IsNullable: false}
 
@@ -55,7 +55,7 @@ func TestDiffColumn_NoChange(t *testing.T) {
 }
 
 func TestDiffColumn_TypeChange(t *testing.T) {
-	ctx := newDiffContext(context.Background())
+	ctx := newDiffContext(context.Background(), nil)
 	src := &model.Column{Name: "age", DataType: "integer", IsNullable: true}
 	tgt := &model.Column{Name: "age", DataType: "bigint", IsNullable: true}
 
@@ -70,7 +70,7 @@ func TestDiffColumn_TypeChange(t *testing.T) {
 }
 
 func TestDiffColumn_NullableChange(t *testing.T) {
-	ctx := newDiffContext(context.Background())
+	ctx := newDiffContext(context.Background(), nil)
 	src := &model.Column{Name: "email", DataType: "text", IsNullable: true}
 	tgt := &model.Column{Name: "email", DataType: "text", IsNullable: false}
 
@@ -85,7 +85,7 @@ func TestDiffColumn_NullableChange(t *testing.T) {
 }
 
 func TestDiffColumn_CollationChange(t *testing.T) {
-	ctx := newDiffContext(context.Background())
+	ctx := newDiffContext(context.Background(), nil)
 	src := &model.Column{Name: "name", DataType: "text", IsNullable: true, Collation: "en_US"}
 	tgt := &model.Column{Name: "name", DataType: "text", IsNullable: true, Collation: "fr_FR"}
 

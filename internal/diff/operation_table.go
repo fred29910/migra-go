@@ -90,13 +90,16 @@ func (op *AddTableOp) IsDestructive() bool {
 	return false
 }
 
-// DependsOn returns dependencies for add table operations (foreign key references)
+// DependsOn returns dependencies for add table operations (foreign key references and column types)
 func (op *AddTableOp) DependsOn() []model.ObjectKey {
 	var deps []model.ObjectKey
 	for _, constraint := range op.Table.Constraints {
 		if constraint.Type == "foreign_key" && constraint.RefTable != "" {
 			deps = append(deps, model.NewObjectKey(constraint.RefSchema, constraint.RefTable, model.KindTable))
 		}
+	}
+	for _, col := range op.Table.Columns {
+		deps = append(deps, columnTypeDependencies(op.Table.Schema, col)...)
 	}
 	return deps
 }
